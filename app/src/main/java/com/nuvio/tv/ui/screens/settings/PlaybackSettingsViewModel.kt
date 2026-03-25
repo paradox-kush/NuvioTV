@@ -72,6 +72,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setDecoderPriority(priority)
     }
 
+    suspend fun setDownmixEnabled(enabled: Boolean) {
+        playerSettingsDataStore.setDownmixEnabled(enabled)
+    }
+
     suspend fun setAudioOutputChannels(channels: AudioOutputChannels) {
         playerSettingsDataStore.setAudioOutputChannels(channels)
     }

@@ -20,11 +20,14 @@ internal const val CENTER_MIX_LEVEL_MAX_DB = 30
 
 internal fun PlayerRuntimeController.applyAudioAmplification(db: Int) {
     val clampedDb = db.coerceIn(AUDIO_AMPLIFICATION_MIN_DB, AUDIO_AMPLIFICATION_MAX_DB)
-    gainAudioProcessor.setGainDb(clampedDb)
+    val isAudioPathActive = ffmpegAudioRenderer?.isAudioPathActive() == true
+    gainAudioProcessor.setGainDb(
+        if (isAudioPathActive) clampedDb else AUDIO_AMPLIFICATION_MIN_DB
+    )
     _uiState.update {
         it.copy(
             audioAmplificationDb = clampedDb,
-            isAudioAmplificationAvailable = true
+            isAudioAmplificationAvailable = isAudioPathActive
         )
     }
 }
@@ -37,15 +40,24 @@ internal fun PlayerRuntimeController.applyCenterMixLevel(db: Int) {
     }
 }
 
-internal fun PlayerRuntimeController.updateCenterMixAvailability(
+internal fun PlayerRuntimeController.updateAudioControlAvailability(
     audioTracks: List<TrackInfo> = _uiState.value.audioTracks,
     selectedAudioIndex: Int = _uiState.value.selectedAudioTrackIndex
 ) {
     val selectedTrack = audioTracks.getOrNull(selectedAudioIndex)
-    val isAvailable =
+    val isAudioAmplificationAvailable = ffmpegAudioRenderer?.isAudioPathActive() == true
+    val isCenterMixAvailable =
         ffmpegAudioRenderer?.isCenterMixActive() == true && (selectedTrack?.channelCount ?: 0) > 2
+    val clampedDb = _uiState.value.audioAmplificationDb
+        .coerceIn(AUDIO_AMPLIFICATION_MIN_DB, AUDIO_AMPLIFICATION_MAX_DB)
+    gainAudioProcessor.setGainDb(
+        if (isAudioAmplificationAvailable) clampedDb else AUDIO_AMPLIFICATION_MIN_DB
+    )
     _uiState.update { state ->
-        state.copy(isCenterMixAvailable = isAvailable)
+        state.copy(
+            isAudioAmplificationAvailable = isAudioAmplificationAvailable,
+            isCenterMixAvailable = isCenterMixAvailable
+        )
     }
 }
 

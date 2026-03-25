@@ -294,7 +294,7 @@ dependencies {
         "libs/lib-decoder-iamf-release.aar",
         "libs/lib-decoder-mpegh-release.aar"
     ))
-    implementation(project(":kodi-decoder-ffmpeg"))
+    implementation(project(":ffmpeg-decoder-downmix"))
 
     // libass-android for ASS/SSA subtitle support (from Maven Central)
     implementation("io.github.peerless2012:ass-media:0.4.0-beta01")

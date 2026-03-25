@@ -245,6 +245,9 @@ fun PlaybackSettingsContent(
                 },
                 onSetTrailerEnabled = { enabled -> coroutineScope.launch { viewModel.setTrailerEnabled(enabled) } },
                 onSetTrailerDelaySeconds = { seconds -> coroutineScope.launch { viewModel.setTrailerDelaySeconds(seconds) } },
+                onSetDownmixEnabled = { enabled ->
+                    coroutineScope.launch { viewModel.setDownmixEnabled(enabled) }
+                },
                 onSetMaintainOriginalAudioOnDownmix = { enabled ->
                     coroutineScope.launch { viewModel.setMaintainOriginalAudioOnDownmix(enabled) }
                 },

@@ -175,19 +175,18 @@ internal fun PlayerRuntimeController.initializePlayer(url: String, headers: Map<
                 context = context,
                 subtitleDelayUsProvider = subtitleDelayUs::get,
                 gainAudioProcessor = gainAudioProcessor,
+                downmixEnabled = playerSettings.downmixEnabled,
                 audioOutputChannels = playerSettings.audioOutputChannels,
                 downmixNormalizationEnabled = !playerSettings.maintainOriginalAudioOnDownmix,
                 onFfmpegAudioRendererChanged = { renderer ->
                     ffmpegAudioRenderer = renderer
-                    renderer?.setAudioOutputChannels(
-                        playerSettings.audioOutputChannels.ffmpegLayoutName,
-                        playerSettings.audioOutputChannels.channelCount
-                    )
-                    renderer?.setDownmixNormalizationEnabled(
-                        !playerSettings.maintainOriginalAudioOnDownmix
+                    renderer?.applyDownmixSettings(
+                        downmixEnabled = playerSettings.downmixEnabled,
+                        audioOutputChannels = playerSettings.audioOutputChannels,
+                        downmixNormalizationEnabled = !playerSettings.maintainOriginalAudioOnDownmix
                     )
                     applyCenterMixLevel(_uiState.value.centerMixLevelDb)
-                    updateCenterMixAvailability()
+                    updateAudioControlAvailability()
                 }
             ).setExtensionRendererMode(playerSettings.decoderPriority)
                 .setMapDV7ToHevc(playerSettings.mapDV7ToHevc)
@@ -285,7 +284,7 @@ internal fun PlayerRuntimeController.initializePlayer(url: String, headers: Map<
                                 duration = playerDuration.coerceAtLeast(0L)
                             )
                         }
-                        updateCenterMixAvailability()
+                        updateAudioControlAvailability()
 
                         if (playbackState == Player.STATE_BUFFERING && !hasRenderedFirstFrame) {
                             _uiState.update { state ->
@@ -359,7 +358,7 @@ internal fun PlayerRuntimeController.initializePlayer(url: String, headers: Map<
 
                     override fun onRenderedFirstFrame() {
                         hasRenderedFirstFrame = true
-                        updateCenterMixAvailability()
+                        updateAudioControlAvailability()
                         _uiState.update { it.copy(showLoadingOverlay = false) }
                     }
 
@@ -586,6 +585,7 @@ private class SubtitleOffsetRenderersFactory(
     context: Context,
     private val subtitleDelayUsProvider: () -> Long,
     private val gainAudioProcessor: GainAudioProcessor,
+    private val downmixEnabled: Boolean,
     private val audioOutputChannels: com.nuvio.tv.data.local.AudioOutputChannels,
     private val downmixNormalizationEnabled: Boolean,
     private val onFfmpegAudioRendererChanged: (FfmpegAudioRenderer?) -> Unit
@@ -639,13 +639,30 @@ private class SubtitleOffsetRenderersFactory(
             out
         )
         out.filterIsInstance<FfmpegAudioRenderer>().forEach { renderer ->
-            renderer.setAudioOutputChannels(
-                audioOutputChannels.ffmpegLayoutName,
-                audioOutputChannels.channelCount
+            renderer.applyDownmixSettings(
+                downmixEnabled = downmixEnabled,
+                audioOutputChannels = audioOutputChannels,
+                downmixNormalizationEnabled = downmixNormalizationEnabled
             )
-            renderer.setDownmixNormalizationEnabled(downmixNormalizationEnabled)
         }
         onFfmpegAudioRendererChanged(out.filterIsInstance<FfmpegAudioRenderer>().firstOrNull())
+    }
+}
+
+private fun FfmpegAudioRenderer.applyDownmixSettings(
+    downmixEnabled: Boolean,
+    audioOutputChannels: com.nuvio.tv.data.local.AudioOutputChannels,
+    downmixNormalizationEnabled: Boolean
+) {
+    if (downmixEnabled) {
+        setAudioOutputChannels(
+            audioOutputChannels.ffmpegLayoutName,
+            audioOutputChannels.channelCount
+        )
+        setDownmixNormalizationEnabled(downmixNormalizationEnabled)
+    } else {
+        setAudioOutputChannels(null, 0)
+        setDownmixNormalizationEnabled(false)
     }
 }
 

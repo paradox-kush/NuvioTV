@@ -189,6 +189,7 @@ data class PlayerSettings(
     val bufferSettings: BufferSettings = BufferSettings(),
     // Audio settings
     val decoderPriority: Int = 1, // EXTENSION_RENDERER_MODE_ON (0=off, 1=on, 2=prefer)
+    val downmixEnabled: Boolean = false,
     val audioOutputChannels: AudioOutputChannels = AudioOutputChannels.default,
     val maintainOriginalAudioOnDownmix: Boolean = true,
     val tunnelingEnabled: Boolean = false,
@@ -303,6 +304,7 @@ class PlayerSettingsDataStore @Inject constructor(
 
     // Audio settings keys
     private val decoderPriorityKey = intPreferencesKey("decoder_priority")
+    private val downmixEnabledKey = booleanPreferencesKey("downmix_enabled")
     private val audioOutputChannelsKey = stringPreferencesKey("audio_output_channels")
     private val maintainOriginalAudioOnDownmixKey =
         booleanPreferencesKey("maintain_original_audio_on_downmix")
@@ -446,6 +448,13 @@ class PlayerSettingsDataStore @Inject constructor(
                     try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
                 } ?: LibassRenderType.OVERLAY_OPEN_GL,
                 decoderPriority = prefs[decoderPriorityKey] ?: 1,
+                downmixEnabled =
+                    prefs[downmixEnabledKey]
+                        ?: (
+                            prefs[audioOutputChannelsKey] != null ||
+                                prefs[maintainOriginalAudioOnDownmixKey] != null ||
+                                prefs[downmixNormalizationEnabledLegacyKey] != null
+                            ),
                 audioOutputChannels = AudioOutputChannels.fromSettingValue(
                     prefs[audioOutputChannelsKey]
                 ),
@@ -576,14 +585,22 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setDownmixEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[downmixEnabledKey] = enabled
+        }
+    }
+
     suspend fun setAudioOutputChannels(channels: AudioOutputChannels) {
         store().edit { prefs ->
+            prefs[downmixEnabledKey] = true
             prefs[audioOutputChannelsKey] = channels.settingValue
         }
     }
 
     suspend fun setMaintainOriginalAudioOnDownmix(enabled: Boolean) {
         store().edit { prefs ->
+            prefs[downmixEnabledKey] = true
             prefs[maintainOriginalAudioOnDownmixKey] = enabled
         }
     }

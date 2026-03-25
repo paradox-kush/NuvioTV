@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Additional downmix behavior in this file was adapted from Kodi's FFmpeg/AudioEngine
+ * playback path. See this module's NOTICE.md for provenance details.
+ */
 package androidx.media3.decoder.ffmpeg;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -181,7 +185,7 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
         .build();
   }
 
-  /** Sets the center-mix offset in dB relative to FFmpeg metadata or the Kodi default (-3 dB). */
+  /** Sets the center-mix offset in dB relative to FFmpeg metadata or the default (-3 dB). */
   public void setCenterMixLevelDb(int centerMixLevelDb) {
     userCenterMixLevelDb = centerMixLevelDb;
     @Nullable FfmpegAudioDecoder decoder = activeDecoder;
@@ -190,13 +194,13 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     }
   }
 
-  /** Sets the desired FFmpeg output layout used for Kodi-style downmix decisions. */
+  /** Sets the desired FFmpeg output layout used for explicit downmix decisions. */
   public void setAudioOutputChannels(@Nullable String outputLayoutName, int outputChannelCount) {
     requestedOutputLayoutName = outputLayoutName;
     requestedOutputChannelCount = outputChannelCount;
   }
 
-  /** Sets whether Kodi-style downmix normalization should be enabled. */
+  /** Sets whether downmix normalization should be enabled. */
   public void setDownmixNormalizationEnabled(boolean downmixNormalizationEnabled) {
     this.downmixNormalizationEnabled = downmixNormalizationEnabled;
     @Nullable FfmpegAudioDecoder decoder = activeDecoder;
@@ -208,6 +212,11 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
   /** Returns whether this renderer is the active playback path for FFmpeg downmix + center mix. */
   public boolean isCenterMixActive() {
     return rendererEnabled && activeDecoder != null && downmixActive;
+  }
+
+  /** Returns whether this renderer is the active playback path for FFmpeg audio decoding. */
+  public boolean isAudioPathActive() {
+    return rendererEnabled && activeDecoder != null;
   }
 
   /**

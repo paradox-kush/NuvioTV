@@ -44,7 +44,7 @@ data class PlayerUiState(
     val selectedAudioTrackIndex: Int = -1,
     val selectedSubtitleTrackIndex: Int = -1,
     val audioAmplificationDb: Int = 0,
-    val isAudioAmplificationAvailable: Boolean = true,
+    val isAudioAmplificationAvailable: Boolean = false,
     val persistAudioAmplification: Boolean = false,
     val centerMixLevelDb: Int = 0,
     val isCenterMixAvailable: Boolean = false,

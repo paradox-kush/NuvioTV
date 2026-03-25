@@ -73,18 +73,21 @@ internal fun AudioSelectionOverlay(
     val centerPlusFocusRequester = remember { FocusRequester() }
     val listState = rememberLazyListState()
     val currentDb = audioAmplificationDb.coerceIn(AUDIO_AMPLIFICATION_MIN_DB, AUDIO_AMPLIFICATION_MAX_DB)
+    val showAmplificationSection = isAmplificationAvailable
     val canDecrease = isAmplificationAvailable && currentDb > AUDIO_AMPLIFICATION_MIN_DB
     val canIncrease = isAmplificationAvailable && currentDb < AUDIO_AMPLIFICATION_MAX_DB
     val currentCenterMixDb = centerMixLevelDb.coerceIn(CENTER_MIX_LEVEL_MIN_DB, CENTER_MIX_LEVEL_MAX_DB)
+    val showCenterMixSection = isCenterMixAvailable
     val canDecreaseCenterMix = isCenterMixAvailable && currentCenterMixDb > CENTER_MIX_LEVEL_MIN_DB
     val canIncreaseCenterMix = isCenterMixAvailable && currentCenterMixDb < CENTER_MIX_LEVEL_MAX_DB
+    val hasAudioControls = showAmplificationSection || showCenterMixSection
     val primaryControlsFocusRequester = when {
-        canDecrease -> minusFocusRequester
-        canIncrease -> plusFocusRequester
-        isAmplificationAvailable -> persistFocusRequester
-        canDecreaseCenterMix -> centerMinusFocusRequester
-        canIncreaseCenterMix -> centerPlusFocusRequester
-        else -> persistFocusRequester
+        showAmplificationSection && canDecrease -> minusFocusRequester
+        showAmplificationSection && canIncrease -> plusFocusRequester
+        showAmplificationSection -> persistFocusRequester
+        showCenterMixSection && canDecreaseCenterMix -> centerMinusFocusRequester
+        showCenterMixSection && canIncreaseCenterMix -> centerPlusFocusRequester
+        else -> tracksFocusRequester
     }
 
     var lastFocusedAudioIndex by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -97,7 +100,7 @@ internal fun AudioSelectionOverlay(
             listState.scrollToItem(selectedListIndex)
             delay(120)
             runCatching { tracksFocusRequester.requestFocus() }
-        } else {
+        } else if (hasAudioControls) {
             delay(120)
             runCatching { primaryControlsFocusRequester.requestFocus() }
         }
@@ -129,37 +132,47 @@ internal fun AudioSelectionOverlay(
                 verticalAlignment = Alignment.Top,
                 modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                Column(modifier = Modifier.width(460.dp)) {
+                Column(modifier = Modifier.width(if (hasAudioControls) 496.dp else 760.dp)) {
                     AudioTracksContent(
                         tracks = tracks,
                         selectedIndex = selectedIndex,
                         listState = listState,
                         initialFocusRequester = tracksFocusRequester,
-                        rightFocusRequester = primaryControlsFocusRequester,
+                        rightFocusRequester = if (hasAudioControls) {
+                            primaryControlsFocusRequester
+                        } else {
+                            FocusRequester.Default
+                        },
                         onTrackFocused = { lastFocusedAudioIndex = it },
                         onTrackSelected = onTrackSelected
                     )
                 }
-                Column(modifier = Modifier.width(286.dp)) {
-                    AudioMixContent(
-                        audioAmplificationDb = audioAmplificationDb,
-                        isAmplificationAvailable = isAmplificationAvailable,
-                        persistAmplification = persistAmplification,
-                        minusFocusRequester = minusFocusRequester,
-                        plusFocusRequester = plusFocusRequester,
-                        persistFocusRequester = persistFocusRequester,
-                        leftFocusRequester = tracksFocusRequester,
-                        onAmplificationChange = onAmplificationChange,
-                        onPersistAmplificationChange = onPersistAmplificationChange
-                    )
-                    CenterMixContent(
-                        centerMixLevelDb = centerMixLevelDb,
-                        isCenterMixAvailable = isCenterMixAvailable,
-                        minusFocusRequester = centerMinusFocusRequester,
-                        plusFocusRequester = centerPlusFocusRequester,
-                        leftFocusRequester = tracksFocusRequester,
-                        onCenterMixLevelChange = onCenterMixLevelChange
-                    )
+                if (hasAudioControls) {
+                    Column(modifier = Modifier.width(250.dp)) {
+                        if (showAmplificationSection) {
+                            AudioMixContent(
+                                audioAmplificationDb = audioAmplificationDb,
+                                isAmplificationAvailable = isAmplificationAvailable,
+                                persistAmplification = persistAmplification,
+                                minusFocusRequester = minusFocusRequester,
+                                plusFocusRequester = plusFocusRequester,
+                                persistFocusRequester = persistFocusRequester,
+                                leftFocusRequester = tracksFocusRequester,
+                                onAmplificationChange = onAmplificationChange,
+                                onPersistAmplificationChange = onPersistAmplificationChange
+                            )
+                        }
+                        if (showCenterMixSection) {
+                            CenterMixContent(
+                                centerMixLevelDb = centerMixLevelDb,
+                                isCenterMixAvailable = isCenterMixAvailable,
+                                minusFocusRequester = centerMinusFocusRequester,
+                                plusFocusRequester = centerPlusFocusRequester,
+                                leftFocusRequester = tracksFocusRequester,
+                                onCenterMixLevelChange = onCenterMixLevelChange
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -345,23 +358,23 @@ private fun AudioMixContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(top = 6.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = stringResource(R.string.audio_mix_label),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.92f)
         )
 
         Text(
             text = stringResource(R.string.audio_mix_value_db, currentDb),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = Color.White
         )
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MixStepCard(
                 icon = Icons.Default.Remove,
@@ -422,9 +435,9 @@ private fun AudioMixContent(
                 } else {
                     stringResource(R.string.audio_mix_persist_off)
                 },
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = if (persistAmplification) NuvioColors.OnSecondary else Color.White,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
             )
         }
 
@@ -457,23 +470,23 @@ private fun CenterMixContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = stringResource(R.string.audio_center_mix_label),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.92f)
         )
 
         Text(
             text = stringResource(R.string.audio_center_mix_value_db, currentDb),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             color = Color.White
         )
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MixStepCard(
                 icon = Icons.Default.Remove,
@@ -528,7 +541,7 @@ private fun MixStepCard(
             }
         },
         modifier = Modifier
-            .width(78.dp)
+            .width(64.dp)
             .focusRequester(focusRequester)
             .focusProperties {
                 canFocus = enabled
@@ -555,7 +568,7 @@ private fun MixStepCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .padding(vertical = 10.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             Icon(

@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Additional downmix behavior in this file was adapted from Kodi's FFmpeg/AudioEngine
+ * playback path. See this module's NOTICE.md for provenance details.
+ */
 package androidx.media3.decoder.ffmpeg;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -195,12 +199,12 @@ import java.util.List;
     return OUTPUT_ENCODING;
   }
 
-  /** Sets the center-mix offset in dB relative to stream metadata or Kodi's default (-3 dB). */
+  /** Sets the center-mix offset in dB relative to stream metadata or the default (-3 dB). */
   public void setUserCenterMixLevelDb(int userCenterMixLevelDb) {
     this.userCenterMixLevelDb = userCenterMixLevelDb;
   }
 
-  /** Enables or disables Kodi-style downmix normalization. */
+  /** Enables or disables downmix normalization. */
   public void setDownmixNormalizationEnabled(boolean downmixNormalizationEnabled) {
     this.downmixNormalizationEnabled = downmixNormalizationEnabled;
   }

@@ -324,6 +324,8 @@
     <string name="audio_decoder_prefer_device">Prefer device decoders</string>
     <string name="audio_decoder_prefer_app">Prefer app decoders (FFmpeg)</string>
     <string name="audio_decoder_priority">Decoder Priority</string>
+    <string name="audio_enable_downmix_title">Enable downmix</string>
+    <string name="audio_enable_downmix_subtitle">Uses the FFmpeg downmix path. When disabled, audio follows the previous Android/device path.</string>
     <string name="audio_tunneled">Tunneled Playback</string>
     <string name="audio_tunneled_sub">Hardware-level audio/video sync. May improve playback on some Android TV devices</string>
     <string name="audio_dv_sub">Map Dolby Vision Profile 7 to standard HEVC for devices without DV hardware support</string>

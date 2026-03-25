@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "My Application"
 include(":app")
 include(":baselineprofile")
-include(":kodi-decoder-ffmpeg")
+include(":ffmpeg-decoder-downmix")

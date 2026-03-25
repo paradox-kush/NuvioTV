@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Additional downmix logic in this file was adapted from Kodi's FFmpeg/AudioEngine
+ * downmix behavior. See this module's NOTICE.md for provenance details.
+ */
 #include <android/log.h>
 #include <jni.h>
 #include <math.h>
@@ -66,8 +70,8 @@ extern "C" {
 
 // Output format corresponding to AudioFormat.ENCODING_PCM_FLOAT.
 static const AVSampleFormat OUTPUT_FORMAT_PCM_FLOAT = AV_SAMPLE_FMT_FLT;
-// Kodi's default downmix center level when no metadata is present (-3 dB).
-static const double KODI_DEFAULT_CENTER_MIX_LEVEL = M_SQRT1_2;
+// Default center level when no downmix metadata is present (-3 dB).
+static const double DEFAULT_CENTER_MIX_LEVEL = M_SQRT1_2;
 
 // LINT.IfChange
 static const int AUDIO_DECODER_ERROR_INVALID_DATA = -1;
@@ -689,10 +693,10 @@ bool applyRequestedOutputLayout(DecoderContext* decoderContext,
 double getAdjustedCenterMixLevel(AVFrame* frame, jint userCenterMixLevelDb,
                                  bool isDownmixActive) {
   if (!isDownmixActive) {
-    return KODI_DEFAULT_CENTER_MIX_LEVEL;
+    return DEFAULT_CENTER_MIX_LEVEL;
   }
 
-  double centerMixLevel = KODI_DEFAULT_CENTER_MIX_LEVEL;
+  double centerMixLevel = DEFAULT_CENTER_MIX_LEVEL;
   AVFrameSideData* sideData =
       av_frame_get_side_data(frame, AV_FRAME_DATA_DOWNMIX_INFO);
   if (sideData && sideData->size >= sizeof(AVDownmixInfo)) {
