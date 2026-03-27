@@ -26,7 +26,18 @@ val devProperties = Properties().apply {
 
 fun env(name: String): String? = providers.environmentVariable(name).orNull
 
+fun truthy(value: String?): Boolean {
+    return value.equals("true", ignoreCase = true) ||
+        value.equals("1", ignoreCase = true) ||
+        value.equals("yes", ignoreCase = true)
+}
+
 val useDebugReleaseSigning = env("CI_USE_DEBUG_SIGNING").equals("true", ignoreCase = true)
+val useLocalFfmpegDecoder = truthy(
+    providers.gradleProperty("useLocalFfmpegDecoder").orNull
+        ?: env("USE_LOCAL_FFMPEG_DECODER")
+        ?: localProperties.getProperty("USE_LOCAL_FFMPEG_DECODER")
+)
 val releaseStoreFilePath = env("NUVIO_RELEASE_STORE_FILE")
     ?: localProperties.getProperty("NUVIO_RELEASE_STORE_FILE")
 val releaseKeyAliasValue = env("NUVIO_RELEASE_KEY_ALIAS")
@@ -294,7 +305,11 @@ dependencies {
         "libs/lib-decoder-iamf-release.aar",
         "libs/lib-decoder-mpegh-release.aar"
     ))
-    implementation(project(":ffmpeg-decoder-downmix"))
+    if (useLocalFfmpegDecoder) {
+        implementation(project(":ffmpeg-decoder-downmix"))
+    } else {
+        implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
+    }
 
     // libass-android for ASS/SSA subtitle support (from Maven Central)
     implementation("io.github.peerless2012:ass-media:0.4.0-beta01")
