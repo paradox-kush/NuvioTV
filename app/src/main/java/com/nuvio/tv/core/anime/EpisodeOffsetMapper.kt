@@ -72,31 +72,44 @@ class EpisodeOffsetMapper @Inject constructor(
         season: Int,
         episode: Int
     ): TrackerEpisodeMapping {
+        Log.i(TAG, "resolveByIds imdb=$imdbId tmdb=$tmdbId s=$season e=$episode cacheSize=${cache?.size}")
         ensureLoaded()
+        Log.i(TAG, "  after ensureLoaded: cacheSize=${cache?.size} imdbIdx=${byImdbShowIndex.size} tmdbIdx=${byTmdbShowIndex.size}")
+
+        // 1. Direct IMDb hit in PAB — cheapest path.
         if (!imdbId.isNullOrBlank()) {
             val pab = byImdbShowIndex[imdbId.trim()].orEmpty()
             if (pab.isNotEmpty()) {
                 val match = pickCandidate(pab, season, episode)
                 if (match != null) {
-                    val absolute = translateEpisode(match.entry, match.tvdbSeason, episode)
-                    return TrackerEpisodeMapping(
-                        tmdbId = match.entry.tmdbShowId ?: tmdbId ?: -1,
-                        tmdbSeason = season,
-                        tmdbEpisode = episode,
-                        malId = match.entry.malId,
-                        anilistId = match.entry.anilistId,
-                        kitsuId = match.entry.kitsuId,
-                        anidbId = match.entry.anidbId,
-                        trackerEpisode = absolute ?: episode,
-                        totalEpisodes = match.entry.length,
-                        source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE
-                    )
+                    return plexAniBridgeMapping(match, tmdbId, season, episode)
                 }
             }
         }
-        if (tmdbId != null) return resolve(tmdbId, season, episode)
+
+        // 2. Direct TMDB hit in PAB.
+        if (tmdbId != null) {
+            val result = resolve(tmdbId, season, episode)
+            if (result.source != TrackerEpisodeMapping.MappingSource.HEURISTIC_NONE) return result
+        }
+
+        // 3. IMDb → TMDB via ARM, then retry PAB TMDB lookup. Most anime
+        // entries in PAB are keyed by tmdb_show_id only — the IMDb index
+        // misses them entirely. This bridge covers the common case.
         if (!imdbId.isNullOrBlank()) {
             val arm = animeIdMapper.getEntriesForImdb(imdbId)
+            val tmdbFromArm = arm.firstNotNullOfOrNull { it.themoviedb }
+            if (tmdbFromArm != null) {
+                Log.d(TAG, "  IMDb→TMDB bridge via arm: $imdbId → $tmdbFromArm")
+                val bridged = byTmdbShowIndex[tmdbFromArm].orEmpty()
+                if (bridged.isNotEmpty()) {
+                    val match = pickCandidate(bridged, season, episode)
+                    if (match != null) {
+                        return plexAniBridgeMapping(match, tmdbFromArm, season, episode)
+                    }
+                }
+            }
+            // ARM positional fallback — least accurate, only when PAB has nothing.
             if (arm.isNotEmpty()) {
                 val idx = (season - 1).coerceIn(0, arm.lastIndex)
                 val entry = arm[idx]
@@ -114,12 +127,34 @@ class EpisodeOffsetMapper @Inject constructor(
                 )
             }
         }
+
         return TrackerEpisodeMapping(
             tmdbId = tmdbId ?: -1,
             tmdbSeason = season,
             tmdbEpisode = episode,
             trackerEpisode = episode,
             source = TrackerEpisodeMapping.MappingSource.HEURISTIC_NONE
+        )
+    }
+
+    private fun plexAniBridgeMapping(
+        match: CandidateMatch,
+        tmdbId: Int?,
+        season: Int,
+        episode: Int
+    ): TrackerEpisodeMapping {
+        val absolute = translateEpisode(match.entry, match.tvdbSeason, episode, match.viaTmdbMappings)
+        return TrackerEpisodeMapping(
+            tmdbId = match.entry.tmdbShowId ?: tmdbId ?: -1,
+            tmdbSeason = season,
+            tmdbEpisode = episode,
+            malId = match.entry.malId,
+            anilistId = match.entry.anilistId,
+            kitsuId = match.entry.kitsuId,
+            anidbId = match.entry.anidbId,
+            trackerEpisode = absolute ?: episode,
+            totalEpisodes = match.entry.length,
+            source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE
         )
     }
 
@@ -134,7 +169,7 @@ class EpisodeOffsetMapper @Inject constructor(
         if (candidates.isNotEmpty()) {
             val match = pickCandidate(candidates, tmdbSeason, tmdbEpisode)
             if (match != null) {
-                val absolute = translateEpisode(match.entry, match.tvdbSeason, tmdbEpisode)
+                val absolute = translateEpisode(match.entry, match.tvdbSeason, tmdbEpisode, match.viaTmdbMappings)
                 return TrackerEpisodeMapping(
                     tmdbId = tmdbId,
                     tmdbSeason = tmdbSeason,
@@ -304,18 +339,30 @@ class EpisodeOffsetMapper @Inject constructor(
 
     // --- internal --- //
 
+    /** Backs off failed loads so we don't hammer GitHub on every episode watched. */
+    @Volatile private var lastFailedLoadAtMs: Long = 0L
+
     private suspend fun ensureLoaded() {
-        if (cache != null) return
+        if (cache != null && cache!!.isNotEmpty()) return
+        // Previous attempt may have returned an empty map (sentinel). Retry
+        // unless we failed very recently.
+        if (System.currentTimeMillis() - lastFailedLoadAtMs < FAILED_BACKOFF_MS) return
         loadOrRefresh()
     }
 
     private suspend fun loadOrRefresh() = mutex.withLock {
-        if (cache != null) return@withLock
+        if (cache != null && cache!!.isNotEmpty()) return@withLock
         val file = cacheFile()
         val freshCutoff = System.currentTimeMillis() - MAX_AGE_MS
-        val loaded: Map<String, AnimeMappingEntryDto>? = if (file.exists() && file.lastModified() > freshCutoff) {
-            readFromFile(file)
-        } else {
+        val fromDisk = if (file.exists() && file.lastModified() > freshCutoff) {
+            Log.i(TAG, "reading cached mappings from ${file.absolutePath} (${file.length()} bytes)")
+            readFromFile(file).also {
+                if (it == null) Log.w(TAG, "failed to parse cached mappings — will re-download")
+                else Log.i(TAG, "parsed ${it.size} entries from disk cache")
+            }
+        } else null
+
+        val loaded: Map<String, AnimeMappingEntryDto>? = fromDisk ?: run {
             val fetched = download()
             if (fetched != null) {
                 runCatching { writeToFile(file, fetched) }.onFailure {
@@ -324,38 +371,55 @@ class EpisodeOffsetMapper @Inject constructor(
                 fetched
             } else {
                 // Network failed — fall back to whatever stale copy we have.
-                if (file.exists()) readFromFile(file) else null
+                if (file.exists()) {
+                    Log.w(TAG, "download failed — trying stale cache at ${file.absolutePath}")
+                    readFromFile(file)
+                } else null
             }
         }
-        if (loaded != null) {
-            cache = loaded
-            byTmdbShowIndex = loaded.values
+        // The outer JSON object is keyed by AniList id (`"182205": { ... }`).
+        // Entries themselves don't carry `anilist_id` — pull it from the map key.
+        val hydrated = loaded?.mapValues { (keyStr, entry) ->
+            if (entry.anilistId != null) entry
+            else entry.copy(anilistId = keyStr.toIntOrNull())
+        }
+        if (hydrated != null && hydrated.isNotEmpty()) {
+            cache = hydrated
+            val values = hydrated.values
+            byTmdbShowIndex = values
                 .filter { it.tmdbShowId != null }
                 .groupBy { it.tmdbShowId!! }
-            byTmdbMovieIndex = loaded.values
-                .filter { it.tmdbMovieId != null }
-                .associateBy { it.tmdbMovieId!! }
-            byImdbShowIndex = loaded.values
-                .filter { !it.imdbId.isNullOrBlank() }
-                .groupBy { it.imdbId!!.trim() }
-            Log.i(TAG, "loaded ${loaded.size} anime mappings (shows=${byTmdbShowIndex.size}, movies=${byTmdbMovieIndex.size}, imdb=${byImdbShowIndex.size})")
+            byTmdbMovieIndex = values
+                .flatMap { entry -> entry.tmdbMovieIds.map { it to entry } }
+                .associate { it }
+            byImdbShowIndex = values
+                .flatMap { entry -> entry.imdbIds.map { it to entry } }
+                .groupBy({ it.first }, { it.second })
+            Log.i(TAG, "loaded ${hydrated.size} anime mappings (shows=${byTmdbShowIndex.size}, movies=${byTmdbMovieIndex.size}, imdb=${byImdbShowIndex.size})")
         } else {
-            cache = emptyMap()
-            Log.w(TAG, "no mappings available — falling back to arm only")
+            lastFailedLoadAtMs = System.currentTimeMillis()
+            Log.w(TAG, "no mappings available — falling back to arm only (will retry in ${FAILED_BACKOFF_MS / 1000}s)")
         }
     }
 
     private suspend fun download(): Map<String, AnimeMappingEntryDto>? {
+        Log.i(TAG, "downloading mappings from ${AnimeMappingsSource.PLEX_ANI_BRIDGE_URL}")
         val result = safeApiCall {
             animeMappingsApi.getMappings(AnimeMappingsSource.PLEX_ANI_BRIDGE_URL)
         }
         return when (result) {
-            is NetworkResult.Success -> result.data
+            is NetworkResult.Success -> {
+                Log.i(TAG, "mappings download ok, ${result.data.size} raw entries")
+                result.data
+            }
             is NetworkResult.Error -> {
                 Log.w(TAG, "mappings download failed code=${result.code} msg=${result.message}")
                 null
             }
-            NetworkResult.Loading -> null
+            NetworkResult.Loading -> {
+                Log.w(TAG, "mappings download returned Loading (should not happen)")
+                null
+            }
         }
     }
 
@@ -385,62 +449,86 @@ class EpisodeOffsetMapper @Inject constructor(
 
     /**
      * Pick which PlexAniBridge candidate corresponds to the given TMDB
-     * (season, episode). We walk [AnimeMappingEntryDto.tvdbMappings] keys —
-     * the format is one of:
-     *   "s{N}"                          — whole TVDB season N
-     *   "s{N}e{start}-e{end}"           — specific episode range
-     *   "s{N}e{start}-e{end}|s{M}..."   — multiple segments pipe-separated
+     * (season, episode). Keys look like `s1`, `s4e1-e16`, or
+     * `s2e1-e12|s3e1-e12` (pipe-separated compound segments).
      *
-     * AniList episode numbers for that segment are supplied in the value with
-     * the same syntax; translation happens in [translateEpisode].
+     * Strategy:
+     *   1. Prefer `tmdb_mappings` — keys there really are TMDB season numbers.
+     *   2. Fall back to `tvdb_mappings` — keys are TVDB season numbers, which
+     *      align with TMDB for ~80% of anime but not all (e.g. shows split
+     *      into multiple TVDB seasons but bundled under one TMDB season).
+     *   3. If only one candidate exists and nothing matched, take it — better
+     *      to write to some tracker entry than skip entirely.
      */
     private fun pickCandidate(
         candidates: List<AnimeMappingEntryDto>,
         tmdbSeason: Int,
         tmdbEpisode: Int
     ): CandidateMatch? {
+        // Pass 1: tmdb_mappings when PlexAniBridge supplies them.
         for (entry in candidates) {
-            val mappings = entry.tvdbMappings ?: continue
+            val mappings = entry.tmdbMappings ?: continue
             for ((key, _) in mappings) {
-                val segments = key.split("|")
-                for (seg in segments) {
+                for (seg in key.split("|")) {
                     val (s, range) = parseSeasonSegment(seg) ?: continue
                     if (s != tmdbSeason) continue
                     if (range == null || tmdbEpisode in range) {
-                        return CandidateMatch(entry = entry, tvdbSeason = s)
+                        Log.d(TAG, "pickCandidate matched via tmdb_mappings: anilist=${entry.anilistId} key=$key")
+                        return CandidateMatch(entry = entry, tvdbSeason = s, viaTmdbMappings = true)
                     }
                 }
             }
         }
-        // No explicit mapping hit — if exactly one candidate exists, use it.
-        return candidates.singleOrNull()?.let { CandidateMatch(entry = it, tvdbSeason = tmdbSeason) }
+        // Pass 2: tvdb_mappings as a proxy.
+        for (entry in candidates) {
+            val mappings = entry.tvdbMappings ?: continue
+            for ((key, _) in mappings) {
+                for (seg in key.split("|")) {
+                    val (s, range) = parseSeasonSegment(seg) ?: continue
+                    if (s != tmdbSeason) continue
+                    if (range == null || tmdbEpisode in range) {
+                        Log.d(TAG, "pickCandidate matched via tvdb_mappings: anilist=${entry.anilistId} key=$key")
+                        return CandidateMatch(entry = entry, tvdbSeason = s, viaTmdbMappings = false)
+                    }
+                }
+            }
+        }
+        // Last resort: sole candidate.
+        if (candidates.size == 1) {
+            Log.d(TAG, "pickCandidate fell back to sole candidate: anilist=${candidates[0].anilistId}")
+            return CandidateMatch(entry = candidates[0], tvdbSeason = tmdbSeason, viaTmdbMappings = false)
+        }
+        Log.w(TAG, "pickCandidate: no match among ${candidates.size} candidates for S${tmdbSeason}E$tmdbEpisode — " +
+            "candidates=${candidates.map { "anilist=${it.anilistId} tvdb=${it.tvdbMappings?.keys} tmdb=${it.tmdbMappings?.keys}" }}")
+        return null
     }
 
     /**
      * Given a picked candidate, translate the TMDB episode to the tracker
-     * (AniList/MAL/Kitsu) absolute episode. Uses [AnimeMappingEntryDto.tvdbMappings]
-     * key→value pair to compute the offset. If no explicit range exists,
-     * returns null and the caller falls back to tmdbEpisode.
+     * (AniList/MAL/Kitsu) absolute episode. Uses the same key→value pair that
+     * [pickCandidate] matched on; [fromTmdbMappings] selects which map to
+     * read. Returns null when no explicit range exists — caller falls back
+     * to `tmdbEpisode` as-is.
      */
     private fun translateEpisode(
         entry: AnimeMappingEntryDto,
         tvdbSeason: Int,
-        tmdbEpisode: Int
+        tmdbEpisode: Int,
+        fromTmdbMappings: Boolean
     ): Int? {
-        val mappings = entry.tvdbMappings ?: return null
+        val mappings = (if (fromTmdbMappings) entry.tmdbMappings else entry.tvdbMappings) ?: return null
         for ((key, value) in mappings) {
             val keySegs = key.split("|")
             val valueSegs = value.split("|")
             for ((i, seg) in keySegs.withIndex()) {
                 val (s, range) = parseSeasonSegment(seg) ?: continue
                 if (s != tvdbSeason) continue
-                val tvdbStart = range?.first ?: 1
+                val sourceStart = range?.first ?: 1
                 val matchesEpisode = range == null || tmdbEpisode in range
                 if (!matchesEpisode) continue
                 val valSeg = valueSegs.getOrNull(i).orEmpty()
                 val trackerStart = parseRange(valSeg)?.first ?: 1
-                // offset = trackerStart - tvdbStart
-                return trackerStart + (tmdbEpisode - tvdbStart)
+                return trackerStart + (tmdbEpisode - sourceStart)
             }
         }
         return null
@@ -479,13 +567,16 @@ class EpisodeOffsetMapper @Inject constructor(
 
     private data class CandidateMatch(
         val entry: AnimeMappingEntryDto,
-        val tvdbSeason: Int
+        val tvdbSeason: Int,
+        /** True when match came from `tmdb_mappings`; translate reads the right map accordingly. */
+        val viaTmdbMappings: Boolean = false
     )
 
     companion object {
         private const val TAG = "EpisodeOffsetMapper"
         private const val CACHE_FILENAME = "anime_mappings.json"
         private const val MAX_AGE_MS = 24L * 60 * 60 * 1000
+        private const val FAILED_BACKOFF_MS = 60_000L
         // s1, s1e1-e12, s21e1-e1072
         private val SEGMENT_REGEX = Regex("""s(\d+)(?:e(\d+)(?:-e(\d+))?)?""", RegexOption.IGNORE_CASE)
         // e1-e12 or e1 or 1-12

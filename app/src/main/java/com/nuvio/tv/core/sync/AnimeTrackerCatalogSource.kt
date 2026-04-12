@@ -1,5 +1,6 @@
 package com.nuvio.tv.core.sync
 
+import android.util.Log
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.data.local.AniListSettingsDataStore
 import com.nuvio.tv.data.local.KitsuSettingsDataStore
@@ -45,7 +46,17 @@ class AnimeTrackerCatalogSource @Inject constructor(
         val source: TrackerListItem.TrackerSource,
         val status: TrackerListStatus
     ) {
-        val key: String = "tracker:${source.name.lowercase()}:${status.key}"
+        /** `addonId` component — stable per tracker service. */
+        val addonId: String = "tracker_${source.name.lowercase()}"
+        /** `apiType` component — trackers only produce series rows. */
+        val apiType: String = "series"
+        /** `catalogId` component — the wire status key. */
+        val catalogId: String = status.key
+        /**
+         * Full home-catalog key matching the `${addonId}_${apiType}_${catalogId}`
+         * convention used by [HomeViewModelCatalogPipeline]'s display lookup.
+         */
+        val key: String = "${addonId}_${apiType}_${catalogId}"
     }
 
     /**
@@ -58,8 +69,14 @@ class AnimeTrackerCatalogSource @Inject constructor(
         malRows(),
         aniListRows(),
         kitsuRows()
-    ) { mal, ani, kit -> mal + ani + kit }
+    ) { mal, ani, kit ->
+        val combined = mal + ani + kit
+        Log.d(TAG, "enabledRows emit: mal=${mal.size} ani=${ani.size} kit=${kit.size} → ${combined.size}")
+        combined
+    }
         .distinctUntilChanged()
+
+    companion object { private const val TAG = "AnimeTrackerRows" }
 
     fun rowKeys(
         malEnabled: Set<TrackerListStatus>,
@@ -86,11 +103,18 @@ class AnimeTrackerCatalogSource @Inject constructor(
     private fun aniListRows(): Flow<List<CatalogRow>> =
         aniListSettings.settings.flatMapLatest { settings ->
             val ordered = settings.rowOrder.filter { it in settings.enabledStatuses }
+            Log.d(TAG, "aniListRows: enabled=${settings.enabledStatuses} ordered=$ordered")
             if (ordered.isEmpty()) return@flatMapLatest flowOf(emptyList())
             combine(ordered.map { status -> aniListList.observe(status).map { status to it } }) { perStatus ->
-                perStatus.mapNotNull { (status, result) ->
-                    toRow(TrackerListItem.TrackerSource.ANILIST, "AniList", status, result)
+                val rows = perStatus.mapNotNull { (status, result) ->
+                    val row = toRow(TrackerListItem.TrackerSource.ANILIST, "AniList", status, result)
+                    Log.d(
+                        TAG,
+                        "aniListRows status=$status resultType=${result::class.simpleName} items=${(result as? NetworkResult.Success)?.data?.size} row=${row != null}"
+                    )
+                    row
                 }
+                rows
             }
         }
 
@@ -114,16 +138,16 @@ class AnimeTrackerCatalogSource @Inject constructor(
         val items = (result as? NetworkResult.Success)?.data ?: return null
         if (items.isEmpty()) return null
         val key = TrackerRowKey(source, status)
-        // `addonId` piggy-backs on the key so HomeCatalogSync's order/disabled
-        // plumbing works without a schema change.
+        // addonId / apiType / catalogId picked so the display pipeline's
+        // `${addonId}_${apiType}_${catalogId}` lookup produces [key.key].
         return CatalogRow(
-            addonId = key.key,
+            addonId = key.addonId,
             addonName = addonName,
             addonBaseUrl = "tracker://${source.name.lowercase()}",
-            catalogId = status.key,
+            catalogId = key.catalogId,
             catalogName = "${status.displayName} on $addonName",
             type = ContentType.SERIES,
-            rawType = "series",
+            rawType = key.apiType,
             items = items.map { it.preview },
             isLoading = false,
             hasMore = false,

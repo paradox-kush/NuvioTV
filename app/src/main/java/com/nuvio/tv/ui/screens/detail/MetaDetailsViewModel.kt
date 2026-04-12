@@ -1567,8 +1567,9 @@ class MetaDetailsViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isMovieWatchedPending = true) }
+            val wasWatched = _uiState.value.isMovieWatched
             runCatching {
-                if (_uiState.value.isMovieWatched) {
+                if (wasWatched) {
                     watchProgressRepository.removeFromHistory(_effectiveContentId.value, videoId = resolveFallbackVideoId())
                     showMessage(context.getString(R.string.detail_movie_marked_unwatched))
                 } else {
@@ -1580,6 +1581,17 @@ class MetaDetailsViewModel @Inject constructor(
                     message = error.message ?: "Failed to update watched status",
                     isError = true
                 )
+            }
+            // Fan out only on the watched→unwatched→watched transition forward.
+            // Unmarking is a no-op on trackers (monotonic rule).
+            if (!wasWatched) {
+                val parsed = parseContentIds(_effectiveContentId.value)
+                runCatching {
+                    animeTrackerFanoutService.markMovieWatched(
+                        imdbId = parsed.imdb ?: meta.imdbId,
+                        tmdbId = parsed.tmdb
+                    )
+                }.onFailure { Log.w(TAG, "anime fanout (movie) threw: ${it.message}") }
             }
             _uiState.update { it.copy(isMovieWatchedPending = false) }
         }
@@ -1612,6 +1624,20 @@ class MetaDetailsViewModel @Inject constructor(
                     message = error.message ?: "Failed to update episode watched status",
                     isError = true
                 )
+            }
+
+            // Fan out forward marks only. Unmarking doesn't lower tracker
+            // progress — see AnimeTrackerFanoutService's monotonic rule.
+            if (!isWatched) {
+                val parsed = parseContentIds(_effectiveContentId.value)
+                runCatching {
+                    animeTrackerFanoutService.markEpisodeWatched(
+                        imdbId = parsed.imdb ?: meta.imdbId,
+                        tmdbId = parsed.tmdb,
+                        season = season,
+                        episode = episode
+                    )
+                }.onFailure { Log.w(TAG, "anime fanout (episode s${season}e$episode) threw: ${it.message}") }
             }
 
             _uiState.update {

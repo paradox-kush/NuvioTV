@@ -70,13 +70,23 @@ class AniListListService @Inject constructor(
     suspend fun refreshAll(): Map<TrackerListStatus, List<TrackerListItem>> = fullFetchMutex.withLock {
         val cachedAny = cache.value.values.firstOrNull()
         if (cachedAny != null && System.currentTimeMillis() - cachedAny.fetchedAtMs < CACHE_TTL_MS) {
+            Log.d(TAG, "refreshAll → cache hit, ${cache.value.values.sumOf { it.items.size }} items")
             return@withLock cache.value.mapValues { it.value.items }
         }
         val authed = authStore.isAuthenticated.first()
-        if (!authed) return@withLock emptyMap()
+        if (!authed) {
+            Log.w(TAG, "refreshAll aborted: not authenticated")
+            return@withLock emptyMap()
+        }
         val userId = authStore.state.first().userId?.toIntOrNull()
-            ?: (fetchViewerId() ?: return@withLock emptyMap())
-        fetchCollection(userId) ?: emptyMap()
+            ?: (fetchViewerId() ?: run {
+                Log.w(TAG, "refreshAll aborted: could not resolve AniList viewer id")
+                return@withLock emptyMap()
+            })
+        Log.i(TAG, "refreshAll → fetching collection for userId=$userId")
+        val result = fetchCollection(userId) ?: emptyMap()
+        Log.i(TAG, "refreshAll ← buckets=${result.mapValues { it.value.size }}")
+        result
     }
 
     suspend fun refresh(status: TrackerListStatus): NetworkResult<List<TrackerListItem>> {

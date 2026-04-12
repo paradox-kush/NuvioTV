@@ -88,7 +88,8 @@ class AnimeTrackerFanoutService @Inject constructor(
             Log.d(TAG, "skip episode s${season}e$episode: no tracker mapping (imdb=$imdbId tmdb=$tmdbId)")
             return
         }
-        Log.i(TAG, "fanout episode: source=${mapping.source} trackerEp=${mapping.trackerEpisode} " +
+        Log.i(TAG, "fanout episode: tmdb=(s$season,e$episode) imdb=$imdbId → " +
+            "source=${mapping.source} trackerEp=${mapping.trackerEpisode} " +
             "mal=${mapping.malId} anilist=${mapping.anilistId} kitsu=${mapping.kitsuId}")
         coroutineScope {
             mapping.malId?.let { launch { writeMal(it, mapping.trackerEpisode, mapping.totalEpisodes) } }

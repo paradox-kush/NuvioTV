@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.core.player.StreamAutoPlayPolicy
+import com.nuvio.tv.core.sync.AnimeTrackerCatalogSource
 import com.nuvio.tv.core.tmdb.TmdbMetadataService
 import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.AuthSessionNoticeDataStore
@@ -74,7 +75,8 @@ class HomeViewModel @Inject constructor(
     internal val watchedItemsPreferences: WatchedItemsPreferences,
     internal val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
     internal val cwEnrichmentCache: ContinueWatchingEnrichmentCache,
-    private val profileManager: com.nuvio.tv.core.profile.ProfileManager
+    private val profileManager: com.nuvio.tv.core.profile.ProfileManager,
+    internal val animeTrackerCatalogSource: AnimeTrackerCatalogSource
 ) : ViewModel() {
     companion object {
         internal const val TAG = "HomeViewModel"
@@ -113,6 +115,15 @@ class HomeViewModel @Inject constructor(
 
     internal val catalogsMap = linkedMapOf<String, CatalogRow>()
     internal val catalogOrder = mutableListOf<String>()
+    /**
+     * Keys of rows sourced from anime trackers (MAL/AniList/Kitsu) currently
+     * present in [catalogsMap]. Tracked separately so the addon clear-and-
+     * reload cycle in `loadAllCatalogsPipeline` can re-apply them without
+     * double-adding or wiping unrelated entries.
+     */
+    internal val trackerRowKeys = mutableSetOf<String>()
+    /** Most recent emission from [animeTrackerCatalogSource] — cached so we can re-apply after an addon reload. */
+    @Volatile internal var latestTrackerRows: List<CatalogRow> = emptyList()
     internal var addonsCache: List<Addon> = emptyList()
     internal var collectionsCache: List<Collection> = emptyList()
     internal var homeCatalogOrderKeys: List<String> = emptyList()
@@ -227,6 +238,57 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             delay(STARTUP_GRACE_PERIOD_MS)
             startupGracePeriodActive = false
+        }
+        observeAnimeTrackerRows()
+    }
+
+    /**
+     * Mirrors anime-tracker catalog rows (MAL/AniList/Kitsu) into
+     * [catalogsMap] / [catalogOrder] whenever the user toggles a status on
+     * the Settings subscreens or the list caches refresh. Failures are
+     * swallowed — a slow tracker must not block the main home pipeline.
+     */
+    private fun observeAnimeTrackerRows() {
+        viewModelScope.launch {
+            animeTrackerCatalogSource.enabledRows.collectLatest { rows ->
+                latestTrackerRows = rows
+                applyTrackerRowsIntoHomeCatalogs(rows)
+            }
+        }
+    }
+
+    /**
+     * Sync [rows] into [catalogsMap] and [catalogOrder]. Existing tracker
+     * entries are removed first so toggling a status off actually drops the
+     * row; order is stable because [catalogOrder] preserves insertion order
+     * for keys already in the list.
+     */
+    internal fun applyTrackerRowsIntoHomeCatalogs(rows: List<CatalogRow>) {
+        // The home display pipeline reconstructs the lookup key from a row's
+        // addonId/apiType/catalogId — so the map key here MUST use the same
+        // `${addonId}_${apiType}_${catalogId}` convention (see
+        // HomeViewModelCatalogPipeline line ~555). Using just addonId
+        // produced a key mismatch that silently dropped tracker rows.
+        val incomingByKey: Map<String, CatalogRow> = rows.associateBy { row ->
+            "${row.addonId}_${row.apiType}_${row.catalogId}"
+        }
+        android.util.Log.i(
+            TAG,
+            "applyTrackerRows incoming=${rows.size} keys=${incomingByKey.keys}"
+        )
+        val staleKeys = trackerRowKeys - incomingByKey.keys
+        staleKeys.forEach { key ->
+            catalogsMap.remove(key)
+            catalogOrder.remove(key)
+        }
+        trackerRowKeys.removeAll(staleKeys)
+        incomingByKey.forEach { (key, row) ->
+            catalogsMap[key] = row
+            if (key !in catalogOrder) catalogOrder.add(key)
+            trackerRowKeys.add(key)
+        }
+        if (rows.isNotEmpty() || staleKeys.isNotEmpty()) {
+            scheduleUpdateCatalogRows()
         }
     }
 

@@ -27,6 +27,12 @@ class AniListListToMetaMapper @Inject constructor(
         val status = TrackerListStatus.fromAniList(entry.status) ?: return null
         val media = entry.media ?: return null
         val arm = animeIdMapper.resolveFromTracker(AnimeIdMapper.TrackerSource.ANILIST, media.id)
+        android.util.Log.d(
+            "AniListMapper",
+            "anilist=${media.id} title='${media.title?.romaji ?: media.title?.english}' " +
+                "poster=${media.coverImage?.large?.take(60)} " +
+                "arm.imdb=${arm?.imdb} arm.tmdb=${arm?.themoviedb}"
+        )
         val contentType = TrackerMetaPreviewBuilder.contentTypeFromAniList(media.format)
         val title = media.title?.english?.takeIf { it.isNotBlank() }
             ?: media.title?.userPreferred

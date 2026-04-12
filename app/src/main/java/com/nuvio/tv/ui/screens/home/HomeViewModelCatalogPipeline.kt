@@ -126,6 +126,10 @@ internal suspend fun HomeViewModel.loadAllCatalogsPipeline(
     _uiState.update { it.copy(isLoading = true, error = null, installedAddonsCount = addons.size) }
     catalogOrder.clear()
     catalogsMap.clear()
+    // catalogsMap/catalogOrder just got wiped; tracker key tracking must be
+    // reset too, otherwise the next apply would think the tracker rows
+    // already exist and skip re-inserting them.
+    trackerRowKeys.clear()
     posterStatusReconcileJob?.cancel()
     reconcilePosterStatusObserversPipeline(emptyList())
     _fullCatalogRows.value = emptyList()
@@ -156,6 +160,10 @@ internal suspend fun HomeViewModel.loadAllCatalogsPipeline(
         }
 
         rebuildCatalogOrder(addons)
+
+        // Re-insert tracker rows after addon-driven rebuild so toggled
+        // MAL/AniList/Kitsu lists don't disappear when addons refresh.
+        applyTrackerRowsIntoHomeCatalogs(latestTrackerRows)
 
         // Hero has its own catalog sources (heroCatalogKeys) configured
         // independently in Layout Settings.  When the user has explicitly
