@@ -66,36 +66,81 @@ class EpisodeOffsetMapper @Inject constructor(
      * when present. Falls back through ARM if neither is in the PlexAniBridge
      * file.
      */
+    /**
+     * Legacy single-result resolver. Kept public because a few call sites
+     * legitimately want just the primary match (the one containing the
+     * watched episode, not the already-completed earlier parts). For fanout
+     * writes, prefer [resolveAllByIds] so Part 1 + Part 2 splits both get
+     * updated.
+     */
     suspend fun resolveByIds(
         imdbId: String?,
         tmdbId: Int?,
         season: Int,
         episode: Int
     ): TrackerEpisodeMapping {
-        Log.i(TAG, "resolveByIds imdb=$imdbId tmdb=$tmdbId s=$season e=$episode cacheSize=${cache?.size}")
+        val all = resolveAllByIds(imdbId, tmdbId, season, episode)
+        // Return the mapping that actually CONTAINS the watched episode (not
+        // one of the completed earlier parts). `isRangeComplete=false` means
+        // "this entry is still in progress at the watched episode".
+        return all.firstOrNull { !it.isRangeComplete }
+            ?: all.firstOrNull()
+            ?: TrackerEpisodeMapping(
+                tmdbId = tmdbId ?: -1,
+                tmdbSeason = season,
+                tmdbEpisode = episode,
+                trackerEpisode = episode,
+                source = TrackerEpisodeMapping.MappingSource.HEURISTIC_NONE
+            )
+    }
+
+    /**
+     * Collect every tracker entry whose mapping ranges contribute to the
+     * watched `(season, episode)`. Earlier parts of a split season are
+     * returned with `isRangeComplete=true` (Part 1 finished when user reaches
+     * Part 2 content). The containing entry is returned with
+     * `isRangeComplete=false` and `trackerEpisode` = tracker-side offset.
+     *
+     * Resolution priority is the same as [resolveByIds]: IMDb-direct on PAB
+     * → TMDB-direct on PAB → IMDb→TMDB bridge via ARM → ARM positional
+     * fallback (single result) → HEURISTIC_NONE.
+     */
+    suspend fun resolveAllByIds(
+        imdbId: String?,
+        tmdbId: Int?,
+        season: Int,
+        episode: Int
+    ): List<TrackerEpisodeMapping> {
+        Log.i(TAG, "resolveAllByIds imdb=$imdbId tmdb=$tmdbId s=$season e=$episode cacheSize=${cache?.size}")
         ensureLoaded()
         Log.i(TAG, "  after ensureLoaded: cacheSize=${cache?.size} imdbIdx=${byImdbShowIndex.size} tmdbIdx=${byTmdbShowIndex.size}")
 
-        // 1. Direct IMDb hit in PAB — cheapest path.
+        // 1. Direct IMDb hit in PAB.
         if (!imdbId.isNullOrBlank()) {
             val pab = byImdbShowIndex[imdbId.trim()].orEmpty()
             if (pab.isNotEmpty()) {
-                val match = pickCandidate(pab, season, episode)
-                if (match != null) {
-                    return plexAniBridgeMapping(match, tmdbId, season, episode)
+                val matches = collectCoveringCandidates(pab, season, episode)
+                if (matches.isNotEmpty()) {
+                    Log.d(TAG, "  IMDb-direct PAB: ${matches.size} mapping(s)")
+                    return matches.map { plexAniBridgeMapping(it, tmdbId, season, episode) }
                 }
             }
         }
 
         // 2. Direct TMDB hit in PAB.
         if (tmdbId != null) {
-            val result = resolve(tmdbId, season, episode)
-            if (result.source != TrackerEpisodeMapping.MappingSource.HEURISTIC_NONE) return result
+            val pab = byTmdbShowIndex[tmdbId].orEmpty()
+            if (pab.isNotEmpty()) {
+                val matches = collectCoveringCandidates(pab, season, episode)
+                if (matches.isNotEmpty()) {
+                    Log.d(TAG, "  TMDB-direct PAB: ${matches.size} mapping(s)")
+                    return matches.map { plexAniBridgeMapping(it, tmdbId, season, episode) }
+                }
+            }
         }
 
-        // 3. IMDb → TMDB via ARM, then retry PAB TMDB lookup. Most anime
-        // entries in PAB are keyed by tmdb_show_id only — the IMDb index
-        // misses them entirely. This bridge covers the common case.
+        // 3. IMDb → TMDB via ARM, then retry PAB TMDB lookup. Covers the
+        // common case where PAB indexes by tmdb_show_id only.
         if (!imdbId.isNullOrBlank()) {
             val arm = animeIdMapper.getEntriesForImdb(imdbId)
             val tmdbFromArm = arm.firstNotNullOfOrNull { it.themoviedb }
@@ -103,88 +148,108 @@ class EpisodeOffsetMapper @Inject constructor(
                 Log.d(TAG, "  IMDb→TMDB bridge via arm: $imdbId → $tmdbFromArm")
                 val bridged = byTmdbShowIndex[tmdbFromArm].orEmpty()
                 if (bridged.isNotEmpty()) {
-                    val match = pickCandidate(bridged, season, episode)
-                    if (match != null) {
-                        return plexAniBridgeMapping(match, tmdbFromArm, season, episode)
+                    val matches = collectCoveringCandidates(bridged, season, episode)
+                    if (matches.isNotEmpty()) {
+                        Log.d(TAG, "  bridged PAB: ${matches.size} mapping(s)")
+                        return matches.map { plexAniBridgeMapping(it, tmdbFromArm, season, episode) }
                     }
                 }
             }
-            // ARM positional fallback — least accurate, only when PAB has nothing.
+            // ARM positional fallback — one mapping, single entry, no splits.
             if (arm.isNotEmpty()) {
                 val idx = (season - 1).coerceIn(0, arm.lastIndex)
                 val entry = arm[idx]
-                return TrackerEpisodeMapping(
-                    tmdbId = entry.themoviedb ?: -1,
-                    tmdbSeason = season,
-                    tmdbEpisode = episode,
-                    malId = entry.myanimelist,
-                    anilistId = entry.anilist,
-                    kitsuId = entry.kitsu,
-                    anidbId = entry.anidb,
-                    trackerEpisode = episode,
-                    totalEpisodes = null,
-                    source = TrackerEpisodeMapping.MappingSource.ARM
+                return listOf(
+                    TrackerEpisodeMapping(
+                        tmdbId = entry.themoviedb ?: -1,
+                        tmdbSeason = season,
+                        tmdbEpisode = episode,
+                        malId = entry.myanimelist,
+                        anilistId = entry.anilist,
+                        kitsuId = entry.kitsu,
+                        anidbId = entry.anidb,
+                        trackerEpisode = episode,
+                        totalEpisodes = null,
+                        source = TrackerEpisodeMapping.MappingSource.ARM
+                    )
                 )
             }
         }
-
-        return TrackerEpisodeMapping(
-            tmdbId = tmdbId ?: -1,
-            tmdbSeason = season,
-            tmdbEpisode = episode,
-            trackerEpisode = episode,
-            source = TrackerEpisodeMapping.MappingSource.HEURISTIC_NONE
-        )
+        return emptyList()
     }
 
-    private fun plexAniBridgeMapping(
-        match: CandidateMatch,
+    private suspend fun plexAniBridgeMapping(
+        match: CoveringMatch,
         tmdbId: Int?,
         season: Int,
         episode: Int
     ): TrackerEpisodeMapping {
-        val absolute = translateEpisode(match.entry, match.tvdbSeason, episode, match.viaTmdbMappings)
+        // PAB entries sometimes lack fields for trackers the user has connected
+        // (e.g. One Piece has no kitsu_id in PAB even though ARM does). If any
+        // tracker id is missing and we have an AniList id to pivot on, fill the
+        // gaps via the ARM cross-reference. ARM results are memoised so this
+        // costs at most one network call per show, ever.
+        var malId = match.entry.malId
+        var kitsuId = match.entry.kitsuId
+        var anilistId = match.entry.anilistId
+        var anidbId = match.entry.anidbId
+        if ((malId == null || kitsuId == null) && anilistId != null) {
+            val arm = animeIdMapper.resolveFromTracker(AnimeIdMapper.TrackerSource.ANILIST, anilistId)
+            if (arm != null) {
+                if (malId == null) malId = arm.myanimelist
+                if (kitsuId == null) kitsuId = arm.kitsu
+                if (anidbId == null) anidbId = arm.anidb
+            }
+        }
         return TrackerEpisodeMapping(
             tmdbId = match.entry.tmdbShowId ?: tmdbId ?: -1,
             tmdbSeason = season,
             tmdbEpisode = episode,
-            malId = match.entry.malId,
-            anilistId = match.entry.anilistId,
-            kitsuId = match.entry.kitsuId,
-            anidbId = match.entry.anidbId,
-            trackerEpisode = absolute ?: episode,
+            malId = malId,
+            anilistId = anilistId,
+            kitsuId = kitsuId,
+            anidbId = anidbId,
+            trackerEpisode = match.trackerEpisode,
             totalEpisodes = match.entry.length,
-            source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE
+            source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE,
+            isRangeComplete = match.isRangeComplete
         )
     }
 
+    /**
+     * Single-mapping TMDB-only resolver. Kept for callers that don't have
+     * an IMDb id (e.g. the movie flow). For split-season coverage use
+     * [resolveAllByIds] instead.
+     */
     suspend fun resolve(
         tmdbId: Int,
         tmdbSeason: Int,
         tmdbEpisode: Int
     ): TrackerEpisodeMapping {
         ensureLoaded()
-        // 1. PlexAniBridge path — most accurate when present.
         val candidates = byTmdbShowIndex[tmdbId].orEmpty()
         if (candidates.isNotEmpty()) {
-            val match = pickCandidate(candidates, tmdbSeason, tmdbEpisode)
-            if (match != null) {
-                val absolute = translateEpisode(match.entry, match.tvdbSeason, tmdbEpisode, match.viaTmdbMappings)
+            val matches = collectCoveringCandidates(candidates, tmdbSeason, tmdbEpisode)
+            // Prefer the "containing" match (still in progress) over earlier
+            // completed parts — callers want the currently-active entry.
+            val primary = matches.firstOrNull { !it.isRangeComplete } ?: matches.firstOrNull()
+            if (primary != null) {
                 return TrackerEpisodeMapping(
                     tmdbId = tmdbId,
                     tmdbSeason = tmdbSeason,
                     tmdbEpisode = tmdbEpisode,
-                    malId = match.entry.malId,
-                    anilistId = match.entry.anilistId,
-                    kitsuId = match.entry.kitsuId,
-                    anidbId = match.entry.anidbId,
-                    trackerEpisode = absolute ?: tmdbEpisode,
-                    totalEpisodes = match.entry.length,
-                    source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE
+                    malId = primary.entry.malId,
+                    anilistId = primary.entry.anilistId,
+                    kitsuId = primary.entry.kitsuId,
+                    anidbId = primary.entry.anidbId,
+                    trackerEpisode = primary.trackerEpisode,
+                    totalEpisodes = primary.entry.length,
+                    source = TrackerEpisodeMapping.MappingSource.PLEX_ANI_BRIDGE,
+                    isRangeComplete = primary.isRangeComplete
                 )
             }
         }
-        // 2. ARM fallback — one entry per anime season/cour, no episode offsets.
+        // ARM fallback — one entry per anime season/cour, no episode offsets.
         val armEntries = animeIdMapper.getEntriesForTmdb(tmdbId)
         if (armEntries.isNotEmpty()) {
             val idx = (tmdbSeason - 1).coerceIn(0, armEntries.lastIndex)
@@ -202,7 +267,6 @@ class EpisodeOffsetMapper @Inject constructor(
                 source = TrackerEpisodeMapping.MappingSource.ARM
             )
         }
-        // 3. Nothing — caller should treat as "not anime / unknown".
         return TrackerEpisodeMapping(
             tmdbId = tmdbId,
             tmdbSeason = tmdbSeason,
@@ -448,128 +512,290 @@ class EpisodeOffsetMapper @Inject constructor(
     }
 
     /**
-     * Pick which PlexAniBridge candidate corresponds to the given TMDB
-     * (season, episode). Keys look like `s1`, `s4e1-e16`, or
-     * `s2e1-e12|s3e1-e12` (pipe-separated compound segments).
+     * Collect every candidate that contributes to the watched `(season,
+     * episode)`. PlexAniBridge keys are always `s{N}` (season-only); the
+     * episode range lives in the value. For each candidate whose mapping
+     * mentions this season, we parse the value's intervals and emit:
      *
-     * Strategy:
-     *   1. Prefer `tmdb_mappings` — keys there really are TMDB season numbers.
-     *   2. Fall back to `tvdb_mappings` — keys are TVDB season numbers, which
-     *      align with TMDB for ~80% of anime but not all (e.g. shows split
-     *      into multiple TVDB seasons but bundled under one TMDB season).
-     *   3. If only one candidate exists and nothing matched, take it — better
-     *      to write to some tracker entry than skip entirely.
+     *   • every interval whose last-episode is ≤ `episode` → contributes
+     *     its full length, flagged `isRangeComplete=true` when nothing
+     *     later in this season remains.
+     *   • the interval containing `episode` → contributes
+     *     `(episode - interval.first + 1)`, flagged `isRangeComplete=false`
+     *     when there's still unwatched content after in the same entry.
+     *   • intervals entirely after `episode` → skipped for this candidate.
+     *
+     * tmdb_mappings is preferred over tvdb_mappings when both exist for a
+     * candidate (tmdb is authoritative for our TMDB-based inputs).
      */
-    private fun pickCandidate(
+    internal fun collectCoveringCandidates(
         candidates: List<AnimeMappingEntryDto>,
         tmdbSeason: Int,
         tmdbEpisode: Int
-    ): CandidateMatch? {
-        // Pass 1: tmdb_mappings when PlexAniBridge supplies them.
+    ): List<CoveringMatch> {
+        val matches = mutableListOf<CoveringMatch>()
         for (entry in candidates) {
-            val mappings = entry.tmdbMappings ?: continue
-            for ((key, _) in mappings) {
-                for (seg in key.split("|")) {
-                    val (s, range) = parseSeasonSegment(seg) ?: continue
-                    if (s != tmdbSeason) continue
-                    if (range == null || tmdbEpisode in range) {
-                        Log.d(TAG, "pickCandidate matched via tmdb_mappings: anilist=${entry.anilistId} key=$key")
-                        return CandidateMatch(entry = entry, tvdbSeason = s, viaTmdbMappings = true)
-                    }
-                }
-            }
+            val contribution = computeContribution(entry, tmdbSeason, tmdbEpisode) ?: continue
+            Log.d(TAG, "  candidate anilist=${entry.anilistId} → trackerEp=${contribution.trackerEpisode} " +
+                "complete=${contribution.isComplete} via=${if (contribution.viaTmdbMappings) "tmdb" else "tvdb"}")
+            matches += CoveringMatch(
+                entry = entry,
+                trackerEpisode = contribution.trackerEpisode,
+                isRangeComplete = contribution.isComplete,
+                viaTmdbMappings = contribution.viaTmdbMappings
+            )
         }
-        // Pass 2: tvdb_mappings as a proxy.
-        for (entry in candidates) {
-            val mappings = entry.tvdbMappings ?: continue
-            for ((key, _) in mappings) {
-                for (seg in key.split("|")) {
-                    val (s, range) = parseSeasonSegment(seg) ?: continue
-                    if (s != tmdbSeason) continue
-                    if (range == null || tmdbEpisode in range) {
-                        Log.d(TAG, "pickCandidate matched via tvdb_mappings: anilist=${entry.anilistId} key=$key")
-                        return CandidateMatch(entry = entry, tvdbSeason = s, viaTmdbMappings = false)
-                    }
-                }
-            }
+        // Fallback for shows with exactly one candidate and no resolvable
+        // season mapping — better to attempt a write than silently skip.
+        if (matches.isEmpty() && candidates.size == 1) {
+            val sole = candidates[0]
+            Log.d(TAG, "  sole-candidate fallback: anilist=${sole.anilistId}")
+            matches += CoveringMatch(
+                entry = sole,
+                trackerEpisode = tmdbEpisode,
+                isRangeComplete = false,
+                viaTmdbMappings = false
+            )
         }
-        // Last resort: sole candidate.
-        if (candidates.size == 1) {
-            Log.d(TAG, "pickCandidate fell back to sole candidate: anilist=${candidates[0].anilistId}")
-            return CandidateMatch(entry = candidates[0], tvdbSeason = tmdbSeason, viaTmdbMappings = false)
-        }
-        Log.w(TAG, "pickCandidate: no match among ${candidates.size} candidates for S${tmdbSeason}E$tmdbEpisode — " +
-            "candidates=${candidates.map { "anilist=${it.anilistId} tvdb=${it.tvdbMappings?.keys} tmdb=${it.tmdbMappings?.keys}" }}")
-        return null
+        return matches
     }
 
     /**
-     * Given a picked candidate, translate the TMDB episode to the tracker
-     * (AniList/MAL/Kitsu) absolute episode. Uses the same key→value pair that
-     * [pickCandidate] matched on; [fromTmdbMappings] selects which map to
-     * read. Returns null when no explicit range exists — caller falls back
-     * to `tmdbEpisode` as-is.
+     * Given one candidate and a watched `(season, episode)`, compute how
+     * many tracker-side episodes have been watched on this entry and
+     * whether any content remains unwatched. Handles two distinct value
+     * coordinate systems used in PlexAniBridge:
+     *
+     *   • **Absolute-cumulative**: each season's value range is a slice
+     *     of the tracker's absolute episode numbering (e.g. One Piece
+     *     `tmdb_mappings` — `s1: e1-e61, s2: e62-e77, s3: e78-e91...`).
+     *     Detected when consecutive season values chain end-to-start.
+     *
+     *   • **Season-local**: each season's value is in that source
+     *     season's own episode coordinates starting from 1 (tvdb case) or
+     *     from the entry's first covered TMDB episode (split-entry case
+     *     like AoT Part 2 `s4: e17-e28`). Must sum earlier seasons'
+     *     lengths to produce cumulative tracker progress.
+     *
+     * Returns null when the candidate has no mapping for this season.
      */
-    private fun translateEpisode(
+    private fun computeContribution(
         entry: AnimeMappingEntryDto,
-        tvdbSeason: Int,
+        tmdbSeason: Int,
+        tmdbEpisode: Int
+    ): Contribution? {
+        // Prefer tvdb_mappings when it covers the watched season — current
+        // TMDB season layouts for most anime shows mirror TVDB (One Piece
+        // S1=8 eps, S2=22 eps, …), so tvdb-side season-local episode ranges
+        // match what the user sees in the app. tmdb_mappings is kept as a
+        // fallback and tends to be an older snapshot of TMDB that used
+        // very different absolute numbering (e.g. One Piece S1=61 eps).
+        val preferTvdb = entry.tvdbMappings?.containsKey("s$tmdbSeason") == true
+        val mappings = when {
+            preferTvdb -> entry.tvdbMappings!!
+            entry.tmdbMappings?.containsKey("s$tmdbSeason") == true -> entry.tmdbMappings
+            else -> return null
+        } ?: return null
+        val viaTmdb = !preferTvdb
+
+        return if (detectChaining(mappings)) {
+            computeAbsoluteContribution(mappings, tmdbSeason, tmdbEpisode, viaTmdb)
+        } else {
+            computeSeasonLocalContribution(mappings, tmdbSeason, tmdbEpisode, viaTmdb)
+        }
+    }
+
+    /**
+     * True iff every consecutive pair of numeric season keys in [mappings]
+     * chains: the last episode of `s(n)`'s value equals the first episode
+     * of `s(n+1)`'s value minus one. This pattern is how PlexAniBridge
+     * encodes absolute-cumulative tracker numbering across multiple TMDB
+     * seasons. Single-season mappings are never considered chaining.
+     */
+    private fun detectChaining(mappings: Map<String, String>): Boolean {
+        val sorted = mappings.entries.mapNotNull { (k, v) ->
+            val s = SEASON_KEY_REGEX.matchEntire(k.trim())?.groupValues?.get(1)?.toIntOrNull()
+            if (s == null || s <= 0 || v.isEmpty()) null else s to v
+        }.sortedBy { it.first }
+        if (sorted.size < 2) return false
+        var prevEnd: Int? = null
+        for ((_, value) in sorted) {
+            val intervals = parseValueCoverage(value)
+            if (intervals.isEmpty()) return false
+            val firstStart = intervals.first().first
+            val lastEnd = intervals.last().last
+            if (prevEnd != null) {
+                if (firstStart != prevEnd!! + 1) return false
+            }
+            prevEnd = if (lastEnd == Int.MAX_VALUE) lastEnd else lastEnd
+        }
+        return true
+    }
+
+    /**
+     * Absolute-cumulative branch. Example: `s2: e62-e77` means TMDB S2 (whose
+     * episodes run 1..16 in TMDB-season-local numbering) maps to tracker
+     * absolute eps 62..77. Watching TMDB S2E5 → tracker ep = `62 + (5 - 1)`.
+     *
+     * Completeness: the watched episode must reach or exceed the last interval's
+     * end for this season, AND there must be no later-season keys left.
+     */
+    private fun computeAbsoluteContribution(
+        mappings: Map<String, String>,
+        tmdbSeason: Int,
         tmdbEpisode: Int,
-        fromTmdbMappings: Boolean
-    ): Int? {
-        val mappings = (if (fromTmdbMappings) entry.tmdbMappings else entry.tvdbMappings) ?: return null
-        for ((key, value) in mappings) {
-            val keySegs = key.split("|")
-            val valueSegs = value.split("|")
-            for ((i, seg) in keySegs.withIndex()) {
-                val (s, range) = parseSeasonSegment(seg) ?: continue
-                if (s != tvdbSeason) continue
-                val sourceStart = range?.first ?: 1
-                val matchesEpisode = range == null || tmdbEpisode in range
-                if (!matchesEpisode) continue
-                val valSeg = valueSegs.getOrNull(i).orEmpty()
-                val trackerStart = parseRange(valSeg)?.first ?: 1
-                return trackerStart + (tmdbEpisode - sourceStart)
+        preferTmdb: Boolean
+    ): Contribution? {
+        val rawValue = mappings["s$tmdbSeason"] ?: return null
+        val intervals = parseValueCoverage(rawValue)
+        if (intervals.isEmpty()) return null
+        val first = intervals.first()
+        val last = intervals.last()
+        val trackerEp = first.first + (tmdbEpisode - 1)
+        val seasonDone = trackerEp >= last.last
+        val laterSeasonsExist = mappings.keys.any {
+            val s = SEASON_KEY_REGEX.matchEntire(it.trim())?.groupValues?.get(1)?.toIntOrNull()
+            s != null && s > tmdbSeason
+        }
+        return Contribution(
+            trackerEpisode = trackerEp,
+            isComplete = seasonDone && !laterSeasonsExist,
+            viaTmdbMappings = preferTmdb
+        )
+    }
+
+    /**
+     * Season-local branch. Sums earlier-season full ranges + current-season
+     * partial. Covers both split-entry cases (AoT Part 2 with one season
+     * key) and multi-season non-chaining entries (tvdb_mappings where each
+     * season resets to e1).
+     *
+     * Returns null when this candidate doesn't mention the watched season
+     * at all — prevents emitting a mapping for an entry that only covers
+     * OTHER seasons.
+     */
+    private fun computeSeasonLocalContribution(
+        mappings: Map<String, String>,
+        tmdbSeason: Int,
+        tmdbEpisode: Int,
+        preferTmdb: Boolean
+    ): Contribution? {
+        val sortedSeasons = mappings.keys.mapNotNull {
+            SEASON_KEY_REGEX.matchEntire(it.trim())?.groupValues?.get(1)?.toIntOrNull()
+        }.filter { it in 1..tmdbSeason }.sorted()
+        if (sortedSeasons.isEmpty()) return null
+
+        var trackerContribution = 0
+        var hasUnwatchedAfter = false
+        var touchedCurrent = false
+
+        for (season in sortedSeasons) {
+            val rawValue = mappings["s$season"] ?: continue
+            val intervals = parseValueCoverage(rawValue)
+            if (intervals.isEmpty()) continue
+
+            if (season < tmdbSeason) {
+                // Earlier season: fully watched (user's past viewing assumed).
+                // Skip unbounded intervals — we can't count `""` (1..MAX_VALUE)
+                // without a length field. Explicit ranges contribute their size.
+                for (interval in intervals) {
+                    if (interval.last == Int.MAX_VALUE) continue
+                    trackerContribution += (interval.last - interval.first + 1)
+                }
+            } else {
+                // Current season: partial based on watched episode.
+                for (interval in intervals) {
+                    when {
+                        interval.last < tmdbEpisode -> {
+                            trackerContribution += (interval.last - interval.first + 1)
+                            touchedCurrent = true
+                        }
+                        interval.first > tmdbEpisode -> hasUnwatchedAfter = true
+                        else -> {
+                            trackerContribution += (tmdbEpisode - interval.first + 1)
+                            touchedCurrent = true
+                            if (tmdbEpisode < interval.last) hasUnwatchedAfter = true
+                        }
+                    }
+                }
             }
         }
-        return null
-    }
+        if (!touchedCurrent) return null
 
-    /** Returns `null` when the whole season is mapped (no e-range). */
-    private fun parseSeasonSegment(seg: String): Pair<Int, IntRange?>? {
-        val m = SEGMENT_REGEX.matchEntire(seg.trim()) ?: return null
-        val season = m.groupValues[1].toInt()
-        val epStart = m.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }?.toInt()
-        val epEnd = m.groupValues.getOrNull(3)?.takeIf { it.isNotEmpty() }?.toInt()
-        val range = when {
-            epStart != null && epEnd != null -> epStart..epEnd
-            epStart != null -> epStart..epStart
-            else -> null
+        val laterSeasonsExist = mappings.keys.any {
+            val s = SEASON_KEY_REGEX.matchEntire(it.trim())?.groupValues?.get(1)?.toIntOrNull()
+            s != null && s > tmdbSeason
         }
-        return season to range
+        return Contribution(
+            trackerEpisode = trackerContribution,
+            isComplete = !hasUnwatchedAfter && !laterSeasonsExist,
+            viaTmdbMappings = preferTmdb
+        )
     }
 
-    private fun parseRange(seg: String): IntRange? {
-        val m = RANGE_REGEX.matchEntire(seg.trim()) ?: return null
-        val start = m.groupValues[1].toInt()
-        val end = m.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }?.toInt() ?: start
-        return start..end
+    /**
+     * Parse a PlexAniBridge mapping value into a list of TMDB episode
+     * intervals.
+     *
+     * Grammar (confirmed against 20,626 real entries):
+     *   ""                             → the whole season (wildcard, all episodes)
+     *   "eN"                           → single episode N
+     *   "eA-eB"                        → range A..B inclusive
+     *   "<seg>,<seg>,..."              → comma-separated multi-range
+     *   "<seg>|{ratio}" (rare, 85 entries) → ratio suffix for movie/recap
+     *     compressions; we strip the `|…` and use the base range. That
+     *     over-counts for recap segments but covers the common case.
+     *
+     * Empty string is treated as the interval `1..Int.MAX_VALUE` so a
+     * single-candidate whole-season mapping always "contains" the watched
+     * episode and writes `trackerEpisode = watched`.
+     */
+    internal fun parseValueCoverage(value: String): List<IntRange> {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return listOf(1..Int.MAX_VALUE)
+        val segments = trimmed.split(",")
+        val out = mutableListOf<IntRange>()
+        for (raw in segments) {
+            val seg = raw.substringBefore("|").trim() // strip ratio suffix
+            if (seg.isEmpty()) continue
+            val m = VALUE_RANGE_REGEX.matchEntire(seg) ?: continue
+            val start = m.groupValues[1].toInt()
+            val endGroup = m.groupValues.getOrNull(2)?.takeIf { it.isNotEmpty() }
+            // "e1089" (no dash) → single ep. "e1089-" (trailing dash, no
+            // end) → open-ended; used by PAB to mark ongoing seasons like
+            // One Piece's latest arc. Distinguish via the raw string.
+            val end = when {
+                endGroup != null -> endGroup.toInt()
+                seg.contains('-') -> Int.MAX_VALUE
+                else -> start
+            }
+            out += start..end
+        }
+        return out
     }
 
     private fun firstTvdbSeason(entry: AnimeMappingEntryDto): Int? {
         val keys = entry.tvdbMappings?.keys ?: return null
         for (key in keys) {
-            for (seg in key.split("|")) {
-                parseSeasonSegment(seg)?.let { return it.first }
-            }
+            val m = SEASON_KEY_REGEX.matchEntire(key.trim()) ?: continue
+            return m.groupValues[1].toInt()
         }
         return null
     }
 
-    private data class CandidateMatch(
+    /** Per-candidate computation result (internal helper). */
+    private data class Contribution(
+        val trackerEpisode: Int,
+        val isComplete: Boolean,
+        val viaTmdbMappings: Boolean
+    )
+
+    /** Public enough to be addressable by test-only code; sealed via `internal`. */
+    internal data class CoveringMatch(
         val entry: AnimeMappingEntryDto,
-        val tvdbSeason: Int,
-        /** True when match came from `tmdb_mappings`; translate reads the right map accordingly. */
-        val viaTmdbMappings: Boolean = false
+        val trackerEpisode: Int,
+        val isRangeComplete: Boolean,
+        val viaTmdbMappings: Boolean
     )
 
     companion object {
@@ -577,9 +803,9 @@ class EpisodeOffsetMapper @Inject constructor(
         private const val CACHE_FILENAME = "anime_mappings.json"
         private const val MAX_AGE_MS = 24L * 60 * 60 * 1000
         private const val FAILED_BACKOFF_MS = 60_000L
-        // s1, s1e1-e12, s21e1-e1072
-        private val SEGMENT_REGEX = Regex("""s(\d+)(?:e(\d+)(?:-e(\d+))?)?""", RegexOption.IGNORE_CASE)
-        // e1-e12 or e1 or 1-12
-        private val RANGE_REGEX = Regex("""e?(\d+)(?:-e?(\d+))?""", RegexOption.IGNORE_CASE)
+        // Keys — always `s{N}` in real PAB data.
+        private val SEASON_KEY_REGEX = Regex("""s(\d+)""", RegexOption.IGNORE_CASE)
+        // Value segments — `eA`, `eA-eB`, or `eA-` (open-ended).
+        private val VALUE_RANGE_REGEX = Regex("""e?(\d+)(?:-e?(\d+)?)?""", RegexOption.IGNORE_CASE)
     }
 }

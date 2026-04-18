@@ -104,11 +104,13 @@ class KitsuAuthService @Inject constructor(
                 okHttpClient.newCall(req).execute().use { resp ->
                     val body = resp.body.string()
                     if (!resp.isSuccessful) {
+                        Log.w(TAG, "kitsu password grant ${resp.code}: $body")
                         return@withContext Result.failure(IllegalStateException("Kitsu login failed (${resp.code}): $body"))
                     }
                     val token = tokenAdapter.fromJson(body)
                         ?: return@withContext Result.failure(IllegalStateException("Malformed Kitsu token response"))
                     dataStore.saveTokens(token.accessToken, token.refreshToken, token.expiresIn)
+                    Log.i(TAG, "kitsu password grant ok")
                 }
                 Result.success(Unit)
             } catch (e: Exception) {

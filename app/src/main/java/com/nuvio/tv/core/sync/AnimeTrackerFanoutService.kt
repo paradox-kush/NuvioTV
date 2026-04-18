@@ -83,33 +83,51 @@ class AnimeTrackerFanoutService @Inject constructor(
 ) {
 
     suspend fun markEpisodeWatched(imdbId: String?, tmdbId: Int?, season: Int, episode: Int) {
-        val mapping = episodeOffsetMapper.resolveByIds(imdbId, tmdbId, season, episode)
-        if (!mapping.hasAnyTrackerId) {
+        val mappings = episodeOffsetMapper.resolveAllByIds(imdbId, tmdbId, season, episode)
+        val activeMappings = mappings.filter { it.hasAnyTrackerId }
+        if (activeMappings.isEmpty()) {
             Log.d(TAG, "skip episode s${season}e$episode: no tracker mapping (imdb=$imdbId tmdb=$tmdbId)")
             return
         }
-        Log.i(TAG, "fanout episode: tmdb=(s$season,e$episode) imdb=$imdbId → " +
-            "source=${mapping.source} trackerEp=${mapping.trackerEpisode} " +
-            "mal=${mapping.malId} anilist=${mapping.anilistId} kitsu=${mapping.kitsuId}")
+        Log.i(TAG, "fanout episode: tmdb=(s$season,e$episode) imdb=$imdbId → ${activeMappings.size} mapping(s)")
         coroutineScope {
-            mapping.malId?.let { launch { writeMal(it, mapping.trackerEpisode, mapping.totalEpisodes) } }
-            mapping.anilistId?.let { launch { writeAniList(it, mapping.trackerEpisode, mapping.totalEpisodes) } }
-            mapping.kitsuId?.let { launch { writeKitsu(it.toString(), mapping.trackerEpisode, mapping.totalEpisodes) } }
+            for (m in activeMappings) {
+                // Prior-part mappings carry `isRangeComplete=true`; force
+                // their tracker entry to COMPLETED so Part 1 flips when the
+                // user watches an episode that lives in Part 2.
+                val force = m.isRangeComplete
+                Log.i(TAG, "  → source=${m.source} trackerEp=${m.trackerEpisode} complete=${m.isRangeComplete} " +
+                    "mal=${m.malId} anilist=${m.anilistId} kitsu=${m.kitsuId}")
+                m.malId?.let { launch { writeMal(it, m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+                m.anilistId?.let { launch { writeAniList(it, m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+                m.kitsuId?.let { launch { writeKitsu(it.toString(), m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+            }
         }
     }
 
     suspend fun markSeasonWatched(imdbId: String?, tmdbId: Int?, season: Int, episodeCount: Int) {
-        // Resolve the specific season's tracker entry and mark it complete.
-        val mapping = episodeOffsetMapper.resolveByIds(imdbId, tmdbId, season, episodeCount)
-        if (!mapping.hasAnyTrackerId) {
+        // Pass the season's last episode as the watched episode; the mapper
+        // computes the cumulative tracker-side progress and a per-entry
+        // `isRangeComplete` flag. If the tracker entry spans beyond this
+        // season (e.g. Dragon Ball Z on AniList is one entry with DB+DBZ+Super),
+        // completeness stays false and we just advance progress, leaving the
+        // user's status as CURRENT.
+        val mappings = episodeOffsetMapper.resolveAllByIds(imdbId, tmdbId, season, episodeCount)
+        val activeMappings = mappings.filter { it.hasAnyTrackerId }
+        if (activeMappings.isEmpty()) {
             Log.d(TAG, "skip season $season: no tracker mapping")
             return
         }
-        val finalEp = mapping.totalEpisodes ?: episodeCount.coerceAtLeast(mapping.trackerEpisode)
+        Log.i(TAG, "fanout season: s$season imdb=$imdbId → ${activeMappings.size} mapping(s)")
         coroutineScope {
-            mapping.malId?.let { launch { writeMal(it, finalEp, mapping.totalEpisodes, forceComplete = true) } }
-            mapping.anilistId?.let { launch { writeAniList(it, finalEp, mapping.totalEpisodes, forceComplete = true) } }
-            mapping.kitsuId?.let { launch { writeKitsu(it.toString(), finalEp, mapping.totalEpisodes, forceComplete = true) } }
+            for (m in activeMappings) {
+                val force = m.isRangeComplete
+                Log.i(TAG, "  → source=${m.source} trackerEp=${m.trackerEpisode} complete=${m.isRangeComplete} " +
+                    "mal=${m.malId} anilist=${m.anilistId} kitsu=${m.kitsuId}")
+                m.malId?.let { launch { writeMal(it, m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+                m.anilistId?.let { launch { writeAniList(it, m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+                m.kitsuId?.let { launch { writeKitsu(it.toString(), m.trackerEpisode, m.totalEpisodes, forceComplete = force) } }
+            }
         }
     }
 
@@ -247,7 +265,22 @@ class AnimeTrackerFanoutService @Inject constructor(
     private suspend fun writeKitsu(animeId: String, newProgress: Int, totalEpisodes: Int?, forceComplete: Boolean = false) {
         if (!kitsuAuth.isAuthenticated.first()) return
         if (!kitsuSettings.settings.first().sendProgress) return
-        val userId = kitsuAuth.state.first().userId ?: return
+        // userId is populated by KitsuListService on first list fetch. If the
+        // user marks an episode before any list loads (common with debug
+        // sign-in where we only stored tokens), resolve it on demand.
+        val userId = kitsuAuth.state.first().userId ?: run {
+            val self = safeApiCall { kitsuApi.getSelf() }
+            val resolved = (self as? NetworkResult.Success)?.data?.data?.firstOrNull()?.id
+            if (resolved == null) {
+                Log.w(TAG, "Kitsu write skipped: cannot resolve self user id")
+                return
+            }
+            kitsuAuth.saveUser(
+                userId = resolved,
+                username = (self as NetworkResult.Success).data.data.firstOrNull()?.attributes?.name
+            )
+            resolved
+        }
         // Find existing library entry for (user, anime). Filter by anime_id.
         val existingResult = safeApiCall {
             kitsuApi.getLibrary(

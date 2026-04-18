@@ -9,6 +9,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -58,12 +59,18 @@ interface KitsuApi {
     @GET
     suspend fun getLibraryPage(@Url url: String): Response<KitsuLibraryPageDto>
 
+    // Kitsu's JSON:API enforces the vnd.api+json media type on writes. Retrofit
+    // otherwise serialises the body as `application/json` via the Moshi
+    // converter, which Kitsu rejects with HTTP 415. @Headers sets the header
+    // as part of the request line itself, surviving body serialisation.
+    @Headers("Content-Type: application/vnd.api+json")
     @PATCH("library-entries/{id}")
     suspend fun updateEntry(
         @Path("id") id: String,
         @Body body: KitsuLibraryPatchDto
     ): Response<KitsuLibraryEntryResponseDto>
 
+    @Headers("Content-Type: application/vnd.api+json")
     @POST("library-entries")
     suspend fun createEntry(
         @Body body: KitsuLibraryCreateDto

@@ -169,6 +169,15 @@ android {
         buildConfig = true
     }
 
+    testOptions {
+        unitTests {
+            // Return 0/null from mocked Android SDK calls (e.g. android.util.Log)
+            // instead of throwing. Lets us unit-test logic that incidentally
+            // logs without wiring a Log mock in every test.
+            isReturnDefaultValues = true
+        }
+    }
+
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("src/main/jniLibs")

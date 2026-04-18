@@ -28,7 +28,16 @@ data class TrackerEpisodeMapping(
      */
     val totalEpisodes: Int? = null,
     /** Where this mapping came from, for diagnostics/logging. */
-    val source: MappingSource
+    val source: MappingSource,
+    /**
+     * True when this mapping's episode range ends *before* the user's
+     * watched TMDB episode — i.e. the whole tracker entry was consumed by
+     * prior progress. Set when a TMDB season is split across multiple
+     * tracker entries (AoT "Final Season Part 1" + "Part 2") and the
+     * watched episode falls after this entry's range. The fanout writes
+     * it with `forceComplete = true` so its status flips to COMPLETED.
+     */
+    val isRangeComplete: Boolean = false
 ) {
     val hasAnyTrackerId: Boolean
         get() = malId != null || anilistId != null || kitsuId != null
