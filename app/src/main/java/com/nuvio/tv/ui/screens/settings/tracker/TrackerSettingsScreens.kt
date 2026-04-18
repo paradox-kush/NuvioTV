@@ -2,14 +2,19 @@
 
 package com.nuvio.tv.ui.screens.settings.tracker
 
+import android.graphics.Bitmap
 import android.view.KeyEvent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -18,15 +23,20 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -40,8 +50,11 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.nuvio.tv.core.qr.QrCodeGenerator
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.theme.NuvioColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Thin mount points for each tracker's Settings subscreen. Each wires its
@@ -172,24 +185,37 @@ private fun MalDebugDialog(
     NuvioDialog(
         onDismiss = onDismiss,
         title = "MyAnimeList — local auth",
-        subtitle = "1. Open the URL below on any browser. 2. Sign in. 3. When redirected to localhost, copy the `code=…` from the URL and paste it here.",
+        subtitle = "1. Scan the QR with your phone (or open the URL). 2. Sign in. 3. When redirected to localhost, copy the `code=…` value from the URL and paste it here.",
         width = 720.dp
     ) {
-        ReadOnlyUrlRow(
-            url = authorizeUrl,
-            onCopy = { clip.setText(AnnotatedString(authorizeUrl)) }
-        )
-        Text(
-            text = "Redirect URI set to: $redirectUri",
-            style = MaterialTheme.typography.bodySmall,
-            color = NuvioColors.TextTertiary
-        )
-        Spacer(Modifier.height(6.dp))
-        InputField(
-            value = code,
-            placeholder = "Paste the `code` value here",
-            onValueChange = { code = it }
-        )
+        // Side-by-side: QR on left, URL + input stack on right. Keeps the
+        // dialog short enough that the Exchange button stays on-screen on
+        // 720p TV panels where NuvioDialog doesn't scroll.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            QrImageBox(url = authorizeUrl)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ReadOnlyUrlRow(
+                    url = authorizeUrl,
+                    onCopy = { clip.setText(AnnotatedString(authorizeUrl)) }
+                )
+                Text(
+                    text = "Redirect URI: $redirectUri",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NuvioColors.TextTertiary
+                )
+                InputField(
+                    value = code,
+                    placeholder = "Paste the `code` value here",
+                    onValueChange = { code = it }
+                )
+            }
+        }
         DialogButtonRow(
             onCancel = onDismiss,
             onSubmit = { if (code.isNotBlank()) onSubmit(code.trim()) },
@@ -210,19 +236,29 @@ private fun AniListDebugDialog(
     NuvioDialog(
         onDismiss = onDismiss,
         title = "AniList — local auth",
-        subtitle = "1. Open the URL below on any browser. 2. Sign in and authorize. 3. AniList will display the access token — paste it here.",
+        subtitle = "1. Scan the QR with your phone (or open the URL). 2. Sign in and authorize. 3. AniList displays an access token on the next page — paste it here.",
         width = 720.dp
     ) {
-        ReadOnlyUrlRow(
-            url = authorizeUrl,
-            onCopy = { clip.setText(AnnotatedString(authorizeUrl)) }
-        )
-        Spacer(Modifier.height(6.dp))
-        InputField(
-            value = token,
-            placeholder = "Paste access_token here",
-            onValueChange = { token = it }
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            QrImageBox(url = authorizeUrl)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ReadOnlyUrlRow(
+                    url = authorizeUrl,
+                    onCopy = { clip.setText(AnnotatedString(authorizeUrl)) }
+                )
+                InputField(
+                    value = token,
+                    placeholder = "Paste access_token here",
+                    onValueChange = { token = it }
+                )
+            }
+        }
         DialogButtonRow(
             onCancel = onDismiss,
             onSubmit = { if (token.isNotBlank()) onSubmit(token.trim()) },
@@ -271,6 +307,35 @@ private fun KitsuDebugDialog(
 
 // --- Shared dialog primitives --- //
 
+/**
+ * Renders a QR code image in a 220dp rounded container. Bitmap generation
+ * runs on [Dispatchers.Default] via `produceState` so the dialog's main
+ * thread stays unblocked — same pattern as `TrackerConnectQrDialog`.
+ */
+@Composable
+private fun QrImageBox(url: String) {
+    val qrBitmap by produceState<Bitmap?>(initialValue = null, url) {
+        value = withContext(Dispatchers.Default) {
+            runCatching { QrCodeGenerator.generate(url, size = 512) }.getOrNull()
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(220.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(NuvioColors.BackgroundElevated),
+        contentAlignment = Alignment.Center
+    ) {
+        qrBitmap?.let {
+            Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.size(200.dp)
+            )
+        } ?: Text("Generating QR…", color = NuvioColors.TextSecondary)
+    }
+}
+
 @Composable
 private fun ReadOnlyUrlRow(url: String, onCopy: () -> Unit) {
     Card(
@@ -294,10 +359,16 @@ private fun ReadOnlyUrlRow(url: String, onCopy: () -> Unit) {
         scale = CardDefaults.scale(focusedScale = 1f)
     ) {
         Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            // Cap the visual height — auth URLs can be 200+ chars, which would
+            // wrap to dozens of lines and push the input / buttons off-screen.
+            // The user scans the QR or taps this row to copy, so truncation
+            // is fine.
             Text(
                 text = url,
                 style = MaterialTheme.typography.bodyMedium,
-                color = NuvioColors.TextPrimary
+                color = NuvioColors.TextPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

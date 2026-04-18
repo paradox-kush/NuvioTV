@@ -201,7 +201,10 @@ class AnimeTrackerFanoutService @Inject constructor(
         }
         when (result) {
             is NetworkResult.Success -> {
-                Log.i(TAG, "MAL wrote anime=$animeId progress=$targetProgress status=${targetStatus.toMal()}")
+                val actualStatus = result.data.status
+                val actualProgress = result.data.numEpisodesWatched
+                Log.i(TAG, "MAL wrote anime=$animeId sent(progress=$targetProgress status=${targetStatus.toMal()}) " +
+                    "echoed(progress=$actualProgress status=$actualStatus)")
                 malList.invalidateAll()
             }
             is NetworkResult.Error -> Log.w(TAG, "MAL write failed anime=$animeId code=${result.code} ${result.message}")
