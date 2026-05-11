@@ -172,7 +172,7 @@ class SubtitleRepositoryImpl @Inject constructor(
                     subtitles
                 }
                 is NetworkResult.Error -> {
-                    Log.e(TAG, "Failed to fetch subtitles from ${addon.name}: ${result.message}")
+                    Log.e(TAG, "Failed to fetch subtitles from ${addon.name}: code=${result.code} message=${result.message}")
                     emptyList()
                 }
                 NetworkResult.Loading -> emptyList()

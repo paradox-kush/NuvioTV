@@ -191,6 +191,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setSubtitleSecondaryLanguage(language)
     }
 
+    suspend fun setSubtitleShowOnlyPreferredLanguages(enabled: Boolean) {
+        playerSettingsDataStore.setSubtitleShowOnlyPreferredLanguages(enabled)
+    }
+
     suspend fun setSubtitleSize(size: Int) {
         playerSettingsDataStore.setSubtitleSize(size)
     }

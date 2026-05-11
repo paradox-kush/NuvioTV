@@ -16,6 +16,7 @@ import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.data.local.ExperienceModeDataStore
 import com.nuvio.tv.data.local.ProfileDataStoreFactory
 import com.nuvio.tv.data.remote.supabase.SupabaseProfileSettingsBlob
+import com.nuvio.tv.domain.model.DiscoverLocation
 import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,8 +67,10 @@ class ProfileSettingsSyncService @Inject constructor(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
+
     @Volatile
     private var applyingRemoteBlob: Boolean = false
+
     @Volatile
     private var skipNextPushSignature: String? = null
     private var foregroundPullJob: Job? = null
@@ -90,6 +93,10 @@ class ProfileSettingsSyncService @Inject constructor(
         "home_catalog_order_keys",
         "disabled_home_catalog_keys",
         "custom_catalog_titles"
+    )
+
+    private val localOnlyLayoutKeys = setOf(
+        "last_non_off_discover_location"
     )
 
     init {
@@ -142,6 +149,7 @@ class ProfileSettingsSyncService @Inject constructor(
                 val response = withJwtRefreshRetry {
                     postgrest.rpc("sync_pull_profile_settings_blob", params)
                 }
+                lastForegroundPullAtMs = SystemClock.elapsedRealtime()
                 val rows = response.decodeList<SupabaseProfileSettingsBlob>()
                 val blob = rows.firstOrNull()?.settingsJson
                 if (blob == null) {
@@ -193,6 +201,8 @@ class ProfileSettingsSyncService @Inject constructor(
                 val serialized = buildJsonObject {
                     prefs.asMap().forEach { (key, rawValue) ->
                         if (feature == "layout_settings" && key.name in catalogKeysExcludedFromBlob) return@forEach
+                        if (feature == "layout_settings" && key.name in localOnlyLayoutKeys) return@forEach
+                        if (feature == "layout_settings" && key.name == "search_discover_enabled") return@forEach
                         val encoded = encodePreferenceValue(rawValue) ?: return@forEach
                         put(key.name, encoded)
                     }
@@ -221,14 +231,54 @@ class ProfileSettingsSyncService @Inject constructor(
                             val boolKey = booleanPreferencesKey(keyName)
                             mutablePrefs[boolKey]?.let { entries[boolKey] = it }
                         }
+                        localOnlyLayoutKeys.forEach { keyName ->
+                            val strKey = stringPreferencesKey(keyName)
+                            mutablePrefs[strKey]?.let { entries[strKey] = it }
+                        }
                         entries
                     } else {
                         emptyMap()
                     }
+                    val priorDiscoverLocation = if (feature == "layout_settings") {
+                        mutablePrefs[stringPreferencesKey("discover_location")]
+                    } else null
+                    val priorLastNonOff = if (feature == "layout_settings") {
+                        mutablePrefs[stringPreferencesKey("last_non_off_discover_location")]?.let {
+                            runCatching { DiscoverLocation.valueOf(it) }.getOrNull()
+                        }?.takeIf { it != DiscoverLocation.OFF }
+                    } else null
 
                     mutablePrefs.clear()
+                    val hasWellFormedNewDiscoverKey = feature == "layout_settings" &&
+                        extractDiscoverLocationString(featureJson) != null
                     featureJson.forEach { (keyName, encodedValue) ->
                         if (feature == "layout_settings" && keyName in catalogKeysExcludedFromBlob) return@forEach
+                        if (feature == "layout_settings" && keyName in localOnlyLayoutKeys) return@forEach
+                        if (feature == "layout_settings" && keyName == "search_discover_enabled") {
+                            if (!hasWellFormedNewDiscoverKey) {
+                                val legacy = (encodedValue as? JsonObject)
+                                    ?.get("value")?.jsonPrimitive?.contentOrNull
+                                    ?.toBooleanStrictOrNull()
+                                if (legacy != null) {
+                                    val translated = DiscoverLocation.fromLegacySearchDiscoverEnabled(legacy)
+                                    val priorLocation = priorDiscoverLocation?.let {
+                                        runCatching { DiscoverLocation.valueOf(it) }.getOrNull()
+                                    }
+                                    val priorIsValidNonOff = priorLocation != null && priorLocation != DiscoverLocation.OFF
+                                    when {
+                                        translated == DiscoverLocation.OFF ->
+                                            mutablePrefs[stringPreferencesKey("discover_location")] = translated.name
+                                        priorIsValidNonOff -> {}
+                                        priorLastNonOff != null ->
+                                            mutablePrefs[stringPreferencesKey("discover_location")] = priorLastNonOff.name
+                                        else ->
+                                            mutablePrefs[stringPreferencesKey("discover_location")] = translated.name
+                                    }
+                                }
+                            }
+                            return@forEach
+                        }
+                        if (feature == "layout_settings" && keyName == "discover_location" && !hasWellFormedNewDiscoverKey) return@forEach
                         applyEncodedPreference(mutablePrefs, keyName, encodedValue)
                     }
 
@@ -241,6 +291,21 @@ class ProfileSettingsSyncService @Inject constructor(
                             is Long -> mutablePrefs[key as Preferences.Key<Long>] = value
                             is Float -> mutablePrefs[key as Preferences.Key<Float>] = value
                             is Double -> mutablePrefs[key as Preferences.Key<Double>] = value
+                        }
+                    }
+                    if (feature == "layout_settings" && priorDiscoverLocation != null) {
+                        val discoverKey = stringPreferencesKey("discover_location")
+                        if (mutablePrefs[discoverKey] == null) {
+                            mutablePrefs[discoverKey] = priorDiscoverLocation
+                        }
+                    }
+                    if (feature == "layout_settings") {
+                        val finalDiscover = mutablePrefs[stringPreferencesKey("discover_location")]?.let {
+                            runCatching { DiscoverLocation.valueOf(it) }.getOrNull()
+                        }
+                        if (finalDiscover != null && finalDiscover != DiscoverLocation.OFF) {
+                            mutablePrefs[stringPreferencesKey("last_non_off_discover_location")] =
+                                finalDiscover.name
                         }
                     }
                 }
@@ -294,10 +359,58 @@ class ProfileSettingsSyncService @Inject constructor(
         return signatures.joinToString(separator = "||")
     }
 
+    private fun extractDiscoverLocationString(featureJson: JsonObject): String? {
+        val encoded = featureJson["discover_location"] as? JsonObject ?: return null
+        val type = encoded["type"]?.jsonPrimitive?.contentOrNull
+        if (type != "string") return null
+        return encoded["value"]?.jsonPrimitive?.contentOrNull
+    }
+
+    private fun normalizeLayoutSettingsForSignature(featureJson: JsonObject): JsonObject {
+        val hasLegacy = "search_discover_enabled" in featureJson
+        val hasNewKey = "discover_location" in featureJson
+        val hasLocalOnly = featureJson.keys.any { it in localOnlyLayoutKeys }
+        if (!hasLegacy && !hasNewKey && !hasLocalOnly) return featureJson
+        val newDiscoverString = extractDiscoverLocationString(featureJson)
+        if (!hasLegacy && newDiscoverString != null && !hasLocalOnly) return featureJson
+        return buildJsonObject {
+            featureJson.forEach { (keyName, encodedValue) ->
+                when {
+                    keyName == "search_discover_enabled" -> return@forEach
+                    keyName == "discover_location" && newDiscoverString == null -> return@forEach
+                    keyName in localOnlyLayoutKeys -> return@forEach
+                    else -> put(keyName, encodedValue)
+                }
+            }
+            if (newDiscoverString == null && hasLegacy) {
+                val legacy = (featureJson["search_discover_enabled"] as? JsonObject)
+                    ?.get("value")?.jsonPrimitive?.contentOrNull
+                    ?.toBooleanStrictOrNull()
+                if (legacy != null) {
+                    put(
+                        "discover_location",
+                        buildJsonObject {
+                            put("type", "string")
+                            put(
+                                "value",
+                                DiscoverLocation.fromLegacySearchDiscoverEnabled(legacy).name
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+
     private fun buildSettingsSignature(featuresJson: JsonObject): String {
         return syncedFeatures.joinToString(separator = "||") { feature ->
             val featureJson = featuresJson[feature]?.jsonObject ?: JsonObject(emptyMap())
-            "$feature={${buildFeatureSignature(featureJson)}}"
+            val normalized = if (feature == "layout_settings") {
+                normalizeLayoutSettingsForSignature(featureJson)
+            } else {
+                featureJson
+            }
+            "$feature={${buildFeatureSignature(normalized)}}"
         }
     }
 
@@ -306,6 +419,7 @@ class ProfileSettingsSyncService @Inject constructor(
             .entries
             .mapNotNull { (key, rawValue) ->
                 if (feature == "layout_settings" && key.name in catalogKeysExcludedFromBlob) return@mapNotNull null
+                if (feature == "layout_settings" && key.name in localOnlyLayoutKeys) return@mapNotNull null
                 encodePreferenceValue(rawValue)?.let { encoded ->
                     key.name to encoded.toString()
                 }

@@ -301,6 +301,8 @@
     <string name="sub_forced_lang">फोर्स्ड</string>
     <string name="sub_preferred_lang">पसंदीदा भाषा</string>
     <string name="sub_secondary_lang">दूसरी पसंदीदा भाषा</string>
+    <string name="sub_show_only_preferred_languages">केवल पसंदीदा भाषाएं दिखाएं</string>
+    <string name="sub_show_only_preferred_languages_desc">चयन सूची से अन्य सभी उपशीर्षक भाषाएं छिपाएं</string>
     <string name="sub_organization">सबटाइटल संगठन</string>
     <string name="sub_size">आकार</string>
     <string name="sub_vertical_offset">वर्टिकल ऑफसेट</string>

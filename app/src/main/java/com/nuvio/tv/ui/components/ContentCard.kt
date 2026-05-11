@@ -166,18 +166,9 @@ fun ContentCard(
     }
 
     if (focusedPosterBackdropTrailerEnabled) {
-        LaunchedEffect(
-            item.id,
-            isFocused,
-            trailerPreviewUrl
-        ) {
-            if (!isFocused) return@LaunchedEffect
-            if (trailerPreviewUrl != null) return@LaunchedEffect
-            delay(TRAILER_PREVIEW_REQUEST_FOCUS_DEBOUNCE_MS)
-            if (!isFocused) return@LaunchedEffect
-            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return@LaunchedEffect
-            onRequestTrailerPreview(item)
-        }
+        // Trailer extraction is triggered by ModernHomeContent/ClassicHomeContent
+        // based on actual user focus, not by individual cards becoming visible.
+        // ContentCard only observes trailerPreviewUrl to start playback.
     }
 
     // Only pay the animation cost on the card that is actually focused/expanding.

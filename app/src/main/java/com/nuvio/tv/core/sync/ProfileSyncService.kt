@@ -47,6 +47,7 @@ class ProfileSyncService @Inject constructor(
             val profiles = profileManager.profiles.value
 
             val params = buildJsonObject {
+                put("p_client_max_profiles", ProfileManager.MAX_PROFILES)
                 put("p_profiles", buildJsonArray {
                     profiles.forEach { profile ->
                         addJsonObject {

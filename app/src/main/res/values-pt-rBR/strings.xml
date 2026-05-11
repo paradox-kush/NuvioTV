@@ -551,6 +551,8 @@
     <string name="sub_forced_lang">Forçadas</string>
     <string name="sub_preferred_lang">Idioma preferido</string>
     <string name="sub_secondary_lang">Idioma secundário preferido</string>
+    <string name="sub_show_only_preferred_languages">Mostrar apenas idiomas preferidos</string>
+    <string name="sub_show_only_preferred_languages_desc">Ocultar todos os outros idiomas de legendas da lista de seleção</string>
     <string name="sub_organization">Organização de legendas</string>
     <string name="sub_size">Tamanho</string>
     <string name="sub_vertical_offset">Altura da legenda</string>

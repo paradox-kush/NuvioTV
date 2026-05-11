@@ -347,6 +347,8 @@
     <string name="sub_forced_lang">強制</string>
     <string name="sub_preferred_lang">優先言語</string>
     <string name="sub_secondary_lang">第2優先言語</string>
+    <string name="sub_show_only_preferred_languages">優先言語のみ表示</string>
+    <string name="sub_show_only_preferred_languages_desc">選択リストから他のすべての字幕言語を非表示にする</string>
     <string name="sub_organization">字幕の整理</string>
     <string name="sub_size">サイズ</string>
     <string name="sub_vertical_offset">縦位置オフセット</string>

@@ -23,6 +23,10 @@ class ProfileManager @Inject constructor(
     private val factory: ProfileDataStoreFactory,
     @ApplicationContext private val context: Context
 ) {
+    companion object {
+        const val MAX_PROFILES = 5
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val activeProfileId: StateFlow<Int> = profileDataStore.activeProfileId
@@ -49,6 +53,9 @@ class ProfileManager @Inject constructor(
     val isPrimaryProfileActive: Boolean
         get() = activeProfileId.value == 1
 
+    val canCreateProfile: Boolean
+        get() = profiles.value.size < MAX_PROFILES
+
     suspend fun setActiveProfile(id: Int) {
         val exists = profiles.value.any { it.id == id }
         if (exists) {
@@ -68,10 +75,10 @@ class ProfileManager @Inject constructor(
         avatarId: String? = null
     ): Boolean {
         val current = profiles.value
-        if (current.size >= 4) return false
+        if (current.size >= MAX_PROFILES) return false
 
         val usedIds = current.map { it.id }.toSet()
-        val nextId = (2..4).firstOrNull { it !in usedIds } ?: return false
+        val nextId = (2..MAX_PROFILES).firstOrNull { it !in usedIds } ?: return false
 
         val profile = UserProfile(
             id = nextId,

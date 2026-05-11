@@ -516,12 +516,9 @@ internal fun buildCollectionFolderItem(
     }
     // Cover image takes priority over emoji. Emoji is only used as fallback
     // when no cover image is available.
-    // When focusGifEnabled is off, the GIF URL acts as a regular poster (priority over cover image).
-    val imageUrl = if (!folder.focusGifEnabled) {
-        firstNonBlank(folder.focusGifUrl, folder.coverImageUrl, collection.backdropImageUrl)
-    } else {
-        firstNonBlank(folder.coverImageUrl, collection.backdropImageUrl)
-    }
+    // GIF URL is only used as an animated overlay on focus (when focusGifEnabled is true).
+    // Don't use it as a static poster — it would still animate via Coil's GIF decoder.
+    val imageUrl = firstNonBlank(folder.coverImageUrl, collection.backdropImageUrl)
     val heroBackdrop = firstNonBlank(folder.heroBackdropUrl, folder.coverImageUrl, collection.backdropImageUrl)
 
     return ModernCarouselItem(
@@ -630,7 +627,7 @@ internal fun extractYearText(type: ContentType, releaseInfo: String?, released: 
                     }
                 }
                 fmt.format(
-                    java.util.Date(it.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
+                    java.util.Date(it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
                 )
             }
         if (full != null) return full

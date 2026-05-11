@@ -205,6 +205,7 @@ fun SettingsScreen(
     onNavigateToAuthQrSignIn: () -> Unit = {},
     onNavigateToManageProfiles: () -> Unit = {},
     onNavigateToSupportersContributors: () -> Unit = {},
+    onNavigateToLicensesAttributions: () -> Unit = {},
     profileViewModel: ProfileSettingsViewModel = hiltViewModel(),
     experienceModeViewModel: ExperienceModeSettingsViewModel = hiltViewModel()
 ) {
@@ -501,6 +502,7 @@ fun SettingsScreen(
                         )
                         SettingsCategory.ABOUT -> AboutSettingsContent(
                             onNavigateToSupportersContributors = onNavigateToSupportersContributors,
+                            onNavigateToLicensesAttributions = onNavigateToLicensesAttributions,
                             initialFocusRequester = if (allowDetailAutofocus) {
                                 contentFocusRequesters[SettingsCategory.ABOUT]
                             } else {

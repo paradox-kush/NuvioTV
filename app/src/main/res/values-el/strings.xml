@@ -547,6 +547,8 @@
     <string name="sub_forced_lang">Εξαναγκασμένος</string>
     <string name="sub_preferred_lang">Προτιμώμενη γλώσσα</string>
     <string name="sub_secondary_lang">Δευτερεύουσα προτιμώμενη γλώσσα</string>
+    <string name="sub_show_only_preferred_languages">Εμφάνιση μόνο προτιμώμενων γλωσσών</string>
+    <string name="sub_show_only_preferred_languages_desc">Απόκρυψη όλων των άλλων γλωσσών υποτίτλων από τη λίστα επιλογής</string>
     <string name="sub_organization">Οργάνωση υπότιτλων</string>
     <string name="sub_size">Μέγεθος</string>
     <string name="sub_vertical_offset">Κάθετη μετατόπιση</string>

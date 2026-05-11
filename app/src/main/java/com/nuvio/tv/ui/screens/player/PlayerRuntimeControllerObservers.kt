@@ -101,17 +101,18 @@ internal fun PlayerRuntimeController.fetchAddonSubtitles() {
         
         try {
             val subtitles = fetchAddonSubtitlesNow()
-            Log.d(PlayerRuntimeController.TAG, "fetchAddonSubtitles done: ${subtitles.size} subs, persistedPref=${persistedTrackPreference?.subtitle?.javaClass?.simpleName}")
+            val visibleSubtitles = filterToVisibleAddonSubtitles(subtitles)
+            Log.d(PlayerRuntimeController.TAG, "fetchAddonSubtitles done: ${subtitles.size} subs, visible=${visibleSubtitles.size}, persistedPref=${persistedTrackPreference?.subtitle?.javaClass?.simpleName}")
             _uiState.update { 
                 it.copy(
-                    addonSubtitles = subtitles,
+                    addonSubtitles = visibleSubtitles,
                     isLoadingAddonSubtitles = false
                 ) 
             }
             val pendingAddon = pendingRestoredAddonSubtitle
             if (pendingAddon != null) {
-                val match = subtitles.firstOrNull { it.id == pendingAddon.id }
-                    ?: subtitles.firstOrNull { PlayerSubtitleUtils.matchesLanguageCode(it.lang, pendingAddon.lang) }
+                val match = visibleSubtitles.firstOrNull { it.id == pendingAddon.id }
+                    ?: visibleSubtitles.firstOrNull { PlayerSubtitleUtils.matchesLanguageCode(it.lang, pendingAddon.lang) }
                 if (match != null) {
                     Log.d(PlayerRuntimeController.TAG, "fetchAddonSubtitles: re-applying restored addon id=${match.id}")
                     autoSubtitleSelected = true
@@ -159,6 +160,30 @@ internal fun PlayerRuntimeController.refreshSubtitlesForCurrentEpisode() {
     fetchAddonSubtitles()
 }
 
+internal fun PlayerRuntimeController.filterToVisibleAddonSubtitles(
+    subtitles: List<Subtitle>
+): List<Subtitle> {
+    val style = _uiState.value.subtitleStyle
+    if (!style.showOnlyPreferredLanguages) return subtitles
+
+    val preferredTargets = when (PlayerSubtitleUtils.normalizeLanguageCode(style.preferredLanguage)) {
+        "none" -> listOfNotNull(style.secondaryPreferredLanguage?.takeIf { it.isNotBlank() })
+        else -> listOfNotNull(
+            style.preferredLanguage,
+            style.secondaryPreferredLanguage?.takeIf { it.isNotBlank() }
+        )
+    }.map { PlayerSubtitleUtils.normalizeLanguageCode(it) }
+        .distinct()
+
+    if (preferredTargets.isEmpty()) return emptyList()
+
+    return subtitles.filter { subtitle ->
+        preferredTargets.any { target ->
+            PlayerSubtitleUtils.matchesLanguageCode(subtitle.lang, target)
+        }
+    }
+}
+
 internal fun PlayerRuntimeController.observeBlurUnwatchedEpisodes() {
     scope.launch {
         layoutPreferenceDataStore.blurUnwatchedEpisodes.collectLatest { enabled ->
@@ -188,6 +213,8 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
     scope.launch {
         playerSettingsDataStore.playerSettings.collect { settings ->
             val currentState = _uiState.value
+            val showOnlyPreferredLanguagesChanged =
+                currentState.subtitleStyle.showOnlyPreferredLanguages != settings.subtitleStyle.showOnlyPreferredLanguages
             val wasRememberingAudioDelayPerDevice = rememberAudioDelayPerDeviceEnabled
             rememberAudioDelayPerDeviceEnabled = settings.rememberAudioDelayPerDevice
             val resolvedInternalPlayerEngine =
@@ -320,9 +347,26 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
                 tryAutoSelectPreferredSubtitleFromAvailableTracks()
             }
 
+            if (showOnlyPreferredLanguagesChanged) {
+                if (settings.subtitleStyle.showOnlyPreferredLanguages) {
+                    _uiState.update { state ->
+                        val visibleSubtitles = filterToVisibleAddonSubtitles(state.addonSubtitles)
+                        state.copy(
+                            addonSubtitles = visibleSubtitles,
+                            selectedAddonSubtitle = state.selectedAddonSubtitle?.takeIf { selected ->
+                                visibleSubtitles.any { it.id == selected.id }
+                            }
+                        )
+                    }
+                } else if (_uiState.value.addonSubtitles.isNotEmpty() || _uiState.value.selectedAddonSubtitle != null) {
+                    fetchAddonSubtitles()
+                }
+            }
+
             val wasEnabled = skipIntroEnabled
             skipIntroEnabled = settings.skipIntroEnabled
             autoSkipSegmentTypes = settings.autoSkipSegmentTypes
+            playerSettingsInitialized = true
             if (!skipIntroEnabled) {
                 if (skipIntervals.isNotEmpty() || _uiState.value.activeSkipInterval != null) {
                     skipIntervals = emptyList()
@@ -368,6 +412,38 @@ internal fun PlayerRuntimeController.loadSavedProgressFor(season: Int?, episode:
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Suspend variant of [loadSavedProgressFor] that completes the DB read inline
+ * instead of launching a fire-and-forget coroutine.
+ *
+ * This MUST be called **before** [initializePlayer] inside [preparePlaybackBeforeStart]
+ * so that [pendingResumeProgress] is guaranteed to be set by the time ExoPlayer's
+ * `STATE_READY` callback fires.  The fire-and-forget version races against the
+ * player lifecycle and can lose the resume position entirely.
+ */
+internal suspend fun PlayerRuntimeController.loadSavedProgressSuspend(season: Int?, episode: Int?) {
+    if (contentId == null) return
+
+    pendingResumeProgress = null
+    val progress = if (season != null && episode != null) {
+        watchProgressRepository.getEpisodeProgress(contentId, season, episode).firstOrNull()
+    } else {
+        watchProgressRepository.getProgress(contentId).firstOrNull()
+    }
+
+    progress?.let { saved ->
+        if (saved.isInProgress()) {
+            pendingResumeProgress = saved
+            Log.d(
+                PlayerRuntimeController.TAG,
+                "loadSavedProgressSuspend: set pendingResumeProgress " +
+                    "position=${saved.position} duration=${saved.duration} " +
+                    "percent=${saved.progressPercent} S${season}E${episode}"
+            )
         }
     }
 }

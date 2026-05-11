@@ -238,9 +238,7 @@ private fun ModernCatalogRowItem(
     }
 
     val metaPreview = item.metaPreview
-    val isWatched by remember {
-        derivedStateOf { metaPreview?.let { isCatalogItemWatched(it) } ?: false }
-    }
+    val isWatched = metaPreview?.let { isCatalogItemWatched(it) } ?: false
     val enrichedMeta by remember {
         derivedStateOf { (payload as? ModernPayload.Catalog)?.itemId?.let { enrichedPreviews.map[it] } }
     }

@@ -409,6 +409,8 @@
     <string name="sub_forced_lang">Prisiljeni</string>
     <string name="sub_preferred_lang">Prednostni jezik</string>
     <string name="sub_secondary_lang">Sekundarni prednostni jezik</string>
+    <string name="sub_show_only_preferred_languages">Prikaži samo želene jezike</string>
+    <string name="sub_show_only_preferred_languages_desc">Skrij vse druge jezike podnapisov s seznama izbire</string>
     <string name="sub_organization">Organizacija podnapisov</string>
     <string name="sub_size">Velikost</string>
     <string name="sub_vertical_offset">Vertikalni zamik</string>

@@ -426,6 +426,8 @@
     <string name="sub_forced_lang">Forced</string>
     <string name="sub_preferred_lang">Preferirani Jezik</string>
     <string name="sub_secondary_lang">Sekundarni Preferirani Jezik</string>
+    <string name="sub_show_only_preferred_languages">Prikaži samo preferirane jezike</string>
+    <string name="sub_show_only_preferred_languages_desc">Sakrij sve ostale jezike titlova sa liste za odabir</string>
     <string name="sub_organization">Organizacija Titlova</string>
     <string name="sub_size">Veličina</string>
     <string name="sub_vertical_offset">Vertikalni Pomak</string>

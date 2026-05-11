@@ -91,6 +91,7 @@ import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.components.PosterCardDefaults
 import com.nuvio.tv.ui.components.PosterCardStyle
 import com.nuvio.tv.ui.theme.NuvioColors
+import com.nuvio.tv.domain.model.DiscoverLocation
 import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.platform.LocalView
@@ -303,8 +304,11 @@ fun SearchScreen(
         searchRowFocusedItemIndex.keys.retainAll(visibleRowKeys)
     }
 
-    val isDiscoverMode = remember(uiState.discoverEnabled, trimmedSubmittedQuery) {
-        uiState.discoverEnabled && trimmedSubmittedQuery.isEmpty()
+    val isDiscoverMode = remember(uiState.discoverLocation, trimmedSubmittedQuery) {
+        uiState.discoverLocation == DiscoverLocation.IN_SEARCH && trimmedSubmittedQuery.isEmpty()
+    }
+    LaunchedEffect(isDiscoverMode) {
+        if (isDiscoverMode) viewModel.ensureDiscoverLoaded()
     }
     val hasPendingUnsubmittedQuery = remember(isDiscoverMode, trimmedQuery, trimmedSubmittedQuery) {
         !isDiscoverMode && trimmedQuery.length >= 2 && trimmedQuery != trimmedSubmittedQuery
@@ -483,6 +487,7 @@ fun SearchScreen(
                     onVoiceSearch = launchVoiceSearch,
                     onMoveToResults = { focusResults = true },
                     onOpenDiscover = onOpenDiscover,
+                    showDiscoverButton = uiState.discoverLocation == DiscoverLocation.IN_SEARCH,
                     keyboardController = keyboardController
                 )
 
@@ -543,6 +548,7 @@ fun SearchScreen(
                             focusResults = true
                         },
                         onOpenDiscover = onOpenDiscover,
+                        showDiscoverButton = uiState.discoverLocation == DiscoverLocation.IN_SEARCH,
                         keyboardController = keyboardController
                     )
                 }
@@ -572,15 +578,16 @@ fun SearchScreen(
                                     },
                                     onSectionFocusChanged = { focused ->
                                         isRecentSearchSectionFocused = focused
-                                    }
+                                    },
+                                    modifier = Modifier.padding(horizontal = 52.dp)
                                 )
                             } else {
                                 EmptyScreenState(
                                     title = stringResource(R.string.search_start_title),
-                                    subtitle = if (uiState.discoverEnabled) {
-                                        stringResource(R.string.search_start_subtitle)
-                                    } else {
+                                    subtitle = if (uiState.discoverLocation == DiscoverLocation.OFF) {
                                         stringResource(R.string.search_start_subtitle_no_discover)
+                                    } else {
+                                        stringResource(R.string.search_start_subtitle)
                                     },
                                     icon = Icons.Default.Search
                                 )
@@ -775,6 +782,7 @@ private fun SearchInputField(
     onVoiceSearch: () -> Unit,
     onMoveToResults: () -> Unit,
     onOpenDiscover: () -> Unit,
+    showDiscoverButton: Boolean,
     keyboardController: androidx.compose.ui.platform.SoftwareKeyboardController?
 ) {
     var isDiscoverButtonFocused by remember { mutableStateOf(false) }
@@ -786,29 +794,31 @@ private fun SearchInputField(
             .padding(horizontal = 48.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(
-            onClick = onOpenDiscover,
-            modifier = Modifier
-                .onFocusChanged { isDiscoverButtonFocused = it.isFocused }
-                .size(56.dp)
-                .border(
-                    width = if (isDiscoverButtonFocused) 2.dp else 1.dp,
-                    color = if (isDiscoverButtonFocused) NuvioColors.FocusRing else NuvioColors.Border,
-                    shape = RoundedCornerShape(12.dp)
+        if (showDiscoverButton) {
+            IconButton(
+                onClick = onOpenDiscover,
+                modifier = Modifier
+                    .onFocusChanged { isDiscoverButtonFocused = it.isFocused }
+                    .size(56.dp)
+                    .border(
+                        width = if (isDiscoverButtonFocused) 2.dp else 1.dp,
+                        color = if (isDiscoverButtonFocused) NuvioColors.FocusRing else NuvioColors.Border,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .background(
+                        color = NuvioColors.BackgroundCard,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Explore,
+                    contentDescription = stringResource(R.string.cd_open_discover),
+                    tint = NuvioColors.TextPrimary
                 )
-                .background(
-                    color = NuvioColors.BackgroundCard,
-                    shape = RoundedCornerShape(12.dp)
-                )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Explore,
-                contentDescription = stringResource(R.string.cd_open_discover),
-                tint = NuvioColors.TextPrimary
-            )
-        }
+            }
 
-        Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+        }
 
         if (showVoiceSearch) {
             val themeAccent = NuvioColors.Secondary

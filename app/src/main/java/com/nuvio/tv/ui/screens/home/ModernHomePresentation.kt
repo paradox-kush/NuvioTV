@@ -247,9 +247,14 @@ internal fun buildModernHomePresentation(
                             )
                         )
                     }.asStable()
+                    val placeholderTitle = if (input.showCatalogTypeSuffix) {
+                        homeRow.displayTitle
+                    } else {
+                        homeRow.catalogName.replaceFirstChar { it.uppercase() }
+                    }
                     val placeholderRow = HeroCarouselRow(
                         key = homeRow.catalogKey,
-                        title = homeRow.displayTitle,
+                        title = placeholderTitle,
                         globalRowIndex = index,
                         catalogId = homeRow.catalogId,
                         addonId = homeRow.addonId,

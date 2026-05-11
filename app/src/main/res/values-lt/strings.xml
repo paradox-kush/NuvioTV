@@ -301,6 +301,8 @@
     <string name="sub_forced_lang">Priverstiniai</string>
     <string name="sub_preferred_lang">Pageidaujama kalba</string>
     <string name="sub_secondary_lang">Antrinė pageidaujama kalba</string>
+    <string name="sub_show_only_preferred_languages">Rodyti tik pageidaujamas kalbas</string>
+    <string name="sub_show_only_preferred_languages_desc">Slėpti visas kitas subtitrų kalbas iš pasirinkimo sąrašo</string>
     <string name="sub_organization">Subtitrų organizavimas</string>
     <string name="sub_size">Dydis</string>
     <string name="sub_vertical_offset">Vertikalus poslinkis</string>

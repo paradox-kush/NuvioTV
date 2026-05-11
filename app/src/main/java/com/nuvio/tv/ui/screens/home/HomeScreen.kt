@@ -21,7 +21,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -117,10 +116,11 @@ fun HomeScreen(
         viewModel.notifyLocaleChanged()
     }
 
-    // Stable lambdas — captured via rememberUpdatedState so they never cause
-    // downstream recomposition when uiState changes.
-    val isCatalogItemWatched: (MetaPreview) -> Boolean = remember(viewModel) {
-        { item -> viewModel.uiState.value.movieWatchedStatus[homeItemStatusKey(item.id, item.apiType)] == true }
+    // Watched status: the lambda is recreated whenever movieWatchedStatus changes,
+    // which forces downstream LazyRow items to recompose with fresh watched state.
+    val movieWatchedStatus = uiState.movieWatchedStatus
+    val isCatalogItemWatched: (MetaPreview) -> Boolean = remember(movieWatchedStatus) {
+        { item -> movieWatchedStatus[homeItemStatusKey(item.id, item.apiType)] == true }
     }
     val onCatalogItemLongPress: (MetaPreview, String) -> Unit = remember {
         { item, addonBaseUrl -> posterOptionsTarget = HomePosterOptionsTarget(item, addonBaseUrl) }

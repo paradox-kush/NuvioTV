@@ -86,7 +86,11 @@ class TrailerService(
                 return@withContext tmdbSource
             }
             Log.w(TAG, "TMDB path exhausted; no YouTube trailer key resolved for backend /trailer fallback")
-            cache[cacheKey] = NEGATIVE_CACHE
+            // Only cache negative result if tmdbId was available — if null, enrichment
+            // may not have completed yet and a retry with tmdbId could succeed.
+            if (tmdbId != null) {
+                cache[cacheKey] = NEGATIVE_CACHE
+            }
             null
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching trailer for $title: ${e.message}", e)
@@ -208,7 +212,8 @@ class TrailerService(
                 if (!youtubeKey.isNullOrBlank()) {
                     youtubeSourceCache[youtubeKey] = CachedTrailerPlaybackSource(
                         playbackSource = localSource,
-                        cachedAt = Instant.now(clock)
+                        cachedAt = Instant.now(clock),
+                        expiresAt = extractUrlExpireInstant(localSource)
                     )
                 }
                 Log.d(
@@ -231,13 +236,17 @@ class TrailerService(
             if (!isValidUrl(fallbackUrl)) return@withContext null
 
             if (!youtubeKey.isNullOrBlank()) {
+                val fallbackSource = TrailerPlaybackSource(videoUrl = fallbackUrl)
                 youtubeSourceCache[youtubeKey] = CachedTrailerPlaybackSource(
-                    playbackSource = TrailerPlaybackSource(videoUrl = fallbackUrl),
-                    cachedAt = Instant.now(clock)
+                    playbackSource = fallbackSource,
+                    cachedAt = Instant.now(clock),
+                    expiresAt = extractUrlExpireInstant(fallbackSource)
                 )
             }
             Log.d(TAG, "Using backend fallback source for ${summarizeUrl(youtubeUrl)}")
             TrailerPlaybackSource(videoUrl = fallbackUrl)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Error getting trailer from YouTube: ${e.message}", e)
             null
@@ -341,19 +350,34 @@ class TrailerService(
 
     private fun getValidCachedYoutubeSource(youtubeKey: String): TrailerPlaybackSource? {
         val cached = youtubeSourceCache[youtubeKey] ?: return null
-        val age = Duration.between(cached.cachedAt, Instant.now(clock))
-        if (age <= YOUTUBE_SOURCE_CACHE_TTL) {
+        val now = Instant.now(clock)
+
+        // Use URL expire timestamp if available, otherwise fall back to TTL
+        val expired = cached.expiresAt?.let { now.isAfter(it) }
+            ?: (Duration.between(cached.cachedAt, now) > YOUTUBE_SOURCE_CACHE_TTL)
+
+        if (!expired) {
             return cached.playbackSource
         }
 
         youtubeSourceCache.remove(youtubeKey, cached)
-        Log.d(TAG, "YouTube cache expired for key=${obfuscateYoutubeKey(youtubeKey)} age=${age.toMinutes()}m")
         return null
     }
 
     fun clearCache() {
         cache.clear()
         youtubeSourceCache.clear()
+    }
+
+    /**
+     * Extracts the YouTube URL expiration timestamp from the `/expire/EPOCH/` path segment.
+     */
+    private fun extractUrlExpireInstant(source: TrailerPlaybackSource): Instant? {
+        val url = source.videoUrl
+        val expireRegex = Regex("/expire/(\\d+)/")
+        val match = expireRegex.find(url) ?: return null
+        val epoch = match.groupValues[1].toLongOrNull() ?: return null
+        return Instant.ofEpochSecond(epoch)
     }
 
     private fun extractYouTubeVideoId(input: String): String? {
@@ -401,7 +425,8 @@ class TrailerService(
 
     private data class CachedTrailerPlaybackSource(
         val playbackSource: TrailerPlaybackSource,
-        val cachedAt: Instant
+        val cachedAt: Instant,
+        val expiresAt: Instant? = null
     )
 }
 

@@ -1,5 +1,6 @@
 package com.nuvio.tv.core.sync
 
+import android.os.SystemClock
 import android.util.Log
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.plugin.PluginManager
@@ -25,6 +26,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "StartupSyncService"
+private const val FORCE_RESYNC_MIN_INTERVAL_MS = 60_000L
 
 @Singleton
 class StartupSyncService @Inject constructor(
@@ -52,6 +54,7 @@ class StartupSyncService @Inject constructor(
     private var startupPullJob: Job? = null
     private var lastPulledKey: String? = null
     private var lastPulledIncludedProfileSettings: Boolean = false
+    private var lastPulledAtMs: Long = 0L
     @Volatile
     private var forceSyncRequested: Boolean = false
     @Volatile
@@ -80,6 +83,7 @@ class StartupSyncService @Inject constructor(
                         startupPullJob = null
                         lastPulledKey = null
                         lastPulledIncludedProfileSettings = false
+                        lastPulledAtMs = 0L
                         forceSyncRequested = false
                         forceSyncIncludesProfileSettings = true
                         pendingResyncKey = null
@@ -141,10 +145,18 @@ class StartupSyncService @Inject constructor(
         includeProfileSettings: Boolean = true
     ): Boolean {
         val key = pullKey(userId)
+        val now = SystemClock.elapsedRealtime()
+        val sameKey = lastPulledKey == key
+        val coversProfileSettings = !includeProfileSettings || lastPulledIncludedProfileSettings
+        if (!force && sameKey && coversProfileSettings) {
+            return false
+        }
         if (
-            !force &&
-            lastPulledKey == key &&
-            (!includeProfileSettings || lastPulledIncludedProfileSettings)
+            force &&
+            sameKey &&
+            coversProfileSettings &&
+            startupPullJob?.isActive != true &&
+            now - lastPulledAtMs < FORCE_RESYNC_MIN_INTERVAL_MS
         ) {
             return false
         }
@@ -167,6 +179,7 @@ class StartupSyncService @Inject constructor(
                 if (result.isSuccess) {
                     lastPulledKey = key
                     lastPulledIncludedProfileSettings = includeProfileSettings
+                    lastPulledAtMs = SystemClock.elapsedRealtime()
                     syncCompleted = true
                     break
                 }

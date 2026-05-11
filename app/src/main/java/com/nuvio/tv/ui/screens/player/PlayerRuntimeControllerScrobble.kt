@@ -64,10 +64,15 @@ internal fun PlayerRuntimeController.preparePlaybackBeforeStart(
                     "subtitle=${persistedTrackPreference?.subtitle?.javaClass?.simpleName ?: "none"}"
             )
         }
-        initializePlayer(url, headers)
+        // Load saved watch progress BEFORE player init.
+        // This eliminates the race condition where ExoPlayer's STATE_READY
+        // callback fired before the DB read completed, causing the resume
+        // seek to be silently skipped — the player would start from 0:00
+        // or hang in buffering after a late seek.
         if (loadSavedProgress) {
-            loadSavedProgressFor(currentSeason, currentEpisode)
+            loadSavedProgressSuspend(currentSeason, currentEpisode)
         }
+        initializePlayer(url, headers)
     }
 }
 

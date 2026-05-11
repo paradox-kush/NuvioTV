@@ -24,6 +24,7 @@ import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.model.CatalogDescriptor
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.Collection
+import com.nuvio.tv.domain.model.ContinueWatchingSortMode
 import com.nuvio.tv.domain.model.LibraryEntryInput
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.MetaPreview
@@ -174,6 +175,7 @@ class HomeViewModel @Inject constructor(
     internal val trailerPreviewAudioUrlsState = mutableStateMapOf<String, String>()
     internal var activeTrailerPreviewItemId: String? = null
     internal var trailerPreviewRequestVersion: Long = 0L
+    internal var trailerPreviewJob: Job? = null
     internal var currentTmdbSettings: TmdbSettings = TmdbSettings()
     internal var currentMdbListSettings: MDBListSettings = MDBListSettings()
     internal var heroEnrichmentJob: Job? = null
@@ -222,6 +224,8 @@ class HomeViewModel @Inject constructor(
     internal var posterStatusObservationEnabled: Boolean = false
     @Volatile
     internal var externalMetaPrefetchEnabled: Boolean = false
+    @Volatile
+    internal var continueWatchingSortMode: ContinueWatchingSortMode = ContinueWatchingSortMode.DEFAULT
     internal val startupStartedAtMs: Long = SystemClock.elapsedRealtime()
     @Volatile
     internal var startupGracePeriodActive: Boolean = true
@@ -256,6 +260,7 @@ class HomeViewModel @Inject constructor(
             observeLayoutPreferences()
             observeModernHomePresentation()
             observeExternalMetaPrefetchPreference()
+            observeContinueWatchingSortMode()
             loadHomeCatalogOrderPreference()
             loadFollowAddonsOrder()
             loadDisabledHomeCatalogPreference()
@@ -293,10 +298,7 @@ class HomeViewModel @Inject constructor(
                     cwEnrichedInProgressOverlay.clear()
                     cwLastBadgeEpisodeKeys = emptySet()
                     _uiState.update {
-                        it.copy(
-                            continueWatchingItems = emptyList(),
-                            layoutPreferencesReady = false
-                        )
+                        it.copy(layoutPreferencesReady = false)
                     }
                     // Reset so the new profile's pipeline signals first completion correctly.
                     _initialCwResolved.value = false
@@ -360,6 +362,18 @@ class HomeViewModel @Inject constructor(
     private fun observeModernHomePresentation() = observeModernHomePresentationPipeline()
 
     private fun observeExternalMetaPrefetchPreference() = observeExternalMetaPrefetchPreferencePipeline()
+
+    private fun observeContinueWatchingSortMode() {
+        viewModelScope.launch {
+            layoutPreferenceDataStore.continueWatchingSortMode
+                .distinctUntilChanged()
+                .collect { mode ->
+                    continueWatchingSortMode = mode
+                    // Clear caches so the new sort is applied immediately on next pipeline run
+                    clearAllCwInMemoryCaches()
+                }
+        }
+    }
 
     private fun observeBlurUnwatchedEpisodes() {
         viewModelScope.launch {
@@ -457,7 +471,6 @@ class HomeViewModel @Inject constructor(
                         cwEnrichedInProgressOverlay.clear()
                         discoveredOlderNextUpItems.clear()
                         cwLastProcessedNextUpContentIds.clear()
-                        _uiState.update { it.copy(continueWatchingItems = emptyList()) }
                         // Clear disk cache for current profile.
                         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                             runCatching { cwEnrichmentCache.saveNextUpSnapshot(emptyList(), force = true) }
@@ -584,14 +597,11 @@ class HomeViewModel @Inject constructor(
             }
             val items = mergeContinueWatchingItems(
                 inProgressItems = inProgressItems,
-                nextUpItems = nextUpItems
+                nextUpItems = nextUpItems,
+                mode = continueWatchingSortMode
             )
             if (items.isNotEmpty()) {
-                _uiState.update { state ->
-                    if (state.continueWatchingItems.isEmpty()) {
-                        state.copy(continueWatchingItems = items)
-                    } else state
-                }
+                _uiState.update { it.copy(continueWatchingItems = items) }
                 _initialCwResolved.value = true
             }
         }

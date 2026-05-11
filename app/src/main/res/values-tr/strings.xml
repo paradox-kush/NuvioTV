@@ -481,6 +481,8 @@
     <string name="sub_forced_lang">Zorunlu</string>
     <string name="sub_preferred_lang">Tercih Edilen Dil</string>
     <string name="sub_secondary_lang">İkinci Tercih Edilen Dil</string>
+    <string name="sub_show_only_preferred_languages">Yalnızca tercih edilen dilleri göster</string>
+    <string name="sub_show_only_preferred_languages_desc">Diğer tüm altyazı dillerini seçim listesinden gizle</string>
     <string name="sub_organization">Altyazı Ayarları</string>
     <string name="sub_size">Boyut</string>
     <string name="sub_vertical_offset">Dikey Konum</string>

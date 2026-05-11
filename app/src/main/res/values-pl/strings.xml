@@ -252,6 +252,8 @@
     <string name="sub_forced_lang">Wymuszone</string>
     <string name="sub_preferred_lang">Preferowany język</string>
     <string name="sub_secondary_lang">Drugi preferowany język</string>
+    <string name="sub_show_only_preferred_languages">Pokaż tylko preferowane języki</string>
+    <string name="sub_show_only_preferred_languages_desc">Ukryj wszystkie inne języki napisów na liście wyboru</string>
     <string name="sub_organization">Organizacja napisów</string>
     <string name="sub_size">Rozmiar</string>
     <string name="sub_vertical_offset">Przesunięcie pionowe</string>
@@ -294,6 +296,11 @@
     <string name="autoplay_reuse_last_link">Ponownie użyj ostatniego linku</string>
     <string name="autoplay_reuse_last_link_sub">Auto-odtwarzaj ostatni działający strumień dla tego samego filmu/odcinka gdy cache jest aktualny</string>
     <string name="autoplay_last_link_cache">Czas ważności cache linku</string>
+    <string name="cache_duration_hour_one">%1$d godzina</string>
+    <string name="cache_duration_hour_other">%1$d godzin</string>
+    <string name="cache_duration_day_one">%1$d dzień</string>
+    <string name="cache_duration_day_other">%1$d dni</string>
+    <string name="cache_duration_days_hours">%1$dd %2$dh</string>
     <string name="autoplay_mode_manual">Ręczny (wybierz strumień)</string>
     <string name="autoplay_mode_first">Auto-odtwarzaj pierwsze źródło</string>
     <string name="autoplay_mode_regex">Auto-odtwarzaj dopasowanie regex</string>
@@ -1596,6 +1603,13 @@
     <string name="appearance_amoled_mode_subtitle">Użyj czystej czerni jako tła aplikacji</string>
     <string name="appearance_amoled_surfaces_mode">Czysto czarne powierzchnie</string>
     <string name="appearance_amoled_surfaces_mode_subtitle">Karty, panele i kontenery również będą czysto czarne</string>
+    <string name="theme_color_crimson">Karmazyn</string>
+    <string name="theme_color_ocean">Ocean</string>
+    <string name="theme_color_violet">Fiolet</string>
+    <string name="theme_color_emerald">Szmaragd</string>
+    <string name="theme_color_amber">Bursztyn</string>
+    <string name="theme_color_rose">Róż</string>
+    <string name="theme_color_white">Biel</string>
     <string name="collections_editor_add_source">Dodaj źródło</string>
     <string name="collections_editor_add_tmdb_source">Dodaj źródło TMDB</string>
     <string name="collections_editor_edit_tmdb_source">Edytuj źródło TMDB</string>
@@ -1905,4 +1919,16 @@
     <string name="web_source_singular">źródło</string>
     <string name="web_title_hide">Ukryj</string>
     <string name="web_title_show">Pokaż</string>
+
+    <string name="tv_channel_continue_watching">Kontynuuj oglądanie</string>
+    <string name="profile_custom_avatar_web_panel_note">Niestandardowe adresy URL awatarów można skonfigurować z panelu webowego Nuvio.</string>
+    <string name="collections_editor_tmdb_mode_person">Osoba</string>
+    <string name="collections_editor_tmdb_mode_director">Reżyser</string>
+    <string name="collections_editor_tmdb_help_person">Wpisz ID osoby z TMDB lub URL, aby zbudować wiersz z obsady.</string>
+    <string name="collections_editor_tmdb_help_director">Wpisz ID osoby z TMDB lub URL, aby zbudować wiersz z reżyserii.</string>
+    <string name="collections_editor_tmdb_person_id">ID osoby</string>
+    <string name="collections_editor_tmdb_person_helper">Przykład: https://www.themoviedb.org/person/31-tom-hanks lub 31.</string>
+    <string name="collections_editor_tmdb_person_placeholder">31 dla Tom Hanks, lub URL osoby</string>
+    <string name="collections_editor_tmdb_person_title_placeholder">Filmy z Tom Hanks, Ulubieni aktorzy</string>
+    <string name="collections_editor_tmdb_director_title_placeholder">Filmy Christophera Nolana, Ulubieni reżyserzy</string>
 </resources>

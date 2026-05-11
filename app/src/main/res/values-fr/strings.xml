@@ -303,6 +303,13 @@
     <string name="appearance_subtitle">Choisis ton thème de couleur, ta police et ta langue</string>
     <string name="appearance_color_theme">Thème de couleur</string>
     <string name="appearance_color_theme_subtitle">Choisis la couleur d’accent utilisée dans toute l’application</string>
+    <string name="theme_color_crimson">Cramoisi</string>
+    <string name="theme_color_ocean">Océan</string>
+    <string name="theme_color_violet">Violet</string>
+    <string name="theme_color_emerald">Émeraude</string>
+    <string name="theme_color_amber">Ambre</string>
+    <string name="theme_color_rose">Rose</string>
+    <string name="theme_color_white">Blanc</string>
     <string name="appearance_amoled_mode">Mode AMOLED</string>
     <string name="appearance_amoled_mode_subtitle">Utiliser un noir pur pour les arrière-plans de l’application</string>
     <string name="appearance_amoled_surfaces_mode">Surfaces noir pur</string>
@@ -528,6 +535,8 @@
     <string name="sub_forced_lang">Forcés</string>
     <string name="sub_preferred_lang">Langue préférée</string>
     <string name="sub_secondary_lang">Langue préférée secondaire</string>
+    <string name="sub_show_only_preferred_languages">Afficher uniquement les langues préférées</string>
+    <string name="sub_show_only_preferred_languages_desc">Masquer toutes les autres langues de sous-titres dans la liste de sélection</string>
     <string name="sub_organization">Organisation des sous-titres</string>
     <string name="sub_size">Taille</string>
     <string name="sub_vertical_offset">Décalage vertical</string>
@@ -569,6 +578,11 @@
     <string name="autoplay_reuse_last_link">Réutiliser le dernier lien</string>
     <string name="autoplay_reuse_last_link_sub">Lire automatiquement ton dernier flux fonctionnel pour ce même film/épisode tant que le cache est valide</string>
     <string name="autoplay_last_link_cache">Durée du cache du dernier lien</string>
+    <string name="cache_duration_hour_one">%1$d heure</string>
+    <string name="cache_duration_hour_other">%1$d heures</string>
+    <string name="cache_duration_day_one">%1$d jour</string>
+    <string name="cache_duration_day_other">%1$d jours</string>
+    <string name="cache_duration_days_hours">%1$dj %2$dh</string>
     <string name="autoplay_mode_manual">Manuel (choisir le flux)</string>
     <string name="autoplay_mode_first">Lecture automatique de la première source</string>
     <string name="autoplay_mode_regex">Lecture automatique par correspondance regex</string>
@@ -1883,4 +1897,41 @@
     <string name="tmdb_entity_error_load_named">Impossible de charger %1$s</string>
     <string name="tmdb_entity_error_load">Impossible de charger l’élément TMDB</string>
 
+
+    <!-- Locale parity (matches values/strings.xml additions on dev) -->
+    <string name="addon_manage_addons_only_from_phone_subtitle">Scanne un code QR pour installer ou supprimer des addons depuis ton téléphone</string>
+    <string name="addon_qr_addons_only_scan_instruction">Scanne avec ton téléphone pour installer ou supprimer des addons</string>
+    <string name="web_manage_addons_only_subtitle">Installer ou supprimer des addons</string>
+    <string name="auto_skip_intro">Intro / Générique de début</string>
+    <string name="auto_skip_intro_sub">Passer automatiquement les intros et les génériques d’anime.</string>
+    <string name="auto_skip_outro">Outro / Générique de fin</string>
+    <string name="auto_skip_outro_sub">Passer automatiquement les outros et les génériques de fin d’anime.</string>
+    <string name="auto_skip_recap">Résumé</string>
+    <string name="auto_skip_recap_sub">Passer automatiquement les segments de résumé.</string>
+    <string name="playback_auto_skip_segments">Saut automatique</string>
+    <string name="playback_auto_skip_segments_sub">Choisis les segments à passer automatiquement.</string>
+    <string name="collections_editor_tmdb_director_title_placeholder">Films de Christopher Nolan, réalisateurs favoris</string>
+    <string name="collections_editor_tmdb_help_director">Saisis un ID ou une URL de personne TMDB pour construire une rangée à partir des crédits de réalisation.</string>
+    <string name="collections_editor_tmdb_help_person">Saisis un ID ou une URL de personne TMDB pour construire une rangée à partir des crédits de casting.</string>
+    <string name="collections_editor_tmdb_mode_director">Réalisateur</string>
+    <string name="collections_editor_tmdb_mode_person">Personne</string>
+    <string name="collections_editor_tmdb_person_helper">Exemple : https://www.themoviedb.org/person/31-tom-hanks ou 31.</string>
+    <string name="collections_editor_tmdb_person_id">ID de personne</string>
+    <string name="collections_editor_tmdb_person_placeholder">31 pour Tom Hanks, ou URL de personne</string>
+    <string name="collections_editor_tmdb_person_title_placeholder">Films de Tom Hanks, acteurs favoris</string>
+    <string name="experience_mode_confirm_advanced_subtitle">Ce mode révèle l’ensemble des paramètres, y compris la configuration avancée et les contrôles de catalogue, de collection et de réglage fin.</string>
+    <string name="experience_mode_confirm_advanced_title">Passer en mode avancé&#160;?</string>
+    <string name="experience_mode_confirm_essential_subtitle">Les écrans de configuration avancée seront masqués, mais tes paramètres enregistrés restent inchangés. Tu peux revenir en arrière à tout moment.</string>
+    <string name="experience_mode_confirm_essential_title">Passer en mode essentiel&#160;?</string>
+    <string name="experience_mode_essential">Essentiel</string>
+    <string name="experience_mode_group_title">Mode d’expérience</string>
+    <string name="experience_mode_switch_to_advanced">Passer en mode avancé</string>
+    <string name="experience_mode_switch_to_advanced_header_subtitle">Passe en mode avancé pour accéder à l’ensemble des paramètres.</string>
+    <string name="experience_mode_switch_to_advanced_subtitle">Afficher la disposition complète, les plugins, les intégrations, les catalogues, les collections et les réglages fins.</string>
+    <string name="experience_mode_switch_to_essential">Passer en mode essentiel</string>
+    <string name="experience_mode_switch_to_essential_subtitle">Masquer les écrans de configuration avancée sans modifier les valeurs enregistrées.</string>
+    <string name="settings_experience">Expérience</string>
+    <string name="settings_experience_subtitle">Essentiel ou avancé</string>
+    <string name="profile_custom_avatar_web_panel_note">Les URL d’avatar personnalisé peuvent être configurées depuis le panneau web Nuvio.</string>
+    <string name="tv_channel_continue_watching">Continuer à regarder</string>
 </resources>

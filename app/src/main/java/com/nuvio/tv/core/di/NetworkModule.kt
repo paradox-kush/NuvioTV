@@ -19,6 +19,7 @@ import com.nuvio.tv.data.remote.api.SeriesGraphApi
 import com.nuvio.tv.data.remote.api.SponsorsApi
 import com.nuvio.tv.data.remote.api.TmdbApi
 import com.nuvio.tv.data.remote.api.UniqueContributionsApi
+import com.nuvio.tv.LocaleCache
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -54,6 +55,28 @@ private fun normalizedBaseUrl(rawUrl: String, fallback: String): String {
     return if (trimmed.endsWith('/')) trimmed else "$trimmed/"
 }
 
+/**
+ * Builds the value sent in the `Accept-Language` request header so addons can
+ * serve localized payloads (catalog names, descriptions, etc.). Falls back to
+ * the system locale when the user has not overridden the app language. The
+ * primary tag is given the highest q-weight; English is appended at q=0.7 as
+ * a sensible fallback for addons that don't support the requested locale.
+ */
+private fun buildAcceptLanguageHeader(): String {
+    val explicit = LocaleCache.localeTag
+        .takeIf { it.isNotBlank() && it != LocaleCache.UNSET }
+    val primaryTag = (explicit ?: java.util.Locale.getDefault().toLanguageTag())
+        .takeIf { it.isNotBlank() && it != "und" }
+        ?: "en"
+    return if (primaryTag.equals("en", ignoreCase = true) ||
+        primaryTag.startsWith("en-", ignoreCase = true)
+    ) {
+        primaryTag
+    } else {
+        "$primaryTag,en;q=0.7"
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -86,6 +109,7 @@ object NetworkModule {
                 val version = BuildConfig.VERSION_NAME.ifBlank { "dev" }
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "Nuvio/$version")
+                    .header("Accept-Language", buildAcceptLanguageHeader())
                     .build()
                 chain.proceed(request)
             }

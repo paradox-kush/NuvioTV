@@ -304,6 +304,8 @@
     <string name="sub_forced_lang">Tvingad</string>
     <string name="sub_preferred_lang">Föredraget språk</string>
     <string name="sub_secondary_lang">Sekundärt föredraget språk</string>
+    <string name="sub_show_only_preferred_languages">Visa endast föredragna språk</string>
+    <string name="sub_show_only_preferred_languages_desc">Dölj alla andra undertextspråk från urvalslistan</string>
     <string name="sub_organization">Undertextorganisering</string>
     <string name="sub_size">Storlek</string>
     <string name="sub_vertical_offset">Vertikalt offset</string>

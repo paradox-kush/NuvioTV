@@ -1005,6 +1005,8 @@
     <string name="sub_section">כתוביות</string>
     <string name="sub_preferred_lang">שפה מועדפת</string>
     <string name="sub_secondary_lang">שפה מועדפת משנית</string>
+    <string name="sub_show_only_preferred_languages">הצג רק שפות מועדפות</string>
+    <string name="sub_show_only_preferred_languages_desc">הסתר את כל שאר שפות הכתוביות מרשימת הבחירה</string>
     <string name="sub_forced_lang">מאולץ</string>
     <string name="sub_not_set">לא הוגדר</string>
     <string name="sub_organization">ארגון כתוביות</string>

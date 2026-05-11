@@ -589,7 +589,7 @@ private fun MetaInfoRow(
         if (showFullReleaseDate && meta.type == ContentType.MOVIE) {
             meta.released
                 ?.let { runCatching { java.time.OffsetDateTime.parse(it).toLocalDate() }.getOrNull() }
-                ?.let { val locale = java.util.Locale.getDefault(); java.text.SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "dMMMMy"), locale).format(java.util.Date(it.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())) }
+                ?.let { val locale = java.util.Locale.getDefault(); java.text.SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "dMMMMy"), locale).format(java.util.Date(it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())) }
                 ?: formatYearRange(meta.releaseInfo)
         } else {
             formatYearRange(meta.releaseInfo)

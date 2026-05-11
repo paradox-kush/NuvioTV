@@ -2,7 +2,6 @@ package com.nuvio.tv.ui.screens.player
 
 import android.util.Log
 import androidx.media3.common.PlaybackException
-import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.HttpDataSource
 import com.nuvio.tv.R
@@ -267,6 +266,7 @@ internal fun PlayerRuntimeController.attemptAutoRetry(
 internal fun PlayerRuntimeController.resetErrorRetryState() {
     startupRetryCount = 0
     errorRetryCount = 0
+    pendingAudioPcmFallbackRebuild = false
     errorRetryJob?.cancel()
     errorRetryJob = null
 }
@@ -294,32 +294,23 @@ internal fun PlayerRuntimeController.tryAudioTrackPcmFallback(
     if (_uiState.value.tunnelingEnabled) return false
 
     hasTriedAudioPcmFallback = true
+    pendingAudioPcmFallbackRebuild = true
 
     val player = _exoPlayer ?: return false
     val savedPosition = player.currentPosition.takeIf { it > 0L } ?: 0L
+    val paused = userPausedManually
 
-    Log.d(
-        PlayerRuntimeController.TAG,
-        "Audio track init failed (5001) — forcing PCM via speed trick, position=${savedPosition}ms"
-    )
-
-    // Show loading overlay with fallback info instead of error screen.
+    Log.d(PlayerRuntimeController.TAG, "Audio track init failed (5001) — rebuilding player with PCM forcing, position=${savedPosition}ms")
     showRecoveryOverlay()
 
-    // An imperceptible speed offset disables audio passthrough and forces
-    // software PCM decoding through the GainAudioProcessor pipeline.
-    val currentSpeed = _uiState.value.playbackSpeed
-    val pcmSpeed = if (currentSpeed == 1f) 1.00001f else currentSpeed
-    player.playbackParameters = PlaybackParameters(pcmSpeed)
-    player.trackSelectionParameters = player.trackSelectionParameters
-        .buildUpon()
-        .build()
-
-    if (savedPosition > 0L) {
-        player.seekTo(savedPosition)
+    errorRetryJob?.cancel()
+    errorRetryJob = scope.launch {
+        releasePlayer(flushPlaybackState = false)
+        if (savedPosition > 0L) {
+            _uiState.update { it.copy(pendingSeekPosition = savedPosition) }
+        }
+        initializePlayer(currentStreamUrl, currentHeaders, startPaused = paused)
     }
-    player.prepare()
-    player.playWhenReady = !userPausedManually
 
     return true
 }

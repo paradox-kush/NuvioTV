@@ -434,9 +434,51 @@ class MetaDetailsViewModel @Inject constructor(
                         state.copy(episodeProgressMap = progressMap)
                     }
                 }
+                // Revalidate local watched items against Trakt truth
+                revalidateLocalWatchedEpisodesAgainstTrakt(progressMap)
                 // Recalculate next to watch when progress changes
                 reevaluateSeriesWatchedBadge()
                 calculateNextToWatch()
+            }
+        }
+    }
+
+    /**
+     * Removes local watched-episode entries that Trakt doesn't confirm,
+     * preventing stale state when a Trakt sync silently fails.
+     */
+    private fun revalidateLocalWatchedEpisodesAgainstTrakt(
+        traktProgressMap: Map<Pair<Int, Int>, WatchProgress>
+    ) {
+        if (itemType.equals("other", ignoreCase = true)) return
+        if (itemType.equals("movie", ignoreCase = true)) return
+        if (traktProgressMap.isEmpty()) return
+        val hasCompletedEntries = traktProgressMap.values.any { it.isCompleted() }
+        if (!hasCompletedEntries) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val isTraktActive = try {
+                watchProgressRepository.isTraktProgressActive()
+            } catch (_: Exception) { false }
+            if (!isTraktActive) return@launch
+
+            val contentId = _effectiveContentId.value
+            val localWatched = watchedItemsPreferences
+                .getWatchedEpisodesForContent(contentId)
+                .first()
+            if (localWatched.isEmpty()) return@launch
+
+            val staleEpisodes = localWatched.filter { (season, episode) ->
+                val traktEntry = traktProgressMap[season to episode]
+                traktEntry == null || !traktEntry.isCompleted()
+            }
+
+            if (staleEpisodes.isNotEmpty()) {
+                Log.d(TAG, "revalidateWatchedEpisodes: pruning ${staleEpisodes.size} stale entries for $contentId")
+                watchedItemsPreferences.unmarkAsWatchedBatch(
+                    contentId = contentId,
+                    episodes = staleEpisodes.toList()
+                )
             }
         }
     }

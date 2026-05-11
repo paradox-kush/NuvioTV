@@ -223,6 +223,8 @@
 <string name="sub_forced_lang">Geforceerd</string>
 <string name="sub_preferred_lang">Voorkeurstaal</string>
 <string name="sub_secondary_lang">Secundaire voorkeurstaal</string>
+    <string name="sub_show_only_preferred_languages">Alleen voorkeurstalen weergeven</string>
+    <string name="sub_show_only_preferred_languages_desc">Alle andere ondertiteltalen verbergen in de selectielijst</string>
 <string name="sub_organization">Organisatie van ondertitels</string>
 <string name="sub_size">Grootte</string>
 <string name="sub_vertical_offset">Verticale offset</string>

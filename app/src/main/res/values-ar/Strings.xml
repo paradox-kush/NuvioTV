@@ -417,6 +417,8 @@
     <string name="sub_forced_lang">إجبارية</string>
     <string name="sub_preferred_lang">اللغة المفضلة</string>
     <string name="sub_secondary_lang">اللغة المفضلة الثانوية</string>
+    <string name="sub_show_only_preferred_languages">إظهار اللغات المفضلة فقط</string>
+    <string name="sub_show_only_preferred_languages_desc">إخفاء جميع لغات الترجمة الأخرى من قائمة الاختيار</string>
     <string name="sub_organization">تنظيم الترجمة</string>
     <string name="sub_size">الحجم</string>
     <string name="sub_vertical_offset">الارتفاع</string>

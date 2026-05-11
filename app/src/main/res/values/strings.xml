@@ -305,6 +305,13 @@
     <string name="appearance_subtitle">Choose your color theme, font and language</string>
     <string name="appearance_color_theme">Color Theme</string>
     <string name="appearance_color_theme_subtitle">Pick the accent color used across the app</string>
+    <string name="theme_color_crimson">Crimson</string>
+    <string name="theme_color_ocean">Ocean</string>
+    <string name="theme_color_violet">Violet</string>
+    <string name="theme_color_emerald">Emerald</string>
+    <string name="theme_color_amber">Amber</string>
+    <string name="theme_color_rose">Rose</string>
+    <string name="theme_color_white">White</string>
     <string name="appearance_amoled_mode">AMOLED Mode</string>
     <string name="appearance_amoled_mode_subtitle">Use pure black for app backgrounds</string>
     <string name="appearance_amoled_surfaces_mode">Pure Black Surfaces</string>
@@ -324,6 +331,29 @@
     <string name="about_privacy_policy_subtitle">View our privacy policy</string>
     <string name="about_supporters_contributors">Supporters &amp; Contributors</string>
     <string name="about_supporters_contributors_subtitle">Open recognition and project credits</string>
+    <string name="about_licenses_attributions">Licenses &amp; Attribution</string>
+    <string name="about_licenses_attributions_subtitle">Data sources, acknowledgements, and Android licenses</string>
+    <string name="licenses_attributions_title">Licenses &amp; Attribution</string>
+    <string name="licenses_attributions_subtitle">Data providers, service credits, and Android playback licenses used by Nuvio TV.</string>
+    <string name="licenses_attributions_section_app">APP LICENSE</string>
+    <string name="licenses_attributions_section_data">DATA &amp; SERVICES</string>
+    <string name="licenses_attributions_section_playback">ANDROID PLAYBACK LICENSES</string>
+    <string name="licenses_attributions_nuvio_title">Nuvio TV</string>
+    <string name="licenses_attributions_nuvio_body">Source code and license terms are available in the project repository. Licensed under the GNU General Public License v3.0.</string>
+    <string name="licenses_attributions_tmdb_title">The Movie Database (TMDB)</string>
+    <string name="licenses_attributions_tmdb_body">Nuvio uses the TMDB API for movie and TV metadata, artwork, trailers, cast, production details, collections, and recommendations. This product uses the TMDB API but is not endorsed or certified by TMDB.</string>
+    <string name="licenses_attributions_trakt_title">Trakt</string>
+    <string name="licenses_attributions_trakt_body">Nuvio connects to Trakt for account authentication, watched history, progress sync, library data, ratings, lists, and comments. Nuvio is not affiliated with or endorsed by Trakt.</string>
+    <string name="licenses_attributions_mdblist_title">MDBList</string>
+    <string name="licenses_attributions_mdblist_body">Nuvio uses MDBList for ratings and external score provider data. Nuvio is not affiliated with or endorsed by MDBList.</string>
+    <string name="licenses_attributions_introdb_title">IntroDB</string>
+    <string name="licenses_attributions_introdb_body">Nuvio uses the IntroDB API for community-provided intro, recap, credits, and preview timestamps used by skip controls. Nuvio is not affiliated with or endorsed by IntroDB.</string>
+    <string name="licenses_attributions_imdb_title">IMDb Non-Commercial Datasets</string>
+    <string name="licenses_attributions_imdb_body">Nuvio uses IMDb Non-Commercial Datasets, including title.ratings.tsv.gz, for IMDb ratings and vote counts. Information courtesy of IMDb (https://www.imdb.com). Used with permission. IMDb data is for personal and non-commercial use under IMDb terms.</string>
+    <string name="licenses_attributions_exoplayer_title">AndroidX Media3 ExoPlayer 1.8.0</string>
+    <string name="licenses_attributions_exoplayer_body">Used as an Android playback engine. Licensed under the Apache License, Version 2.0.</string>
+    <string name="licenses_attributions_libmpv_title">libmpv / libmpv-android</string>
+    <string name="licenses_attributions_libmpv_body">Used as an Android playback engine. The libmpv-android wrapper is licensed under the MIT license; mpv/libmpv and bundled native components retain their upstream license terms.</string>
 
     <!-- SettingsScreen categories -->
     <string name="settings_experience">Experience</string>
@@ -555,6 +585,8 @@
     <string name="sub_forced_lang">Forced</string>
     <string name="sub_preferred_lang">Preferred Language</string>
     <string name="sub_secondary_lang">Secondary Preferred Language</string>
+    <string name="sub_show_only_preferred_languages">Show Only Preferred Languages</string>
+    <string name="sub_show_only_preferred_languages_desc">Hide all other subtitles languages from selection list</string>
     <string name="sub_organization">Subtitle Organization</string>
     <string name="sub_size">Size</string>
     <string name="sub_vertical_offset">Vertical Offset</string>
@@ -596,6 +628,11 @@
     <string name="autoplay_reuse_last_link">Reuse Last Link</string>
     <string name="autoplay_reuse_last_link_sub">Auto-play your last working stream for this same movie/episode when cache is still valid</string>
     <string name="autoplay_last_link_cache">Last Link Cache Duration</string>
+    <string name="cache_duration_hour_one">%1$d hour</string>
+    <string name="cache_duration_hour_other">%1$d hours</string>
+    <string name="cache_duration_day_one">%1$d day</string>
+    <string name="cache_duration_day_other">%1$d days</string>
+    <string name="cache_duration_days_hours">%1$dd %2$dh</string>
     <string name="autoplay_mode_manual">Manual (choose stream)</string>
     <string name="autoplay_mode_first">Auto-play first source</string>
     <string name="autoplay_mode_regex">Auto-play regex match</string>
@@ -669,8 +706,14 @@
     <string name="layout_classic_focus_gradient_sub">Blend artwork colors into the right side of Classic home.</string>
     <string name="layout_show_hero">Show Hero Section</string>
     <string name="layout_show_hero_sub">Display hero carousel at top of home.</string>
-    <string name="layout_show_discover">Show Discover in Search</string>
-    <string name="layout_show_discover_sub">Show browse section when search is empty.</string>
+    <string name="layout_show_discover">Show/Hide Discover</string>
+    <string name="layout_show_discover_sub">Adds a Discover section for browsing.</string>
+    <string name="layout_discover_location_action">Discover Location</string>
+    <string name="layout_discover_location_dialog_title">Discover Location</string>
+    <string name="layout_discover_location_in_search">Show in Search</string>
+    <string name="layout_discover_location_in_search_desc">Discover appears inside the Search tab.</string>
+    <string name="layout_discover_location_in_sidebar">Show in Side Panel</string>
+    <string name="layout_discover_location_in_sidebar_desc">Discover gets its own item in the side panel.</string>
     <string name="layout_poster_labels">Show Poster Labels</string>
     <string name="layout_poster_labels_sub">Show titles under posters in rows, grid, and see-all.</string>
     <string name="layout_addon_name">Show Addon Name</string>
@@ -693,6 +736,12 @@
     <string name="layout_next_up_furthest_episode_sub">Show next episode based on the furthest watched episode. Disable for rewatches to use the most recently watched episode instead.</string>
     <string name="layout_show_unaired_next_up">Show Unaired Next Up Episodes</string>
     <string name="layout_show_unaired_next_up_sub">Include upcoming episodes in Continue Watching before they air.</string>
+    <string name="layout_cw_sort_mode">Sort Order</string>
+    <string name="layout_cw_sort_mode_sub">How Continue Watching items are arranged</string>
+    <string name="layout_cw_sort_default">Default</string>
+    <string name="layout_cw_sort_default_desc">Sort all items by recency</string>
+    <string name="layout_cw_sort_streaming">Streaming Style</string>
+    <string name="layout_cw_sort_streaming_desc">Released items first, upcoming at the end</string>
     <string name="layout_trailer_button">Show Trailer Button</string>
     <string name="layout_trailer_button_sub">Show trailer button on detail page (only when trailer is available).</string>
     <string name="layout_prefer_external_meta">Prefer meta from external addon</string>
@@ -1542,7 +1591,7 @@
     <string name="search_no_results_title">No Results</string>
     <string name="search_no_results_subtitle">Try searching with different keywords</string>
     <string name="discover_disabled_title">Discover is disabled</string>
-    <string name="discover_disabled_subtitle">Enable Search Discover in settings</string>
+    <string name="discover_disabled_subtitle">Enable Discover in Layout settings</string>
 
     <!-- Library -->
     <string name="library_list_create_dialog_title">Create List</string>

@@ -6,9 +6,14 @@ import com.nuvio.tv.data.remote.api.TraktApi
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.repository.MetaRepository
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,7 +35,8 @@ class TraktEpisodeMappingService @Inject constructor(
     private val reverseMappingCache = mutableMapOf<String, EpisodeMappingEntry>()
     // In-flight dedup: prevents multiple concurrent coroutines from fetching
     // the same show's addon episodes simultaneously.
-    private val addonEpisodesInFlight = mutableMapOf<String, kotlinx.coroutines.CompletableDeferred<List<EpisodeMappingEntry>>>()
+    private val addonEpisodesInFlight = mutableMapOf<String, CompletableDeferred<List<EpisodeMappingEntry>>>()
+    private val traktEpisodesInFlight = mutableMapOf<String, CompletableDeferred<List<EpisodeMappingEntry>>>()
 
     internal suspend fun prefetchEpisodeMapping(
         contentId: String?,
@@ -40,6 +46,28 @@ class TraktEpisodeMappingService @Inject constructor(
         episode: Int?
     ): EpisodeMappingEntry? {
         return resolveEpisodeMapping(contentId, contentType, videoId, season, episode)
+    }
+
+    /**
+     * Pre-fetches addon episode data for [contentIds] so that subsequent calls to
+     * [resolveAddonEpisodeMapping] hit the cache. Limits concurrency to [concurrency].
+     */
+    internal suspend fun prefetchAddonEpisodes(
+        contentIds: List<String>,
+        concurrency: Int = 8
+    ) {
+        val unique = contentIds.distinct()
+        if (unique.isEmpty()) return
+        val semaphore = Semaphore(concurrency)
+        coroutineScope {
+            unique.forEach { contentId ->
+                launch {
+                    semaphore.withPermit {
+                        getAddonEpisodes(contentId, "series")
+                    }
+                }
+            }
+        }
     }
 
     internal suspend fun resolveAddonEpisodeMapping(
@@ -74,7 +102,8 @@ class TraktEpisodeMappingService @Inject constructor(
         val addonHasEpisode = addonEpisodes.any {
             it.season == requestedSeason && it.episode == requestedEpisode
         }
-        if (addonHasEpisode && hasSameSeasonStructure(addonEpisodes, traktEpisodes)) {
+        val sameStructure = hasSameSeasonStructure(addonEpisodes, traktEpisodes)
+        if (addonHasEpisode && sameStructure) {
             return null
         }
 
@@ -215,18 +244,42 @@ class TraktEpisodeMappingService @Inject constructor(
             traktEpisodesCache[showLookupId]?.let { return it }
         }
 
+        val existingDeferred = cacheMutex.withLock { traktEpisodesInFlight[showLookupId] }
+        if (existingDeferred != null) {
+            return try { existingDeferred.await() } catch (_: Exception) { emptyList() }
+        }
+
+        val deferred = CompletableDeferred<List<EpisodeMappingEntry>>()
+        val weOwn = cacheMutex.withLock {
+            traktEpisodesCache[showLookupId]?.let { return it }
+            if (traktEpisodesInFlight.containsKey(showLookupId)) {
+                false
+            } else {
+                traktEpisodesInFlight[showLookupId] = deferred
+                true
+            }
+        }
+        if (!weOwn) {
+            val other = cacheMutex.withLock { traktEpisodesInFlight[showLookupId] }
+            return try { other?.await() ?: emptyList() } catch (_: Exception) { emptyList() }
+        }
+
         val seasonsResponse = traktAuthService.executeAuthorizedRequest { authHeader ->
             traktApi.getShowSeasons(
                 authorization = authHeader,
                 id = showLookupId,
                 extended = "episodes"
             )
-        } ?: return emptyList()
+        } ?: run {
+            cleanupTraktFlight(showLookupId)
+            return emptyList()
+        }
         if (!seasonsResponse.isSuccessful) {
             Log.w(
                 TAG,
                 "getTraktEpisodes: seasons request failed code=${seasonsResponse.code()} id=$showLookupId"
             )
+            cleanupTraktFlight(showLookupId)
             return emptyList()
         }
 
@@ -254,7 +307,13 @@ class TraktEpisodeMappingService @Inject constructor(
                 traktEpisodesCache[showLookupId] = traktEpisodes
             }
         }
+        deferred.complete(traktEpisodes)
+        cleanupTraktFlight(showLookupId)
         return traktEpisodes
+    }
+
+    private suspend fun cleanupTraktFlight(showLookupId: String) {
+        cacheMutex.withLock { traktEpisodesInFlight.remove(showLookupId) }
     }
 
     private fun cacheKey(

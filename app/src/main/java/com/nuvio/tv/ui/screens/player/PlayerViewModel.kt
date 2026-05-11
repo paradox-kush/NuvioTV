@@ -53,8 +53,15 @@ class PlayerViewModel @Inject constructor(
     private val tmdbService: TmdbService,
     private val tmdbMetadataService: TmdbMetadataService,
     private val tmdbSettingsDataStore: TmdbSettingsDataStore,
+    private val trailerPlayerPool: com.nuvio.tv.core.player.TrailerPlayerPool,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
+
+    init {
+        // Release trailer player codec resources so the full-screen player can
+        // claim hardware decoders without contention (prevents black screen).
+        trailerPlayerPool.yield()
+    }
 
     private val controller = PlayerRuntimeController(
         context = context,
@@ -139,6 +146,8 @@ class PlayerViewModel @Inject constructor(
 
     override fun onCleared() {
         controller.onCleared()
+        // Allow the trailer player to be re-created when returning to home screen.
+        trailerPlayerPool.reclaim()
         super.onCleared()
     }
 }

@@ -345,6 +345,8 @@
     <string name="sub_forced_lang">Tvunget</string>
     <string name="sub_preferred_lang">Foretrukket språk</string>
     <string name="sub_secondary_lang">Sekundært foretrukket språk</string>
+    <string name="sub_show_only_preferred_languages">Vis bare foretrukne språk</string>
+    <string name="sub_show_only_preferred_languages_desc">Skjul alle andre undertekstspråk fra valglisten</string>
     <string name="sub_organization">Undertekstorganisering</string>
     <string name="sub_size">Størrelse</string>
     <string name="sub_vertical_offset">Vertikal forskyvning</string>

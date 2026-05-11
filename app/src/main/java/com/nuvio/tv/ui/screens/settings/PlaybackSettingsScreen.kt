@@ -290,6 +290,9 @@ fun PlaybackSettingsContent(
                 onSetSubtitleSize = { newSize -> coroutineScope.launch { viewModel.setSubtitleSize(newSize) } },
                 onSetSubtitleVerticalOffset = { newOffset -> coroutineScope.launch { viewModel.setSubtitleVerticalOffset(newOffset) } },
                 onSetSubtitleBold = { bold -> coroutineScope.launch { viewModel.setSubtitleBold(bold) } },
+                onSetSubtitleShowOnlyPreferredLanguages = { enabled ->
+                    coroutineScope.launch { viewModel.setSubtitleShowOnlyPreferredLanguages(enabled) }
+                },
                 onSetSubtitleOutlineEnabled = { enabled -> coroutineScope.launch { viewModel.setSubtitleOutlineEnabled(enabled) } },
                 onSetUseLibass = { enabled -> coroutineScope.launch { viewModel.setUseLibass(enabled) } },
                 onSetLibassRenderType = { renderType -> coroutineScope.launch { viewModel.setLibassRenderType(renderType) } },

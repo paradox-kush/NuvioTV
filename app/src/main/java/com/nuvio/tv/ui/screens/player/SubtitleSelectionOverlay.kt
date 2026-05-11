@@ -114,34 +114,47 @@ internal fun SubtitleSelectionOverlay(
     var persistedStyleFocusKey by rememberSaveable { mutableStateOf<String?>(null) }
     val sessionPreferredLanguage = remember(visible) { subtitleStyle.preferredLanguage }
     val sessionSecondaryPreferredLanguage = remember(visible) { subtitleStyle.secondaryPreferredLanguage }
+    val sessionShowOnlyPreferredLanguages = remember(visible) { subtitleStyle.showOnlyPreferredLanguages }
     val sessionSelectedInternalIndex = remember(visible) { selectedInternalIndex }
     val sessionInternalTracks = remember(visible) { internalTracks.map(TrackInfo::copy) }
     val sessionAddonSubtitles = remember(visible) { addonSubtitles.map(Subtitle::copy) }
     val sessionSelectedAddonSubtitle = remember(visible) { selectedAddonSubtitle?.copy() }
     val sessionInstalledSubtitleAddonOrder = remember(visible) { installedSubtitleAddonOrder.toList() }
     val sessionIsLoadingAddons = remember(visible) { isLoadingAddons }
-    val languageItems = remember(visible) {
-        buildSubtitleLanguageRailItems(
-            internalTracks = sessionInternalTracks,
-            addonSubtitles = sessionAddonSubtitles,
-            preferredLanguage = sessionPreferredLanguage,
-            secondaryPreferredLanguage = sessionSecondaryPreferredLanguage,
-            noneLabel = noneLabel
-        )
-    }
-    val sessionInitialLanguageKey = remember(visible) {
+    val sessionSelectedSubtitleLanguageKey = remember(visible) {
         selectedSubtitleLanguageKey(
             internalTracks = sessionInternalTracks,
             selectedInternalIndex = sessionSelectedInternalIndex,
             selectedAddonSubtitle = sessionSelectedAddonSubtitle
         )
     }
-    val sessionInitialSelectedOptionId = remember(visible) {
-        selectedSubtitleOptionId(
+    val languageItems = remember(visible) {
+        buildSubtitleLanguageRailItems(
+            internalTracks = sessionInternalTracks,
+            addonSubtitles = sessionAddonSubtitles,
+            preferredLanguage = sessionPreferredLanguage,
+            secondaryPreferredLanguage = sessionSecondaryPreferredLanguage,
+            showOnlyPreferredLanguages = sessionShowOnlyPreferredLanguages,
+            currentLanguageKey = sessionSelectedSubtitleLanguageKey,
+            noneLabel = noneLabel
+        )
+    }
+    val sessionInitialLanguageKey = remember(visible, languageItems, sessionSelectedSubtitleLanguageKey) {
+        sessionSelectedSubtitleLanguageKey.takeIf { key -> languageItems.any { it.key == key } }
+            ?: languageItems.firstOrNull { it.key != SubtitleOffLanguageKey }?.key
+            ?: SubtitleOffLanguageKey
+    }
+    val sessionInitialSelectedOptionId = remember(
+        visible,
+        sessionInitialLanguageKey,
+        sessionSelectedSubtitleLanguageKey
+    ) {
+        val optionId = selectedSubtitleOptionId(
             internalTracks = sessionInternalTracks,
             selectedInternalIndex = sessionSelectedInternalIndex,
             selectedAddonSubtitle = sessionSelectedAddonSubtitle
         )
+        optionId.takeIf { sessionInitialLanguageKey == sessionSelectedSubtitleLanguageKey }
     }
     fun buildSessionOptions(languageKey: String, activeSelectedOptionId: String?): List<SubtitleOptionRailItem> {
         return buildSubtitleOptionRailItems(
@@ -1660,6 +1673,8 @@ private fun buildSubtitleLanguageRailItems(
     addonSubtitles: List<Subtitle>,
     preferredLanguage: String,
     secondaryPreferredLanguage: String?,
+    showOnlyPreferredLanguages: Boolean,
+    currentLanguageKey: String,
     noneLabel: String
 ): List<SubtitleLanguageRailItem> {
     val counts = linkedMapOf<String, Int>()
@@ -1677,7 +1692,16 @@ private fun buildSubtitleLanguageRailItems(
         secondaryPreferredLanguage = secondaryPreferredLanguage
     )
 
-    val sortedItems = counts.entries
+    val languageEntries = if (showOnlyPreferredLanguages) {
+        val preferredKeys = preferredOrder.toSet()
+        counts.entries.filter { entry ->
+            entry.key in preferredKeys || entry.key == currentLanguageKey
+        }
+    } else {
+        counts.entries
+    }
+
+    val sortedItems = languageEntries
         .sortedWith(
             compareBy<Map.Entry<String, Int>>(
                 { entry ->

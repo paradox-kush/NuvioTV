@@ -60,7 +60,7 @@ internal fun PlayerRuntimeController.startInitialPlaybackIfNeeded() {
     preparePlaybackBeforeStart(
         url = currentStreamUrl,
         headers = currentHeaders,
-        loadSavedProgress = false
+        loadSavedProgress = !navigationArgs.startFromBeginning
     )
 }
 

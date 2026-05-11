@@ -433,6 +433,8 @@
     <string name="sub_forced_lang">Vynucené</string>
     <string name="sub_preferred_lang">Preferovaný jazyk</string>
     <string name="sub_secondary_lang">Sekundární preferovaný jazyk</string>
+    <string name="sub_show_only_preferred_languages">Zobrazit pouze preferované jazyky</string>
+    <string name="sub_show_only_preferred_languages_desc">Skrýt všechny ostatní jazyky titulků ze seznamu výběru</string>
     <string name="sub_organization">Uspořádání titulků</string>
     <string name="sub_size">Velikost</string>
     <string name="sub_vertical_offset">Svislý posun</string>

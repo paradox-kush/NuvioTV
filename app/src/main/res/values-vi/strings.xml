@@ -223,6 +223,8 @@
     <string name="sub_forced_lang">Bắt buộc</string>
     <string name="sub_preferred_lang">Ngôn ngữ ưa thích</string>
     <string name="sub_secondary_lang">Ngôn ngữ ưa thích thứ hai</string>
+    <string name="sub_show_only_preferred_languages">Chỉ hiển thị ngôn ngữ ưu tiên</string>
+    <string name="sub_show_only_preferred_languages_desc">Ẩn tất cả ngôn ngữ phụ đề khác khỏi danh sách chọn</string>
     <string name="sub_organization">Sắp xếp phụ đề</string>
     <string name="sub_size">Cỡ chữ</string>
     <string name="sub_vertical_offset">Khoảng cách dọc</string>

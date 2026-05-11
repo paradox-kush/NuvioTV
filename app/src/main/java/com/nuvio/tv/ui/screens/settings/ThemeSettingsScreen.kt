@@ -381,11 +381,22 @@ private fun ThemeSwatchChip(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = theme.displayName,
+                text = theme.localizedName(),
                 style = MaterialTheme.typography.labelMedium,
                 color = if (isFocused || isSelected) NuvioColors.TextPrimary else NuvioColors.TextSecondary,
                 maxLines = 1
             )
         }
     }
+}
+
+@Composable
+private fun AppTheme.localizedName(): String = when (this) {
+    AppTheme.CRIMSON -> stringResource(R.string.theme_color_crimson)
+    AppTheme.OCEAN -> stringResource(R.string.theme_color_ocean)
+    AppTheme.VIOLET -> stringResource(R.string.theme_color_violet)
+    AppTheme.EMERALD -> stringResource(R.string.theme_color_emerald)
+    AppTheme.AMBER -> stringResource(R.string.theme_color_amber)
+    AppTheme.ROSE -> stringResource(R.string.theme_color_rose)
+    AppTheme.WHITE -> stringResource(R.string.theme_color_white)
 }

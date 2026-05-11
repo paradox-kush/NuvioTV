@@ -503,17 +503,24 @@ private fun NextEpisodeThresholdModeDialog(
     }
 }
 
+@Composable
 private fun formatReuseCacheDuration(hours: Int): String {
     return when {
-        hours < 24 -> "$hours hour${if (hours == 1) "" else "s"}"
+        hours < 24 -> stringResource(
+            if (hours == 1) R.string.cache_duration_hour_one else R.string.cache_duration_hour_other,
+            hours
+        )
         hours % 24 == 0 -> {
             val days = hours / 24
-            "$days day${if (days == 1) "" else "s"}"
+            stringResource(
+                if (days == 1) R.string.cache_duration_day_one else R.string.cache_duration_day_other,
+                days
+            )
         }
         else -> {
             val days = hours / 24
             val remainingHours = hours % 24
-            "${days}d ${remainingHours}h"
+            stringResource(R.string.cache_duration_days_hours, days, remainingHours)
         }
     }
 }

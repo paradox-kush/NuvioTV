@@ -271,6 +271,7 @@ class PlayerRuntimeController(
     internal var skipIntervals: List<SkipInterval> = emptyList()
     internal var skipIntroEnabled: Boolean = true
     internal var autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet()
+    internal var playerSettingsInitialized: Boolean = false
     internal var skipIntroFetchedKey: String? = null
     internal var lastAutoSkippedIntervalKey: String? = null
     internal var lastActiveSkipType: String? = null
@@ -314,6 +315,7 @@ class PlayerRuntimeController(
     internal var audioOutputRouteCallback: AudioDeviceCallback? = null
 
     internal var lastBufferLogTimeMs: Long = 0L
+    internal var pendingSeekFlush: Boolean = false
     
     internal val gainAudioProcessor = GainAudioProcessor()
     internal var trackSelector: DefaultTrackSelector? = null
@@ -336,6 +338,7 @@ class PlayerRuntimeController(
     internal var isReleasingPlayer: Boolean = false
     internal var cachedDecoderPriority: Int = 1
     internal var hasTriedAudioPcmFallback: Boolean = false
+    internal var pendingAudioPcmFallbackRebuild: Boolean = false
     internal var hasTriedDv7HevcFallback: Boolean = false
     internal var forceDv7ToHevc: Boolean = false
     internal var startupRetryCount: Int = 0
@@ -348,6 +351,7 @@ class PlayerRuntimeController(
     internal var hasRequestedScrobbleStartForCurrentItem: Boolean = false
     internal var scrobbleStartRequestGeneration: Long = 0L
     internal var playbackPreparationJob: Job? = null
+    internal var playerInitializationJob: Job? = null
     internal var hasSentCompletionScrobbleForCurrentItem: Boolean = false
     internal var requestedUseLibassByUser: Boolean = false
     internal var libassPipelineOverrideForCurrentStream: Boolean? = null
@@ -380,9 +384,11 @@ class PlayerRuntimeController(
         }
 
     init {
-        if (!navigationArgs.startFromBeginning) {
-            loadSavedProgressFor(currentSeason, currentEpisode)
-        }
+        // NOTE: Saved watch progress is loaded inside preparePlaybackBeforeStart()
+        // via loadSavedProgressSuspend() — NOT here.  Loading it in the init block
+        // was a fire-and-forget coroutine that raced against initializePlayer(),
+        // causing the resume seek to be silently lost when ExoPlayer's STATE_READY
+        // fired before the DB read completed.
         fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
         observeSubtitleSettings()
         fetchMetaDetails(contentId, contentType)

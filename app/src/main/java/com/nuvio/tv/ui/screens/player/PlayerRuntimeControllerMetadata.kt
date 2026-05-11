@@ -360,6 +360,11 @@ internal fun PlayerRuntimeController.updateActiveSkipInterval(positionMs: Long) 
         return
     }
 
+    // Don't evaluate skip intervals until player settings are loaded from DataStore.
+    // Without this, autoSkipSegmentTypes is empty on first iterations, causing the
+    // skip button to appear instead of auto-skipping.
+    if (!playerSettingsInitialized) return
+
     val positionSec = positionMs / 1000.0
     val active = skipIntervals.find { interval ->
         positionSec >= interval.startTime && positionSec < (interval.endTime - 0.5)
@@ -456,7 +461,6 @@ internal fun PlayerRuntimeController.fetchParentalGuide(id: String?, type: Strin
                 )
             }
 
-            
             if (_uiState.value.isPlaying) {
                 tryShowParentalGuide()
             }

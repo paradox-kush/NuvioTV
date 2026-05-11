@@ -18,6 +18,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+/** Hard ceiling for next-episode stream search to prevent hanging forever. */
+private const val NEXT_EPISODE_HARD_TIMEOUT_MS = 120_000L
 
 internal fun PlayerRuntimeController.showEpisodesPanel() {
     _uiState.update {
@@ -1091,12 +1095,35 @@ internal fun PlayerRuntimeController.playNextEpisode() {
                     }
                 }
                 if (selectedStream != null) {
+                    // Found a match within timeout - use it.
                     innerJob.cancel()
+                } else if (lastSuccessData != null) {
+                    // Streams arrived but no match (e.g. binge group not found).
+                    // Respect the original timeout - don't wait further.
+                    innerJob.cancel()
+                    autoSelectTriggered = true
                 } else {
-                    innerJob.join()
+                    // No addon responded yet - wait for the first result with
+                    // a hard ceiling so we never hang indefinitely.
+                    val completed = withTimeoutOrNull(timeoutMs) { innerJob.join() }
+                    if (completed == null) {
+                        innerJob.cancel()
+                        // One last attempt with whatever data arrived
+                        if (!autoSelectTriggered && lastSuccessData != null) {
+                            selectedStream = trySelectStream(lastSuccessData!!)
+                        }
+                    }
                 }
             } else {
-                innerJob.join()
+                // "Unlimited" mode - still apply a hard ceiling to prevent
+                // hanging forever if a scraper/addon never responds.
+                val completed = withTimeoutOrNull(NEXT_EPISODE_HARD_TIMEOUT_MS) { innerJob.join() }
+                if (completed == null) {
+                    innerJob.cancel()
+                    if (!autoSelectTriggered && lastSuccessData != null) {
+                        selectedStream = trySelectStream(lastSuccessData!!)
+                    }
+                }
             }
 
             val streamToPlay = selectedStream

@@ -121,6 +121,7 @@ val AVAILABLE_SUBTITLE_LANGUAGES = listOf(
 data class SubtitleStyleSettings(
     val preferredLanguage: String = "en",
     val secondaryPreferredLanguage: String? = null,
+    val showOnlyPreferredLanguages: Boolean = false,
     val size: Int = 120, // Percentage (50-200)
     val verticalOffset: Int = 5, // Percentage from bottom (-20 to 50)
     val bold: Boolean = false,
@@ -391,11 +392,14 @@ class PlayerSettingsDataStore @Inject constructor(
     private val streamReuseLastLinkCacheHoursKey = intPreferencesKey("stream_reuse_last_link_cache_hours")
     private val subtitleOrganizationModeKey = stringPreferencesKey("subtitle_organization_mode")
     private val addonSubtitleStartupModeKey = stringPreferencesKey("addon_subtitle_startup_mode")
+    private val addonSubtitleStartupModeAutoPreferredKey =
+        booleanPreferencesKey("addon_subtitle_startup_mode_auto_preferred")
     private val resizeModeKey = intPreferencesKey("resize_mode")
 
     // Subtitle style settings keys
     private val subtitlePreferredLanguageKey = stringPreferencesKey("subtitle_preferred_language")
     private val subtitleSecondaryLanguageKey = stringPreferencesKey("subtitle_secondary_language")
+    private val subtitleShowOnlyPreferredLanguagesKey = booleanPreferencesKey("subtitle_show_only_preferred_languages")
     private val subtitleSizeKey = intPreferencesKey("subtitle_size")
     private val subtitleVerticalOffsetKey = intPreferencesKey("subtitle_vertical_offset")
     private val subtitleBoldKey = booleanPreferencesKey("subtitle_bold")
@@ -592,6 +596,7 @@ class PlayerSettingsDataStore @Inject constructor(
                     ),
                     secondaryPreferredLanguage = prefs[subtitleSecondaryLanguageKey]
                         ?.let(::normalizeSelectableLanguageCode),
+                    showOnlyPreferredLanguages = prefs[subtitleShowOnlyPreferredLanguagesKey] ?: false,
                     size = prefs[subtitleSizeKey] ?: 100,
                     verticalOffset = prefs[subtitleVerticalOffsetKey] ?: 5,
                     bold = prefs[subtitleBoldKey] ?: false,
@@ -921,6 +926,7 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setAddonSubtitleStartupMode(mode: AddonSubtitleStartupMode) {
         store().edit { prefs ->
             prefs[addonSubtitleStartupModeKey] = mode.name
+            prefs[addonSubtitleStartupModeAutoPreferredKey] = false
         }
     }
 
@@ -1031,6 +1037,27 @@ class PlayerSettingsDataStore @Inject constructor(
                 prefs[subtitleSecondaryLanguageKey] = normalizedLanguage
             } else {
                 prefs.remove(subtitleSecondaryLanguageKey)
+            }
+        }
+    }
+
+    suspend fun setSubtitleShowOnlyPreferredLanguages(enabled: Boolean) {
+        store().edit { prefs ->
+            val currentStartupMode = parseAddonSubtitleStartupMode(prefs[addonSubtitleStartupModeKey])
+            prefs[subtitleShowOnlyPreferredLanguagesKey] = enabled
+            if (enabled) {
+                if (currentStartupMode == AddonSubtitleStartupMode.ALL_SUBTITLES) {
+                    prefs[addonSubtitleStartupModeKey] = AddonSubtitleStartupMode.PREFERRED_ONLY.name
+                    prefs[addonSubtitleStartupModeAutoPreferredKey] = true
+                } else {
+                    prefs[addonSubtitleStartupModeAutoPreferredKey] = false
+                }
+            } else {
+                val wasAutoPreferred = prefs[addonSubtitleStartupModeAutoPreferredKey] ?: false
+                if (wasAutoPreferred && currentStartupMode == AddonSubtitleStartupMode.PREFERRED_ONLY) {
+                    prefs[addonSubtitleStartupModeKey] = AddonSubtitleStartupMode.ALL_SUBTITLES.name
+                }
+                prefs[addonSubtitleStartupModeAutoPreferredKey] = false
             }
         }
     }

@@ -2,12 +2,14 @@ package com.nuvio.tv.data.local
 
 import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.nuvio.tv.domain.model.DiscoverLocation
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,31 @@ private class ScopedDataStore(
     val job: Job
 )
 
+internal val discoverLocationMigration = object : DataMigration<Preferences> {
+    override suspend fun shouldMigrate(currentData: Preferences): Boolean =
+        legacySearchDiscoverEnabledKey in currentData
+
+    override suspend fun migrate(currentData: Preferences): Preferences {
+        val mutable = currentData.toMutablePreferences()
+        val legacy = mutable[legacySearchDiscoverEnabledKey]
+        if (legacy != null && mutable[discoverLocationKey] == null) {
+            val rememberedLocation = mutable[lastNonOffDiscoverLocationKey]?.let {
+                runCatching { DiscoverLocation.valueOf(it) }.getOrNull()
+            }?.takeIf { it != DiscoverLocation.OFF }
+            val resolved = if (legacy && rememberedLocation != null) {
+                rememberedLocation
+            } else {
+                DiscoverLocation.fromLegacySearchDiscoverEnabled(legacy)
+            }
+            mutable[discoverLocationKey] = resolved.name
+        }
+        mutable.remove(legacySearchDiscoverEnabledKey)
+        return mutable.toPreferences()
+    }
+
+    override suspend fun cleanUp() = Unit
+}
+
 @Singleton
 class ProfileDataStoreFactory @Inject constructor(
     @ApplicationContext private val context: Context
@@ -35,7 +62,7 @@ class ProfileDataStoreFactory @Inject constructor(
     val corruptedFileNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     fun get(profileId: Int, featureName: String): DataStore<Preferences> {
-        val fileName = if (profileId == 1) featureName else "${featureName}_p${profileId}"
+        val fileName = if (profileId == 1) featureName else "${featureName}_p$profileId"
         synchronized(lock) {
             cache[fileName]?.let { return it.store }
             return createAndCache(fileName).store
@@ -45,7 +72,7 @@ class ProfileDataStoreFactory @Inject constructor(
     suspend fun clearProfile(profileId: Int) {
         if (profileId == 1) return
         deletedProfileIds.add(profileId)
-        val suffix = "_p${profileId}"
+        val suffix = "_p$profileId"
         val keysToRemove = synchronized(lock) {
             cache.keys.filter { it.endsWith(suffix) }
         }
@@ -69,6 +96,11 @@ class ProfileDataStoreFactory @Inject constructor(
     private fun createAndCache(fileName: String): ScopedDataStore {
         val job = SupervisorJob()
         val scope = CoroutineScope(Dispatchers.IO + job)
+        val migrations = if (fileName == "layout_settings" || fileName.startsWith("layout_settings_p")) {
+            listOf(discoverLocationMigration)
+        } else {
+            emptyList()
+        }
         val store = PreferenceDataStoreFactory.create(
             corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler { ex ->
                 Log.e("ProfileDataStoreFactory", "DataStore corrupted ($fileName): ${ex.message} — resetting to empty preferences")
@@ -76,6 +108,7 @@ class ProfileDataStoreFactory @Inject constructor(
                 emptyPreferences()
             },
             scope = scope,
+            migrations = migrations,
             produceFile = { context.preferencesDataStoreFile(fileName) }
         )
         val scoped = ScopedDataStore(store, scope, job)

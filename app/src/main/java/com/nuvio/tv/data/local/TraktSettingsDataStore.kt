@@ -64,7 +64,10 @@ class TraktSettingsDataStore @Inject constructor(
 
     val dismissedNextUpKeys: Flow<Set<String>> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { prefs ->
-            prefs[dismissedNextUpKeysKey] ?: emptySet()
+            val raw = prefs[dismissedNextUpKeysKey] ?: emptySet()
+            // Normalize: extract contentId from legacy "contentId|season|episode" keys
+            // so the check `contentId in dismissedSet` works for both old and new formats.
+            raw.mapTo(mutableSetOf()) { it.substringBefore("|") }
         }
     }
 
@@ -114,18 +117,23 @@ class TraktSettingsDataStore @Inject constructor(
 
     suspend fun addDismissedNextUpKey(key: String) {
         if (key.isBlank()) return
+        // Store just the contentId (no season/episode suffix) so dismiss
+        // survives anime episode remapping and seed changes.
+        val contentIdOnly = key.trim().substringBefore("|")
         store().edit { prefs ->
             val current = prefs[dismissedNextUpKeysKey] ?: emptySet()
-            prefs[dismissedNextUpKeysKey] = current + key
+            prefs[dismissedNextUpKeysKey] = current + contentIdOnly
         }
     }
 
     suspend fun removeDismissedNextUpKeysForContent(contentId: String) {
         if (contentId.isBlank()) return
-        val prefix = "${contentId.trim()}|"
+        val trimmed = contentId.trim()
+        val prefix = "$trimmed|"
         store().edit { prefs ->
             val current = prefs[dismissedNextUpKeysKey] ?: emptySet()
-            val filtered = current.filterNot { it.startsWith(prefix) }
+            // Remove both legacy format ("contentId|season|episode") and new format ("contentId")
+            val filtered = current.filterNot { it == trimmed || it.startsWith(prefix) }
             if (filtered.size != current.size) {
                 prefs[dismissedNextUpKeysKey] = filtered.toSet()
             }

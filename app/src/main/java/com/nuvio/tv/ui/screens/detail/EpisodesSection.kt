@@ -1162,7 +1162,7 @@ private fun formatEpisodeCardDate(isoDate: String): String {
 
     return try {
         val localDate = java.time.Instant.parse(isoDate)
-            .atZone(java.time.ZoneOffset.UTC)
+            .atZone(java.time.ZoneId.systemDefault())
             .toLocalDate()
 
         formatter.format(localDate)

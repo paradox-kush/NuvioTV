@@ -10,6 +10,7 @@ import com.nuvio.tv.data.local.SearchHistoryDataStore
 import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.model.CatalogDescriptor
 import com.nuvio.tv.domain.model.CatalogRow
+import com.nuvio.tv.domain.model.DiscoverLocation
 import com.nuvio.tv.domain.model.skipStep
 import com.nuvio.tv.domain.model.supportsExtra
 import com.nuvio.tv.core.util.filterReleasedItems
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.joinAll
@@ -80,18 +82,25 @@ class SearchViewModel @Inject constructor(
                 .collect { ids -> _watchedMovieIds.value = ids }
         }
         viewModelScope.launch {
-            layoutPreferenceDataStore.searchDiscoverEnabled.collectLatest { enabled ->
-                _uiState.update { it.copy(discoverEnabled = enabled) }
-                if (enabled) {
-                    loadDiscoverCatalogs()
-                } else {
+            layoutPreferenceDataStore.discoverLocation.distinctUntilChanged().collectLatest { location ->
+                _uiState.update { it.copy(discoverLocation = location) }
+                if (location == DiscoverLocation.OFF) {
                     discoverJob?.cancel()
+                    discoverJob = null
+                    revealBatchAfterNextDiscoverFetch = false
                     _uiState.update {
                         it.copy(
+                            discoverInitialized = false,
                             discoverLoading = false,
                             discoverLoadingMore = false,
+                            discoverCatalogs = emptyList(),
+                            selectedDiscoverType = "movie",
+                            selectedDiscoverCatalogKey = null,
+                            selectedDiscoverGenre = null,
                             discoverResults = emptyList(),
-                            pendingDiscoverResults = emptyList()
+                            pendingDiscoverResults = emptyList(),
+                            discoverHasMore = true,
+                            discoverPage = 1
                         )
                     }
                 }
@@ -144,6 +153,13 @@ class SearchViewModel @Inject constructor(
         val heightDp: Int,
         val cornerRadiusDp: Int
     )
+
+    fun ensureDiscoverLoaded() {
+        val state = _uiState.value
+        if (state.discoverLocation == DiscoverLocation.OFF) return
+        if (state.discoverInitialized || state.discoverLoading) return
+        viewModelScope.launch { loadDiscoverCatalogs() }
+    }
 
     fun onEvent(event: SearchEvent) {
         when (event) {
@@ -302,11 +318,7 @@ class SearchViewModel @Inject constructor(
                     catalogRows = emptyList()
                 )
             }
-            if (_uiState.value.discoverEnabled && !_uiState.value.discoverInitialized) {
-                viewModelScope.launch {
-                    loadDiscoverCatalogs()
-                }
-            }
+            ensureDiscoverLoaded()
             return
         }
 
@@ -554,7 +566,7 @@ class SearchViewModel @Inject constructor(
     }
 
     private suspend fun loadDiscoverCatalogs() {
-        if (!_uiState.value.discoverEnabled) return
+        if (_uiState.value.discoverLocation == DiscoverLocation.OFF) return
         _uiState.update { it.copy(discoverLoading = true) }
         val addons = try {
             addonRepository.getInstalledAddons().first()
@@ -739,6 +751,7 @@ class SearchViewModel @Inject constructor(
                 extraArgs = extraArgs,
                 supportsSkip = selectedCatalog.supportsSkip
             ).collect { result ->
+                if (_uiState.value.discoverLocation == DiscoverLocation.OFF) return@collect
                 when (result) {
                     is NetworkResult.Success -> {
                         val incoming = result.data.items
@@ -823,6 +836,6 @@ class SearchViewModel @Inject constructor(
     }
 
     private fun catalogKey(addonId: String, type: String, catalogId: String): String {
-        return "${addonId}_${type}_${catalogId}"
+        return "${addonId}_${type}_$catalogId"
     }
 }

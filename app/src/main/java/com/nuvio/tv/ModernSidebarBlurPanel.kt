@@ -21,14 +21,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -45,13 +46,13 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeChild
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import com.nuvio.tv.ui.components.AutoResizeText
 import com.nuvio.tv.ui.components.ProfileAvatarCircle
 import com.nuvio.tv.ui.theme.NuvioColors
-import coil3.compose.rememberAsyncImagePainter
-import coil3.request.ImageRequest
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeChild
 
 private val SidebarLeadingVisualSize = 34.dp
 private val SidebarContentGap = 14.dp
@@ -183,28 +184,29 @@ internal fun ModernSidebarBlurPanel(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 drawerItems.forEachIndexed { index, item ->
-                    SidebarNavigationItem(
-                        label = item.label,
-                        iconRes = item.iconRes,
-                        icon = item.icon,
-                        selected = selectedDrawerRoute == item.route,
-                        focusEnabled = keepSidebarFocusDuringCollapse,
-                        labelAlpha = sidebarLabelAlpha,
-                        iconScale = sidebarIconScale,
-                        onFocusChanged = {
-                            if (it) {
-                                onDrawerItemFocused(index)
-                            }
-                        },
-                        onClick = { onDrawerItemClick(item.route) },
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .focusRequester(drawerItemFocusRequesters.getValue(item.route))
-                    )
+                    key(item.route) {
+                        SidebarNavigationItem(
+                            label = item.label,
+                            iconRes = item.iconRes,
+                            icon = item.icon,
+                            selected = selectedDrawerRoute == item.route,
+                            focusEnabled = keepSidebarFocusDuringCollapse,
+                            labelAlpha = sidebarLabelAlpha,
+                            iconScale = sidebarIconScale,
+                            onFocusChanged = {
+                                if (it) {
+                                    onDrawerItemFocused(index)
+                                }
+                            },
+                            onClick = { onDrawerItemClick(item.route) },
+                            modifier = Modifier
+                                .fillMaxWidth(0.92f)
+                                .focusRequester(drawerItemFocusRequesters.getValue(item.route))
+                        )
+                    }
                 }
             }
         }
-
     }
 }
 

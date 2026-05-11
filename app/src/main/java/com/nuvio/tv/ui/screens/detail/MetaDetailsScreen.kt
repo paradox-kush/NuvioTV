@@ -1274,6 +1274,19 @@ private fun MetaDetailsContent(
         }
     }
 
+    // Switch to the correct people tab when restoring focus after navigation
+    LaunchedEffect(restoreFocusToken, pendingRestoreType) {
+        if (restoreFocusToken <= 0 || pendingRestoreType == null) return@LaunchedEffect
+        val targetTab = when (pendingRestoreType) {
+            RestoreTarget.MORE_LIKE_THIS -> PeopleSectionTab.MORE_LIKE_THIS
+            RestoreTarget.CAST_MEMBER -> PeopleSectionTab.CAST
+            else -> null
+        }
+        if (targetTab != null && targetTab in visiblePeopleTabsList && activePeopleTab != targetTab) {
+            activePeopleTab = targetTab
+        }
+    }
+
     // Backdrop alpha for crossfade
     val backgroundColor = NuvioColors.Background
 

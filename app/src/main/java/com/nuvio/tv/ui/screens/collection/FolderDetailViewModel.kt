@@ -371,57 +371,83 @@ class FolderDetailViewModel @Inject constructor(
 
         val anyLoading = sourceTabs.any { it.isLoading }
 
-        // Build modern presentation so ModernHomeContent has carousel rows to render.
-        val modernPresentation = _uiState.value.let { s ->
-            if (s.homeLayout == HomeLayout.MODERN) {
-                buildModernHomePresentation(
+        // Build modern presentation off the main thread to avoid jank.
+        val needsModernPresentation = _uiState.value.homeLayout == HomeLayout.MODERN
+        if (needsModernPresentation) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                val modernPresentation = buildModernHomePresentation(
                     input = ModernHomePresentationInput(
                         homeRows = homeRows,
                         catalogRows = loadedRows,
                         continueWatchingItems = emptyList(),
-                        useLandscapePosters = s.modernLandscapePostersEnabled,
-                        showCatalogTypeSuffix = s.catalogTypeSuffixEnabled,
-                        showFullReleaseDate = s.showFullReleaseDate,
+                        useLandscapePosters = state.modernLandscapePostersEnabled,
+                        showCatalogTypeSuffix = state.catalogTypeSuffixEnabled,
+                        showFullReleaseDate = state.showFullReleaseDate,
                         localeTag = com.nuvio.tv.LocaleCache.localeTag
                     ),
                     cache = modernCarouselRowBuildCache,
                     context = appContext
                 )
-            } else null
-        }
-
-        _uiState.update { s ->
-            val homeState = HomeUiState(
-                catalogRows = loadedRows,
-                homeRows = homeRows,
-                gridItems = gridItems,
-                heroItems = emptyList(),
-                heroSectionEnabled = false,
-                isLoading = anyLoading,
-                homeLayout = s.homeLayout,
-                posterLabelsEnabled = if (s.homeLayout == HomeLayout.MODERN) false else s.posterLabelsEnabled,
-                modernLandscapePostersEnabled = s.modernLandscapePostersEnabled,
-                modernHeroFullScreenBackdropEnabled = s.modernHeroFullScreenBackdropEnabled,
-                catalogAddonNameEnabled = s.catalogAddonNameEnabled,
-                catalogTypeSuffixEnabled = s.catalogTypeSuffixEnabled,
-                focusedPosterBackdropExpandEnabled = s.focusedPosterBackdropExpandEnabled,
-                focusedPosterBackdropExpandDelaySeconds = s.focusedPosterBackdropExpandDelaySeconds,
-                focusedPosterBackdropTrailerEnabled = s.focusedPosterBackdropTrailerEnabled,
-                focusedPosterBackdropTrailerMuted = s.focusedPosterBackdropTrailerMuted,
-                focusedPosterBackdropTrailerPlaybackTarget = s.focusedPosterBackdropTrailerPlaybackTarget,
-                posterCardWidthDp = s.posterCardWidthDp,
-                posterCardHeightDp = s.posterCardHeightDp,
-                posterCardCornerRadiusDp = s.posterCardCornerRadiusDp,
-                hideUnreleasedContent = s.hideUnreleasedContent,
-                showFullReleaseDate = s.showFullReleaseDate,
-                movieWatchedStatus = s.movieWatchedStatus,
-                heroEnrichmentEnabled = true
-            )
-            s.copy(followLayoutHomeState = if (modernPresentation != null) {
-                homeState.copy(modernHomePresentation = modernPresentation)
-            } else {
-                homeState
-            })
+                _uiState.update { s ->
+                    val homeState = HomeUiState(
+                        catalogRows = loadedRows,
+                        homeRows = homeRows,
+                        gridItems = gridItems,
+                        heroItems = emptyList(),
+                        heroSectionEnabled = false,
+                        isLoading = anyLoading,
+                        homeLayout = s.homeLayout,
+                        posterLabelsEnabled = if (s.homeLayout == HomeLayout.MODERN) false else s.posterLabelsEnabled,
+                        modernLandscapePostersEnabled = s.modernLandscapePostersEnabled,
+                        modernHeroFullScreenBackdropEnabled = s.modernHeroFullScreenBackdropEnabled,
+                        catalogAddonNameEnabled = s.catalogAddonNameEnabled,
+                        catalogTypeSuffixEnabled = s.catalogTypeSuffixEnabled,
+                        focusedPosterBackdropExpandEnabled = s.focusedPosterBackdropExpandEnabled,
+                        focusedPosterBackdropExpandDelaySeconds = s.focusedPosterBackdropExpandDelaySeconds,
+                        focusedPosterBackdropTrailerEnabled = s.focusedPosterBackdropTrailerEnabled,
+                        focusedPosterBackdropTrailerMuted = s.focusedPosterBackdropTrailerMuted,
+                        focusedPosterBackdropTrailerPlaybackTarget = s.focusedPosterBackdropTrailerPlaybackTarget,
+                        posterCardWidthDp = s.posterCardWidthDp,
+                        posterCardHeightDp = s.posterCardHeightDp,
+                        posterCardCornerRadiusDp = s.posterCardCornerRadiusDp,
+                        hideUnreleasedContent = s.hideUnreleasedContent,
+                        showFullReleaseDate = s.showFullReleaseDate,
+                        movieWatchedStatus = s.movieWatchedStatus,
+                        heroEnrichmentEnabled = true
+                    )
+                    s.copy(followLayoutHomeState = homeState.copy(modernHomePresentation = modernPresentation))
+                }
+            }
+        } else {
+            _uiState.update { s ->
+                val homeState = HomeUiState(
+                    catalogRows = loadedRows,
+                    homeRows = homeRows,
+                    gridItems = gridItems,
+                    heroItems = emptyList(),
+                    heroSectionEnabled = false,
+                    isLoading = anyLoading,
+                    homeLayout = s.homeLayout,
+                    posterLabelsEnabled = s.posterLabelsEnabled,
+                    modernLandscapePostersEnabled = s.modernLandscapePostersEnabled,
+                    modernHeroFullScreenBackdropEnabled = s.modernHeroFullScreenBackdropEnabled,
+                    catalogAddonNameEnabled = s.catalogAddonNameEnabled,
+                    catalogTypeSuffixEnabled = s.catalogTypeSuffixEnabled,
+                    focusedPosterBackdropExpandEnabled = s.focusedPosterBackdropExpandEnabled,
+                    focusedPosterBackdropExpandDelaySeconds = s.focusedPosterBackdropExpandDelaySeconds,
+                    focusedPosterBackdropTrailerEnabled = s.focusedPosterBackdropTrailerEnabled,
+                    focusedPosterBackdropTrailerMuted = s.focusedPosterBackdropTrailerMuted,
+                    focusedPosterBackdropTrailerPlaybackTarget = s.focusedPosterBackdropTrailerPlaybackTarget,
+                    posterCardWidthDp = s.posterCardWidthDp,
+                    posterCardHeightDp = s.posterCardHeightDp,
+                    posterCardCornerRadiusDp = s.posterCardCornerRadiusDp,
+                    hideUnreleasedContent = s.hideUnreleasedContent,
+                    showFullReleaseDate = s.showFullReleaseDate,
+                    movieWatchedStatus = s.movieWatchedStatus,
+                    heroEnrichmentEnabled = true
+                )
+                s.copy(followLayoutHomeState = homeState)
+            }
         }
     }
 

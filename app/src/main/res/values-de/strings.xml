@@ -347,6 +347,8 @@
     <string name="sub_forced_lang">Erzwungen (Forced)</string>
     <string name="sub_preferred_lang">Bevorzugte Sprache</string>
     <string name="sub_secondary_lang">Zweitbevorzugte Sprache</string>
+    <string name="sub_show_only_preferred_languages">Nur bevorzugte Sprachen anzeigen</string>
+    <string name="sub_show_only_preferred_languages_desc">Alle anderen Untertitelsprachen aus der Auswahlliste ausblenden</string>
     <string name="sub_organization">Untertitelorganisation</string>
     <string name="sub_size">Größe</string>
     <string name="sub_vertical_offset">Vertikaler Versatz</string>

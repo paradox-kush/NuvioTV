@@ -10,6 +10,7 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.gif.GifDecoder
 import coil3.gif.AnimatedImageDecoder
+import coil3.svg.SvgDecoder
 import coil3.request.crossfade
 import coil3.request.allowHardware
 import coil3.request.allowRgb565
@@ -77,6 +78,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
                 } else {
                     add(GifDecoder.Factory())
                 }
+                add(SvgDecoder.Factory())
                 // Use a lean OkHttpClient for image fetching — no HTTP cache (Coil's own
                 // DiskCache handles caching), no cookie jar, no logging interceptors.
                 add(

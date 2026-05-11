@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -454,7 +455,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
                                     progressPercent = 100f
                                 )
                             }
-                    }
+                    }.flowOn(Dispatchers.Default)
                 }
             }
             .distinctUntilChanged()

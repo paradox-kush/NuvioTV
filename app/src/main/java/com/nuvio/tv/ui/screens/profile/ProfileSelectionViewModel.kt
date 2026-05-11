@@ -34,7 +34,7 @@ class ProfileSelectionViewModel @Inject constructor(
     val profiles: StateFlow<List<UserProfile>> = profileManager.profiles
 
     val canAddProfile: Boolean
-        get() = profileManager.profiles.value.size < 4
+        get() = profileManager.canCreateProfile
 
     private val _avatarCatalog = MutableStateFlow<List<AvatarCatalogItem>>(emptyList())
     val avatarCatalog: StateFlow<List<AvatarCatalogItem>> = _avatarCatalog.asStateFlow()

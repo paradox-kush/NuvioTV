@@ -214,6 +214,8 @@
     <string name="sub_forced_lang">Forțat</string>
     <string name="sub_preferred_lang">Limba preferată</string>
     <string name="sub_secondary_lang">Limba preferată secundară</string>
+    <string name="sub_show_only_preferred_languages">Afișează doar limbile preferate</string>
+    <string name="sub_show_only_preferred_languages_desc">Ascunde toate celelalte limbi de subtitrare din lista de selecție</string>
     <string name="sub_organization">Organizarea subtitrărilor</string>
     <string name="sub_size">Dimensiune</string>
     <string name="sub_vertical_offset">Offset vertical</string>

@@ -22,6 +22,10 @@ internal class GainAudioProcessor : BaseAudioProcessor() {
         gainScale = gainToLinearScale(clampedDb)
     }
 
+    override fun isActive(): Boolean {
+        return super.isActive() && gainDb != 0
+    }
+
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         return when (inputAudioFormat.encoding) {
             C.ENCODING_PCM_16BIT,
