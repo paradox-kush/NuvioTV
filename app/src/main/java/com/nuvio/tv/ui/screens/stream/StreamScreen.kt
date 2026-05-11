@@ -2,6 +2,8 @@
 
 package com.nuvio.tv.ui.screens.stream
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -65,8 +67,8 @@ import android.view.KeyEvent
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
-import coil.request.ImageRequest
-import coil.decode.SvgDecoder
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
@@ -79,13 +81,14 @@ import androidx.tv.material3.FilterChipDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.nuvio.tv.core.player.ExternalPlayerLauncher
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.ui.components.SourceChipItem
 import com.nuvio.tv.ui.components.SourceChipStatus
 import com.nuvio.tv.ui.components.SourceStatusFilterChip
+import com.nuvio.tv.ui.components.P2pConsentDialog
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.components.StreamsSkeletonList
 import com.nuvio.tv.ui.screens.player.LoadingOverlay
@@ -120,8 +123,37 @@ fun StreamScreen(
     var pendingRestoreOnResume by rememberSaveable { mutableStateOf(false) }
     var showPlayerChoiceDialog by remember { mutableStateOf(false) }
     var pendingPlaybackInfo by remember { mutableStateOf<StreamPlaybackInfo?>(null) }
+    var showP2pConsentDialog by remember { mutableStateOf(false) }
+    var pendingTorrentPlaybackInfo by remember { mutableStateOf<StreamPlaybackInfo?>(null) }
+    val p2pEnabled by viewModel.p2pEnabled.collectAsStateWithLifecycle(initialValue = false)
+
+    fun openExternalInBrowser(playbackInfo: StreamPlaybackInfo): Boolean {
+        if (!playbackInfo.isExternal) return false
+        val url = playbackInfo.url?.takeIf { it.isNotBlank() } ?: return false
+        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .addCategory(Intent.CATEGORY_BROWSABLE)
+        runCatching {
+            context.startActivity(browserIntent)
+        }.onFailure {
+            ExternalPlayerLauncher.launch(
+                context = context,
+                url = url,
+                title = playbackInfo.title,
+                headers = playbackInfo.headers
+            )
+        }
+        return true
+    }
 
     fun routePlayback(playbackInfo: StreamPlaybackInfo) {
+        if (openExternalInBrowser(playbackInfo)) {
+            return
+        }
+        if (playbackInfo.isTorrent && !p2pEnabled) {
+            pendingTorrentPlaybackInfo = playbackInfo
+            showP2pConsentDialog = true
+            return
+        }
         when (playerPreference) {
             PlayerPreference.INTERNAL -> {
                 onStreamSelected(playbackInfo)
@@ -144,6 +176,16 @@ fun StreamScreen(
     }
 
     fun routeAutoPlay(playbackInfo: StreamPlaybackInfo) {
+        if (openExternalInBrowser(playbackInfo)) {
+            viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+            return
+        }
+        // Always check P2P consent for torrents, even in direct auto-play flow
+        if (playbackInfo.isTorrent && !p2pEnabled) {
+            pendingTorrentPlaybackInfo = playbackInfo
+            showP2pConsentDialog = true
+            return
+        }
         if (uiState.isDirectAutoPlayFlow) {
             onAutoPlayResolved(playbackInfo)
             return
@@ -161,14 +203,23 @@ fun StreamScreen(
     LaunchedEffect(uiState.autoPlayStream) {
         val stream = uiState.autoPlayStream ?: return@LaunchedEffect
         val playbackInfo = viewModel.getStreamForPlayback(stream)
-        if (playbackInfo.url != null) {
+        // Torrent streams have url == null but carry an infoHash; navigation
+        // builds a torrent:// sentinel URL downstream.
+        if (playbackInfo.url != null || (playbackInfo.isTorrent && playbackInfo.infoHash != null)) {
+            viewModel.awaitStreamLinkCacheSave()
             routeAutoPlay(playbackInfo)
         }
     }
 
     LaunchedEffect(uiState.autoPlayPlaybackInfo) {
         val playbackInfo = uiState.autoPlayPlaybackInfo ?: return@LaunchedEffect
-        if (playbackInfo.url != null) {
+        if (playbackInfo.url != null || (playbackInfo.isTorrent && playbackInfo.infoHash != null)) {
+            // Torrent cached links still need P2P consent
+            if (playbackInfo.isTorrent && !p2pEnabled) {
+                pendingTorrentPlaybackInfo = playbackInfo
+                showP2pConsentDialog = true
+                return@LaunchedEffect
+            }
             onAutoPlayResolved(playbackInfo)
             viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
         }
@@ -293,6 +344,25 @@ fun StreamScreen(
                 }
             )
         }
+
+        if (showP2pConsentDialog && pendingTorrentPlaybackInfo != null) {
+            P2pConsentDialog(
+                onEnableP2p = {
+                    viewModel.enableP2p()
+                    showP2pConsentDialog = false
+                    val info = pendingTorrentPlaybackInfo!!
+                    pendingTorrentPlaybackInfo = null
+                    onStreamSelected(info)
+                },
+                onDismiss = {
+                    showP2pConsentDialog = false
+                    pendingTorrentPlaybackInfo = null
+                    // Cancelled P2P consent — fall back to manual stream selection
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                }
+            )
+        }
+
     }
 }
 
@@ -326,7 +396,8 @@ private fun StreamBackdrop(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = imageAlpha },
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                alignment = Alignment.TopEnd
             )
         }
 
@@ -386,7 +457,6 @@ private fun LeftContentSection(
             ImageRequest.Builder(context)
                 .data(image)
                 .crossfade(false)
-                .decoderFactory(SvgDecoder.Factory())
                 .build()
         }
     }
@@ -429,7 +499,7 @@ private fun LeftContentSection(
                 // Episode info
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "S$season E$episode",
+                    text = stringResource(R.string.stream_episode_label, season, episode),
                     style = MaterialTheme.typography.titleLarge,
                     color = NuvioTheme.extendedColors.textSecondary,
                     textAlign = TextAlign.Center
@@ -494,6 +564,7 @@ private fun RightStreamSection(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     var enter by remember { mutableStateOf(false) }
     var shouldFocusFirstStream by remember { mutableStateOf(false) }
     var wasLoading by remember { mutableStateOf(true) }
@@ -620,23 +691,60 @@ private fun AddonFilterChips(
     focusRequesters: List<FocusRequester>,
     orderedNames: List<String>
 ) {
+    val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val chipMap = sourceChips.associateBy { it.name }
     var chipRowHasFocus by remember { mutableStateOf(false) }
+    // Track the focused chip index to handle duplicate addon names correctly.
+    // indexOf(selectedAddon) would always return the first duplicate.
+    var focusedChipIndex by remember { mutableStateOf(
+        if (selectedAddon == null) 0 else (orderedNames.indexOf(selectedAddon) + 1).coerceAtLeast(0)
+    ) }
+    LaunchedEffect(selectedAddon, orderedNames) {
+        val idx = if (selectedAddon == null) 0 else (orderedNames.indexOf(selectedAddon) + 1).coerceAtLeast(0)
+        focusedChipIndex = idx
+    }
+    val scope = rememberCoroutineScope()
+    val lastKeyRepeatDispatchRef = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
         modifier = Modifier
-            .onFocusChanged { chipRowHasFocus = it.hasFocus }
+            .onFocusChanged { focusState ->
+                val hasFocus = focusState.hasFocus
+                if (hasFocus && !chipRowHasFocus && isRtl) {
+                    scope.coroutineLaunch {
+                        withFrameNanos {}
+                        focusRequesters.getOrNull(focusedChipIndex)?.requestFocus()
+                    }
+                }
+                chipRowHasFocus = hasFocus
+            }
             .onKeyEvent { event ->
                 if (event.nativeKeyEvent.action != android.view.KeyEvent.ACTION_DOWN) return@onKeyEvent false
+
+                // Throttle rapid key repeats (long-press)
+                if (event.nativeKeyEvent.repeatCount > 0) {
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (now - lastKeyRepeatDispatchRef.get() < 112L) return@onKeyEvent true
+                    lastKeyRepeatDispatchRef.set(now)
+                }
+
                 val allOptions = listOf<String?>(null) + orderedNames
-                val currentIdx = allOptions.indexOf(selectedAddon)
+                val currentIdx = focusedChipIndex.coerceIn(0, allOptions.lastIndex)
                 when (event.key) {
                     androidx.compose.ui.input.key.Key.DirectionLeft -> {
-                        if (currentIdx > 0) { onAddonSelected(allOptions[currentIdx - 1]); true } else false
+                        if (isRtl) {
+                            if (currentIdx < allOptions.lastIndex) { focusedChipIndex = currentIdx + 1; onAddonSelected(allOptions[currentIdx + 1]); true } else false
+                        } else {
+                            if (currentIdx > 0) { focusedChipIndex = currentIdx - 1; onAddonSelected(allOptions[currentIdx - 1]); true } else false
+                        }
                     }
                     androidx.compose.ui.input.key.Key.DirectionRight -> {
-                        if (currentIdx < allOptions.lastIndex) { onAddonSelected(allOptions[currentIdx + 1]); true } else false
+                        if (isRtl) {
+                            if (currentIdx > 0) { focusedChipIndex = currentIdx - 1; onAddonSelected(allOptions[currentIdx - 1]); true } else false
+                        } else {
+                            if (currentIdx < allOptions.lastIndex) { focusedChipIndex = currentIdx + 1; onAddonSelected(allOptions[currentIdx + 1]); true } else false
+                        }
                     }
                     else -> false
                 }
@@ -644,7 +752,7 @@ private fun AddonFilterChips(
     ) {
         item {
             SourceStatusFilterChip(
-                name = "All",
+                name = stringResource(R.string.stream_filter_all),
                 isSelected = selectedAddon == null,
                 status = SourceChipStatus.SUCCESS,
                 isSelectable = true,
@@ -774,7 +882,9 @@ private fun StreamsList(
     orderedAddonNames: List<String> = emptyList(),
     onFocusChanged: (Boolean) -> Unit = {}
 ) {
+    val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val firstCardFocusRequester = remember { FocusRequester() }
+    val lastKeyRepeatDispatchRef = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     val restoreFocusRequester = remember { FocusRequester() }
     val firstStreamKey = streams.firstOrNull()?.let { first ->
         "${first.addonName}_${first.url ?: first.infoHash ?: first.ytId ?: "unknown"}"
@@ -811,15 +921,30 @@ private fun StreamsList(
             .onFocusChanged { onFocusChanged(it.hasFocus) }
             .onKeyEvent { event ->
                 if (event.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@onKeyEvent false
+
+                // Throttle rapid key repeats (long-press)
+                if (event.nativeKeyEvent.repeatCount > 0) {
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (now - lastKeyRepeatDispatchRef.get() < 112L) return@onKeyEvent true
+                    lastKeyRepeatDispatchRef.set(now)
+                }
                 if (availableAddons.isEmpty()) return@onKeyEvent false
                 val allOptions = listOf<String?>(null) + availableAddons
                 val currentIdx = allOptions.indexOf(selectedAddonFilter)
                 when (event.key) {
                     Key.DirectionLeft -> {
-                        if (currentIdx > 0) { onAddonFilterSelected(allOptions[currentIdx - 1]); true } else false
+                        if (isRtl) {
+                            if (currentIdx < allOptions.lastIndex) { onAddonFilterSelected(allOptions[currentIdx + 1]); true } else false
+                        } else {
+                            if (currentIdx > 0) { onAddonFilterSelected(allOptions[currentIdx - 1]); true } else false
+                        }
                     }
                     Key.DirectionRight -> {
-                        if (currentIdx < allOptions.lastIndex) { onAddonFilterSelected(allOptions[currentIdx + 1]); true } else false
+                        if (isRtl) {
+                            if (currentIdx > 0) { onAddonFilterSelected(allOptions[currentIdx - 1]); true } else false
+                        } else {
+                            if (currentIdx < allOptions.lastIndex) { onAddonFilterSelected(allOptions[currentIdx + 1]); true } else false
+                        }
                     }
                     else -> false
                 }
@@ -828,7 +953,7 @@ private fun StreamsList(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
     ) {
         itemsIndexed(streams, key = { index, stream ->
-            "${stream.addonName}_${stream.url ?: stream.infoHash ?: stream.ytId ?: "unknown"}_$index"
+            stream.stableKey(index)
         }) { index, stream ->
             StreamCard(
                 stream = stream,
@@ -866,7 +991,6 @@ private fun StreamCard(
             ImageRequest.Builder(context)
                 .data(logo)
                 .crossfade(false)
-                .decoderFactory(SvgDecoder.Factory())
                 .build()
         }
     }

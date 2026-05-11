@@ -28,6 +28,9 @@ class TraktEpisodeMappingService @Inject constructor(
     private val addonEpisodesCache = mutableMapOf<String, List<EpisodeMappingEntry>>()
     private val traktEpisodesCache = mutableMapOf<String, List<EpisodeMappingEntry>>()
     private val reverseMappingCache = mutableMapOf<String, EpisodeMappingEntry>()
+    // In-flight dedup: prevents multiple concurrent coroutines from fetching
+    // the same show's addon episodes simultaneously.
+    private val addonEpisodesInFlight = mutableMapOf<String, kotlinx.coroutines.CompletableDeferred<List<EpisodeMappingEntry>>>()
 
     internal suspend fun prefetchEpisodeMapping(
         contentId: String?,
@@ -68,6 +71,13 @@ class TraktEpisodeMappingService @Inject constructor(
         val traktEpisodes = getTraktEpisodes(showLookupId)
         if (traktEpisodes.isEmpty()) return null
 
+        val addonHasEpisode = addonEpisodes.any {
+            it.season == requestedSeason && it.episode == requestedEpisode
+        }
+        if (addonHasEpisode && hasSameSeasonStructure(addonEpisodes, traktEpisodes)) {
+            return null
+        }
+
         val mapped = reverseRemapEpisodeByTitleOrIndex(
             requestedSeason = requestedSeason,
             requestedEpisode = requestedEpisode,
@@ -80,6 +90,19 @@ class TraktEpisodeMappingService @Inject constructor(
             reverseMappingCache[reverseKey] = mapped
         }
         return mapped
+    }
+
+    private fun hasSameSeasonStructure(
+        addonEpisodes: List<EpisodeMappingEntry>,
+        traktEpisodes: List<EpisodeMappingEntry>
+    ): Boolean {
+        // Compare per-season episode counts, not just the set of season numbers.
+        // Anime often uses the same season numbers in both sources but with completely
+        // different episode distributions (e.g. One Piece has seasons 1-24 in both
+        // AIOMetadata and Trakt but with different episode counts per season).
+        val addonPerSeason = addonEpisodes.groupBy { it.season }.mapValues { it.value.size }
+        val traktPerSeason = traktEpisodes.groupBy { it.season }.mapValues { it.value.size }
+        return addonPerSeason == traktPerSeason
     }
 
     internal suspend fun getCachedEpisodeMapping(
@@ -98,7 +121,8 @@ class TraktEpisodeMappingService @Inject constructor(
         contentType: String?,
         videoId: String?,
         season: Int?,
-        episode: Int?
+        episode: Int?,
+        episodeTitle: String? = null
     ): EpisodeMappingEntry? {
         val key = cacheKey(contentId, contentType, videoId, season, episode) ?: return null
         cacheMutex.withLock {
@@ -117,11 +141,15 @@ class TraktEpisodeMappingService @Inject constructor(
         val traktEpisodes = getTraktEpisodes(showLookupId)
         if (traktEpisodes.isEmpty()) return null
 
+        if (hasSameSeasonStructure(addonEpisodes, traktEpisodes)) {
+            return null
+        }
+
         val mapped = remapEpisodeByTitleOrIndex(
             requestedSeason = requestedSeason,
             requestedEpisode = requestedEpisode,
             requestedVideoId = videoId,
-            requestedTitle = null,
+            requestedTitle = episodeTitle,
             addonEpisodes = addonEpisodes,
             traktEpisodes = traktEpisodes
         ) ?: return null
@@ -137,18 +165,49 @@ class TraktEpisodeMappingService @Inject constructor(
         contentType: String
     ): List<EpisodeMappingEntry> {
         val cacheKey = addonEpisodesCacheKey(contentId, contentType)
+
+        // Fast path: cache hit
         cacheMutex.withLock {
             addonEpisodesCache[cacheKey]?.let { return it }
         }
 
-        val meta = fetchSeriesMeta(contentId, contentType) ?: return emptyList()
-        val addonEpisodes = meta.videos.toEpisodeMappingEntries()
-        if (addonEpisodes.isEmpty()) return emptyList()
-
-        cacheMutex.withLock {
-            addonEpisodesCache[cacheKey] = addonEpisodes
+        // Dedup: if another coroutine is already fetching this show, await its result.
+        val existingDeferred = cacheMutex.withLock { addonEpisodesInFlight[cacheKey] }
+        if (existingDeferred != null) {
+            return try { existingDeferred.await() } catch (_: Exception) { emptyList() }
         }
-        return addonEpisodes
+
+        // Register ourselves as the in-flight fetcher.
+        val deferred = kotlinx.coroutines.CompletableDeferred<List<EpisodeMappingEntry>>()
+        val weOwn = cacheMutex.withLock {
+            // Double-check: cache or another flight may have appeared while we waited.
+            addonEpisodesCache[cacheKey]?.let { return it }
+            if (addonEpisodesInFlight.containsKey(cacheKey)) {
+                false
+            } else {
+                addonEpisodesInFlight[cacheKey] = deferred
+                true
+            }
+        }
+        if (!weOwn) {
+            val other = cacheMutex.withLock { addonEpisodesInFlight[cacheKey] }
+            return try { other?.await() ?: emptyList() } catch (_: Exception) { emptyList() }
+        }
+
+        return try {
+            val meta = fetchSeriesMeta(contentId, contentType)
+            val addonEpisodes = meta?.videos?.toEpisodeMappingEntries() ?: emptyList()
+            if (addonEpisodes.isNotEmpty()) {
+                cacheMutex.withLock { addonEpisodesCache[cacheKey] = addonEpisodes }
+            }
+            deferred.complete(addonEpisodes)
+            addonEpisodes
+        } catch (e: Exception) {
+            deferred.completeExceptionally(e)
+            emptyList()
+        } finally {
+            cacheMutex.withLock { addonEpisodesInFlight.remove(cacheKey) }
+        }
     }
 
     private suspend fun getTraktEpisodes(showLookupId: String): List<EpisodeMappingEntry> {
@@ -267,7 +326,7 @@ class TraktEpisodeMappingService @Inject constructor(
 
         for (type in typeCandidates) {
             for (candidateId in idCandidates) {
-                val result = withTimeoutOrNull(3500) {
+                val result = withTimeoutOrNull(8000) {
                     metaRepository.getMetaFromAllAddons(type = type, id = candidateId)
                         .first { it !is NetworkResult.Loading }
                 } ?: continue

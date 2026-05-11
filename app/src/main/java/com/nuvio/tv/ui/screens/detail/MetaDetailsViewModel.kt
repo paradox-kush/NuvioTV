@@ -16,12 +16,14 @@ import com.nuvio.tv.data.local.TmdbSettingsDataStore
 import com.nuvio.tv.data.repository.ImdbEpisodeRatingsRepository
 import com.nuvio.tv.data.repository.MDBListRepository
 import com.nuvio.tv.data.repository.TraktCommentsService
+import com.nuvio.tv.data.repository.TraktRelatedService
 import com.nuvio.tv.data.repository.parseContentIds
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.LibraryEntryInput
 import com.nuvio.tv.domain.model.LibrarySourceMode
 import com.nuvio.tv.domain.model.ListMembershipChanges
 import com.nuvio.tv.domain.model.Meta
+import com.nuvio.tv.domain.model.MetaTrailer
 import com.nuvio.tv.domain.model.NextToWatch
 import com.nuvio.tv.domain.model.TmdbSettings
 import com.nuvio.tv.domain.model.TraktCommentReview
@@ -54,8 +56,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
+import android.net.Uri
+import com.nuvio.tv.LocaleCache
 import com.nuvio.tv.R
+import com.nuvio.tv.core.build.AppFeaturePolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.Locale
 import javax.inject.Inject
 
 private const val TAG = "MetaDetailsViewModel"
@@ -76,9 +84,12 @@ class MetaDetailsViewModel @Inject constructor(
     private val trailerSettingsDataStore: TrailerSettingsDataStore,
     private val traktAuthDataStore: TraktAuthDataStore,
     private val traktCommentsService: TraktCommentsService,
+    private val traktRelatedService: TraktRelatedService,
     private val traktSettingsDataStore: TraktSettingsDataStore,
     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
     private val playerSettingsDataStore: PlayerSettingsDataStore,
+    private val watchedSeriesStateHolder: com.nuvio.tv.data.local.WatchedSeriesStateHolder,
+    val posterOptions: com.nuvio.tv.ui.components.posteroptions.PosterOptionsController,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val itemId: String = savedStateHandle["itemId"] ?: ""
@@ -87,6 +98,16 @@ class MetaDetailsViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MetaDetailsUiState())
     val uiState: StateFlow<MetaDetailsUiState> = _uiState.asStateFlow()
+
+    private val localizedContext: Context
+        get() {
+            val tag = LocaleCache.localeTag.takeIf { it != LocaleCache.UNSET && it.isNotEmpty() }
+                ?: return context
+            val locale = Locale.forLanguageTag(tag)
+            val config = Configuration(context.resources.configuration)
+            config.setLocale(locale)
+            return context.createConfigurationContext(config)
+        }
     val effectiveAutoplayEnabled = playerSettingsDataStore.playerSettings
         .map(StreamAutoPlayPolicy::isEffectivelyEnabled)
         .distinctUntilChanged()
@@ -95,20 +116,31 @@ class MetaDetailsViewModel @Inject constructor(
     private var trailerFetchJob: Job? = null
     private var moreLikeThisJob: Job? = null
     private var collectionJob: Job? = null
+
+    val lastFocusedEpisodeIdBySeason = androidx.compose.runtime.mutableStateMapOf<Int, String>()
     private var episodeRatingsJob: Job? = null
     private var nextToWatchJob: Job? = null
     private var commentsJob: Job? = null
+    private var commentsLoadMoreJob: Job? = null
 
     private var trailerDelayMs = 7000L
     private var trailerAutoplayEnabled = false
     private var trailerHasPlayed = false
+    private var suppressSeasonAutoSwitch = false
 
     private var isPlayButtonFocused = false
     private var hideUnreleasedContent = false
     private var traktCommentsEnabled = false
     private var traktAuthenticated = false
 
+    /** Content ID used for watch-progress and watched-items lookups.
+     *  Starts as the navigation [itemId] (which may be "tmdb:123") and is
+     *  updated to [Meta.id] once meta loads (typically an IMDB ID like "tt0396375").
+     *  This ensures progress is read from the same key it was written under. */
+    private val _effectiveContentId = MutableStateFlow(itemId)
+
     init {
+        posterOptions.bind(viewModelScope)
         observeMetaViewSettings()
         observeTrailerAutoplaySettings()
         observeTraktCommentsAvailability()
@@ -164,7 +196,7 @@ class MetaDetailsViewModel @Inject constructor(
                     val meta = _uiState.value.meta
                     val shouldShow = enabled && authenticated && supportsComments(meta)
                     if (!shouldShow) {
-                        commentsJob?.cancel()
+                        cancelCommentsRequests()
                     }
 
                     _uiState.update { state ->
@@ -175,11 +207,21 @@ class MetaDetailsViewModel @Inject constructor(
                         } else {
                             state.copy(
                                 comments = emptyList(),
+                                commentsCurrentPage = 0,
+                                commentsPageCount = 0,
                                 isCommentsLoading = false,
+                                isCommentsLoadingMore = false,
                                 commentsError = null,
-                                shouldShowCommentsSection = false
+                                shouldShowCommentsSection = false,
+                                commentsMode = CommentsMode.TITLE,
+                                commentsEpisodeTarget = null,
+                                selectedComment = null
                             )
                         }
+                    }
+
+                    if (meta != null) {
+                        loadMoreLikeThisAsync(meta)
                     }
 
                     if (shouldShow && meta != null) {
@@ -215,7 +257,8 @@ class MetaDetailsViewModel @Inject constructor(
             if (state.nextToWatch == nextToWatch) return@update state
             val nextSeason = nextToWatch.nextSeason
             val meta = state.meta
-            val shouldSwitchSeason = nextSeason != null &&
+            val shouldSwitchSeason = !suppressSeasonAutoSwitch &&
+                nextSeason != null &&
                 nextSeason != state.selectedSeason &&
                 meta != null &&
                 state.seasons.contains(nextSeason)
@@ -247,17 +290,24 @@ class MetaDetailsViewModel @Inject constructor(
         when (event) {
             is MetaDetailsEvent.OnSeasonSelected -> selectSeason(event.season)
             is MetaDetailsEvent.OnEpisodeClick -> { /* Navigate to stream */ }
+            is MetaDetailsEvent.OnCommentsModeSelected -> selectCommentsMode(event.mode)
+            is MetaDetailsEvent.OnCommentsEpisodeSelected -> selectCommentsEpisode(event.video)
             MetaDetailsEvent.OnPlayClick -> { /* Start playback */ }
             MetaDetailsEvent.OnToggleLibrary -> toggleLibrary()
             MetaDetailsEvent.OnRetry -> loadMeta()
             MetaDetailsEvent.OnRetryComments -> _uiState.value.meta?.let { loadComments(it, forceRefresh = true) }
+            MetaDetailsEvent.OnLoadMoreComments -> loadMoreComments()
             is MetaDetailsEvent.OnCommentSelected -> openCommentOverlay(event.review)
+            is MetaDetailsEvent.OnAdvanceCommentOverlay -> advanceCommentOverlay(event.direction)
             MetaDetailsEvent.OnDismissCommentOverlay -> dismissCommentOverlay()
             MetaDetailsEvent.OnBackPress -> { /* Handle in screen */ }
             MetaDetailsEvent.OnUserInteraction -> handleUserInteraction()
             MetaDetailsEvent.OnPlayButtonFocused -> handlePlayButtonFocused()
             MetaDetailsEvent.OnTrailerButtonClick -> handleTrailerButtonClick()
             MetaDetailsEvent.OnTrailerEnded -> handleTrailerEnded()
+            is MetaDetailsEvent.OnSharedTrailerSelected -> handleSharedTrailerSelected(event.trailer)
+            MetaDetailsEvent.OnDismissSharedTrailer -> dismissSharedTrailerOverlay()
+            MetaDetailsEvent.OnRetrySharedTrailer -> retrySharedTrailer()
             MetaDetailsEvent.OnToggleMovieWatched -> toggleMovieWatched()
             is MetaDetailsEvent.OnToggleEpisodeWatched -> toggleEpisodeWatched(event.video)
             is MetaDetailsEvent.OnMarkSeasonWatched -> markSeasonWatched(event.season)
@@ -312,8 +362,21 @@ class MetaDetailsViewModel @Inject constructor(
             }
         }
 
+        // Observe library/watchlist on the *same* (id, type) pair that
+        // `toggleLibrary` writes via `meta.toLibraryEntryInput()`. Falling back
+        // to navigation (itemId, itemType) until meta loads keeps the button
+        // responsive but pre-meta (when toggle is unavailable anyway).
+        val canonicalKey = _uiState
+            .map { state ->
+                val id = state.meta?.id?.takeIf { it.isNotBlank() } ?: itemId
+                val type = state.meta?.apiType?.takeIf { it.isNotBlank() } ?: itemType
+                id to type
+            }
+            .distinctUntilChanged()
+
         viewModelScope.launch {
-            libraryRepository.isInLibrary(itemId = itemId, itemType = itemType)
+            canonicalKey
+                .flatMapLatest { (id, type) -> libraryRepository.isInLibrary(itemId = id, itemType = type) }
                 .distinctUntilChanged()
                 .collectLatest { inLibrary ->
                     _uiState.update { state ->
@@ -323,7 +386,8 @@ class MetaDetailsViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            libraryRepository.isInWatchlist(itemId = itemId, itemType = itemType)
+            canonicalKey
+                .flatMapLatest { (id, type) -> libraryRepository.isInWatchlist(itemId = id, itemType = type) }
                 .distinctUntilChanged()
                 .collectLatest { inWatchlist ->
                     _uiState.update { state ->
@@ -336,7 +400,31 @@ class MetaDetailsViewModel @Inject constructor(
     private fun observeWatchProgress() {
         if (itemType.lowercase() == "movie") return
         viewModelScope.launch {
-            watchProgressRepository.getAllEpisodeProgress(itemId)
+            _effectiveContentId.flatMapLatest { cid ->
+                if (itemType.equals("other", ignoreCase = true)) {
+                    // For "other" type, videos lack season/episode.
+                    // Build progress map by matching video IDs to their
+                    // position in the meta video list.
+                    watchProgressRepository.allProgress.map { allProgress ->
+                        val meta = _uiState.value.meta
+                        val videos = meta?.videos ?: emptyList()
+                        val progressByVideoId = allProgress
+                            .filter { it.contentId == cid }
+                            .associateBy { it.videoId }
+                        val result = mutableMapOf<Pair<Int, Int>, WatchProgress>()
+                        videos.forEachIndexed { index, video ->
+                            val progress = progressByVideoId[video.id]
+                            if (progress != null) {
+                                // Use synthetic season=1, episode=index+1 as key
+                                result[1 to (index + 1)] = progress
+                            }
+                        }
+                        result as Map<Pair<Int, Int>, WatchProgress>
+                    }
+                } else {
+                    watchProgressRepository.getAllEpisodeProgress(cid)
+                }
+            }
                 .distinctUntilChanged()
                 .collectLatest { progressMap ->
                 _uiState.update { state ->
@@ -347,6 +435,7 @@ class MetaDetailsViewModel @Inject constructor(
                     }
                 }
                 // Recalculate next to watch when progress changes
+                reevaluateSeriesWatchedBadge()
                 calculateNextToWatch()
             }
         }
@@ -355,7 +444,9 @@ class MetaDetailsViewModel @Inject constructor(
     private fun observeWatchedEpisodes() {
         if (itemType.lowercase() == "movie") return
         viewModelScope.launch {
-            watchedItemsPreferences.getWatchedEpisodesForContent(itemId)
+            _effectiveContentId.flatMapLatest { cid ->
+                watchedItemsPreferences.getWatchedEpisodesForContent(cid)
+            }
                 .distinctUntilChanged()
                 .collectLatest { watchedSet ->
                 _uiState.update { state ->
@@ -365,8 +456,17 @@ class MetaDetailsViewModel @Inject constructor(
                         state.copy(watchedEpisodes = watchedSet)
                     }
                 }
+                reevaluateSeriesWatchedBadge()
                 calculateNextToWatch()
             }
+        }
+        // Re-calculate next-to-watch when "furthest episode" preference changes
+        viewModelScope.launch {
+            layoutPreferenceDataStore.nextUpFromFurthestEpisode
+                .distinctUntilChanged()
+                .collectLatest {
+                    calculateNextToWatch()
+                }
         }
     }
 
@@ -374,11 +474,13 @@ class MetaDetailsViewModel @Inject constructor(
     private fun observeMovieWatched() {
         if (itemType.lowercase() != "movie") return
         viewModelScope.launch {
-            _uiState.map { it.meta?.imdbId?.takeIf { id -> id != itemId && id.isNotBlank() } }
-                .distinctUntilChanged()
-                .flatMapLatest { videoId ->
-                    watchProgressRepository.isWatched(itemId, videoId = videoId)
-                }
+            _effectiveContentId.flatMapLatest { cid ->
+                _uiState.map { it.meta?.imdbId?.takeIf { id -> id != cid && id.isNotBlank() } }
+                    .distinctUntilChanged()
+                    .flatMapLatest { videoId ->
+                        watchProgressRepository.isWatched(cid, videoId = videoId)
+                    }
+            }
                 .distinctUntilChanged()
                 .collectLatest { watched ->
                 _uiState.update { state ->
@@ -414,7 +516,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun loadMeta() {
         viewModelScope.launch {
-            commentsJob?.cancel()
+            cancelCommentsRequests()
             _uiState.update {
                 it.copy(
                     isLoading = true,
@@ -424,18 +526,36 @@ class MetaDetailsViewModel @Inject constructor(
                     episodeRatingsError = null,
                     mdbListRatings = null,
                     showMdbListImdb = false,
+                    tmdbRating = null,
                     moreLikeThis = emptyList(),
+                    moreLikeThisSource = null,
                     collection = emptyList(),
                     collectionName = null,
                     comments = emptyList(),
+                    commentsCurrentPage = 0,
+                    commentsPageCount = 0,
                     isCommentsLoading = false,
+                    isCommentsLoadingMore = false,
                     commentsError = null,
                     shouldShowCommentsSection = false,
-                    selectedComment = null
+                    commentsMode = CommentsMode.TITLE,
+                    commentsEpisodeTarget = null,
+                    selectedComment = null,
+                    isSharedTrailerOverlayVisible = false,
+                    isSharedTrailerLoading = false,
+                    sharedTrailerUrl = null,
+                    sharedTrailerAudioUrl = null,
+                    sharedTrailerErrorMessage = null,
+                    selectedSharedTrailer = null
                 )
             }
 
             val metaLookupId = resolveMetaLookupId(itemId = itemId, itemType = itemType)
+            // Update effective content ID as early as possible so watch-progress
+            // observers use the canonical (usually IMDB) ID, not the navigation ID.
+            if (metaLookupId != itemId) {
+                _effectiveContentId.value = metaLookupId
+            }
             val preferExternal = layoutPreferenceDataStore.preferExternalMetaAddonDetail.first()
 
             if (preferExternal) {
@@ -458,6 +578,8 @@ class MetaDetailsViewModel @Inject constructor(
 
                             if (preferredMeta != null) {
                                 applyMetaWithEnrichment(preferredMeta)
+                            } else if (tryApplyTmdbFallbackMeta()) {
+                                Unit
                             } else {
                                 _uiState.update { it.copy(isLoading = false, error = result.message) }
                             }
@@ -485,7 +607,9 @@ class MetaDetailsViewModel @Inject constructor(
                         when (result) {
                             is NetworkResult.Success -> applyMetaWithEnrichment(result.data)
                             is NetworkResult.Error -> {
-                                _uiState.update { it.copy(isLoading = false, error = result.message) }
+                                if (!tryApplyTmdbFallbackMeta()) {
+                                    _uiState.update { it.copy(isLoading = false, error = result.message) }
+                                }
                             }
                             NetworkResult.Loading -> {
                                 _uiState.update { it.copy(isLoading = true) }
@@ -495,6 +619,53 @@ class MetaDetailsViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun tryApplyTmdbFallbackMeta(): Boolean {
+        val tmdbId = itemId
+            .takeIf { it.startsWith("tmdb:", ignoreCase = true) }
+            ?.substringAfter(':')
+            ?.substringBefore(':')
+            ?.toIntOrNull()
+            ?: return false
+        val type = ContentType.fromString(itemType)
+        val settings = tmdbSettingsDataStore.settings.first()
+        val enrichment = tmdbMetadataService.fetchEnrichment(
+            tmdbId = tmdbId.toString(),
+            contentType = type,
+            language = settings.language
+        ) ?: return false
+        val meta = Meta(
+            id = itemId,
+            type = type,
+            rawType = itemType,
+            name = enrichment.localizedTitle ?: enrichment.originalTitle ?: "TMDB $tmdbId",
+            poster = enrichment.poster,
+            posterShape = com.nuvio.tv.domain.model.PosterShape.POSTER,
+            background = enrichment.backdrop,
+            logo = enrichment.logo,
+            description = enrichment.description,
+            releaseInfo = enrichment.releaseInfo,
+            status = enrichment.status,
+            imdbRating = enrichment.rating?.toFloat(),
+            genres = enrichment.genres,
+            runtime = enrichment.runtimeMinutes?.toString(),
+            director = enrichment.director,
+            writer = enrichment.writer,
+            cast = enrichment.castMembers.map { it.name },
+            castMembers = enrichment.castMembers,
+            videos = emptyList(),
+            productionCompanies = enrichment.productionCompanies,
+            networks = enrichment.networks,
+            ageRating = enrichment.ageRating,
+            country = enrichment.countries?.joinToString(", "),
+            awards = null,
+            language = enrichment.language,
+            links = emptyList(),
+            trailers = enrichment.trailers
+        )
+        applyMetaWithEnrichment(meta)
+        return true
     }
 
     private suspend fun resolveMetaLookupId(itemId: String, itemType: String): String {
@@ -507,14 +678,36 @@ class MetaDetailsViewModel @Inject constructor(
             .toIntOrNull()
             ?: return raw
 
-        return tmdbService.tmdbToImdb(tmdbNumericId, itemType) ?: raw
+        // Use a short timeout so a blocked TMDB API doesn't stall the detail screen.
+        return kotlinx.coroutines.withTimeoutOrNull(5_000L) {
+            tmdbService.tmdbToImdb(tmdbNumericId, itemType)
+        }
+            ?.takeIf { it.isNotBlank() }
+            ?: raw
     }
 
     private fun applyMeta(meta: Meta) {
+        // Update the effective content ID so watch-progress observers pick up
+        // the canonical ID (e.g. IMDB "tt0396375") instead of the navigation ID
+        // (which may be "tmdb:13836").  Don't downgrade from an IMDB ID to a
+        // less canonical one (e.g. tmdb:) — Trakt stores progress under IMDB.
+        if (meta.id.isNotBlank() && meta.id != itemId) {
+            val currentIsImdb = _effectiveContentId.value.startsWith("tt")
+            val newIsImdb = meta.id.startsWith("tt")
+            if (!currentIsImdb || newIsImdb) {
+                _effectiveContentId.value = meta.id
+            }
+        }
+
         val seasons = meta.videos
             .mapNotNull { it.season }
             .distinct()
             .sorted()
+            .ifEmpty {
+                // For "other" type content videos lack season/episode numbers.  
+                // Treat them as a single virtual season so the episodes UI can display them.
+                if (meta.videos.isNotEmpty()) listOf(1) else emptyList()
+            }
 
         val defaultEpisodeSeason = findPreferredDefaultEpisode(meta)?.season
         // Prefer addon-specified default episode season, otherwise first regular season (> 0), fallback to season 0 (specials)
@@ -526,18 +719,30 @@ class MetaDetailsViewModel @Inject constructor(
         val episodesForSeason = getEpisodesForSeason(meta.videos, selectedSeason)
 
         _uiState.update {
+            // If nextToWatch already set a season (from pre-computed remap), prefer it
+            // over the default season selection.
+            val effectiveSeason = it.nextToWatch?.nextSeason
+                ?.takeIf { s -> s in seasons }
+                ?: selectedSeason
+            val effectiveEpisodes = if (effectiveSeason != selectedSeason) {
+                getEpisodesForSeason(meta.videos, effectiveSeason)
+            } else {
+                episodesForSeason
+            }
             it.copy(
                 isLoading = false,
                 meta = meta,
                 seasons = seasons,
-                selectedSeason = selectedSeason,
-                episodesForSeason = episodesForSeason,
+                selectedSeason = effectiveSeason,
+                episodesForSeason = effectiveEpisodes,
                 error = null,
+                commentsEpisodeTarget = null,
                 shouldShowCommentsSection = traktCommentsEnabled && traktAuthenticated && supportsComments(meta)
             )
         }
 
         // Calculate next to watch after meta is loaded
+        reevaluateSeriesWatchedBadge()
         calculateNextToWatch()
 
         // Start fetching trailer after meta is loaded
@@ -552,6 +757,18 @@ class MetaDetailsViewModel @Inject constructor(
         // Fire all independent async jobs immediately — they run in parallel.
         loadMoreLikeThisAsync(meta)
         val enriched = enrichMeta(meta)
+
+        // Pre-compute nextToWatch before applyMeta so the PlayButton text is stable
+        // from the first composition — prevents focus invalidation from late recomposition.
+        val progressMap = watchProgressRepository
+            .getAllEpisodeProgress(_effectiveContentId.value)
+            .first()
+        val watchedEpisodes = watchedItemsPreferences
+            .getWatchedEpisodesForContent(_effectiveContentId.value)
+            .first()
+        val precomputedNextToWatch = computeNextToWatch(enriched, progressMap, watchedEpisodes)
+        updateNextToWatch(precomputedNextToWatch)
+
         applyMeta(enriched)
         // Episode ratings and MDBList are independent — launch both without waiting.
         loadEpisodeRatingsAsync(enriched)
@@ -560,13 +777,18 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun loadComments(meta: Meta, forceRefresh: Boolean = false) {
         if (!traktCommentsEnabled || !traktAuthenticated || !supportsComments(meta)) {
-            commentsJob?.cancel()
+            cancelCommentsRequests()
             _uiState.update { state ->
                 state.copy(
                     comments = emptyList(),
+                    commentsCurrentPage = 0,
+                    commentsPageCount = 0,
                     isCommentsLoading = false,
+                    isCommentsLoadingMore = false,
                     commentsError = null,
                     shouldShowCommentsSection = false,
+                    commentsMode = CommentsMode.TITLE,
+                    commentsEpisodeTarget = null,
                     selectedComment = null
                 )
             }
@@ -574,25 +796,32 @@ class MetaDetailsViewModel @Inject constructor(
         }
 
         commentsJob?.cancel()
+        commentsLoadMoreJob?.cancel()
         commentsJob = viewModelScope.launch {
             _uiState.update { state ->
                 if (state.meta == null || state.meta.id != meta.id) {
                     state
                 } else {
                     state.copy(
-                        comments = if (forceRefresh) emptyList() else state.comments,
+                        comments = emptyList(),
+                        commentsCurrentPage = 0,
+                        commentsPageCount = 0,
                         isCommentsLoading = true,
+                        isCommentsLoadingMore = false,
                         commentsError = null,
-                        shouldShowCommentsSection = true
+                        shouldShowCommentsSection = true,
+                        selectedComment = if (forceRefresh) null else state.selectedComment
                     )
                 }
             }
 
             try {
-                val comments = traktCommentsService.getBestReviews(
+                val page = traktCommentsService.getCommentsPage(
                     meta = meta,
                     fallbackItemId = itemId,
                     fallbackItemType = itemType,
+                    targetEpisode = currentCommentsEpisodeTarget(meta),
+                    page = 1,
                     forceRefresh = forceRefresh
                 )
 
@@ -601,10 +830,16 @@ class MetaDetailsViewModel @Inject constructor(
                         state
                     } else {
                         state.copy(
-                            comments = comments,
+                            comments = page.items,
+                            commentsCurrentPage = page.currentPage,
+                            commentsPageCount = page.pageCount,
                             isCommentsLoading = false,
+                            isCommentsLoadingMore = false,
                             commentsError = null,
-                            shouldShowCommentsSection = true
+                            shouldShowCommentsSection = true,
+                            selectedComment = state.selectedComment?.let { selected ->
+                                page.items.firstOrNull { it.id == selected.id }
+                            }
                         )
                     }
                 }
@@ -618,8 +853,11 @@ class MetaDetailsViewModel @Inject constructor(
                     } else {
                         state.copy(
                             comments = emptyList(),
+                            commentsCurrentPage = 0,
+                            commentsPageCount = 0,
                             isCommentsLoading = false,
-                            commentsError = context.getString(R.string.detail_comments_error),
+                            isCommentsLoadingMore = false,
+                            commentsError = localizedContext.getString(R.string.detail_comments_error),
                             shouldShowCommentsSection = true
                         )
                     }
@@ -637,9 +875,94 @@ class MetaDetailsViewModel @Inject constructor(
         }
     }
 
+    private fun loadMoreComments(selectNextAfterLoad: Boolean = false) {
+        val state = _uiState.value
+        val meta = state.meta ?: return
+        if (!traktCommentsEnabled || !traktAuthenticated || !supportsComments(meta)) return
+        if (state.isCommentsLoading || state.isCommentsLoadingMore || state.commentsCurrentPage == 0) return
+        if (state.commentsPageCount > 0 && state.commentsCurrentPage >= state.commentsPageCount) return
+
+        val nextPage = state.commentsCurrentPage + 1
+        val currentLastCommentId = state.comments.lastOrNull()?.id
+        val selectedCommentId = state.selectedComment?.id
+
+        commentsLoadMoreJob?.cancel()
+        commentsLoadMoreJob = viewModelScope.launch {
+            _uiState.update { current ->
+                if (current.meta?.id != meta.id) current else current.copy(isCommentsLoadingMore = true)
+            }
+
+            try {
+                val page = traktCommentsService.getCommentsPage(
+                    meta = meta,
+                    fallbackItemId = itemId,
+                    fallbackItemType = itemType,
+                    targetEpisode = currentCommentsEpisodeTarget(meta),
+                    page = nextPage
+                )
+
+                _uiState.update { current ->
+                    if (current.meta?.id != meta.id) {
+                        current
+                    } else {
+                        val appended = page.items.filterNot { fetched ->
+                            current.comments.any { existing -> existing.id == fetched.id }
+                        }
+                        val updatedComments = current.comments + appended
+                        val shouldAdvanceSelection =
+                            selectNextAfterLoad &&
+                                current.selectedComment?.id == selectedCommentId &&
+                                current.selectedComment?.id == currentLastCommentId &&
+                                appended.isNotEmpty()
+
+                        current.copy(
+                            comments = updatedComments,
+                            commentsCurrentPage = maxOf(current.commentsCurrentPage, page.currentPage),
+                            commentsPageCount = maxOf(current.commentsPageCount, page.pageCount),
+                            isCommentsLoadingMore = false,
+                            commentsError = null,
+                            selectedComment = if (shouldAdvanceSelection) appended.first() else current.selectedComment
+                        )
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to load more Trakt comments for ${meta.id}: ${error.message}")
+                _uiState.update { current ->
+                    if (current.meta?.id != meta.id) current else current.copy(isCommentsLoadingMore = false)
+                }
+            }
+        }
+    }
+
     private fun openCommentOverlay(review: TraktCommentReview) {
         _uiState.update { state ->
             state.copy(selectedComment = review)
+        }
+    }
+
+    private fun advanceCommentOverlay(direction: Int) {
+        if (direction == 0) return
+        val state = _uiState.value
+        val selected = state.selectedComment ?: return
+        val selectedIndex = state.comments.indexOfFirst { it.id == selected.id }
+        if (selectedIndex < 0) return
+
+        val targetIndex = selectedIndex + direction
+        if (targetIndex in state.comments.indices) {
+            _uiState.update { current ->
+                if (current.selectedComment?.id != selected.id) {
+                    current
+                } else {
+                    current.copy(selectedComment = current.comments.getOrNull(targetIndex) ?: current.selectedComment)
+                }
+            }
+            return
+        }
+
+        if (direction > 0) {
+            loadMoreComments(selectNextAfterLoad = true)
         }
     }
 
@@ -649,33 +972,61 @@ class MetaDetailsViewModel @Inject constructor(
         }
     }
 
+    private fun cancelCommentsRequests() {
+        commentsJob?.cancel()
+        commentsLoadMoreJob?.cancel()
+    }
+
     private fun loadMoreLikeThisAsync(meta: Meta) {
         moreLikeThisJob?.cancel()
         moreLikeThisJob = viewModelScope.launch {
-            val settings = tmdbSettingsDataStore.settings.first()
-            if (!shouldLoadMoreLikeThis(settings)) {
-                _uiState.update { it.copy(moreLikeThis = emptyList()) }
-                return@launch
+            val source = if (shouldLoadTraktMoreLikeThis(meta)) {
+                MoreLikeThisSource.TRAKT
+            } else {
+                val settings = tmdbSettingsDataStore.settings.first()
+                if (!shouldLoadMoreLikeThis(settings)) {
+                    _uiState.update { it.copy(moreLikeThis = emptyList(), moreLikeThisSource = null) }
+                    return@launch
+                }
+                MoreLikeThisSource.TMDB
             }
 
-            val tmdbContentType = resolveTmdbContentType(meta)
-            val tmdbLookupType = tmdbContentType.toApiString()
-            val tmdbId = tmdbService.ensureTmdbId(meta.id, tmdbLookupType)
-                ?: tmdbService.ensureTmdbId(itemId, itemType)
-            if (tmdbId.isNullOrBlank()) {
-                _uiState.update { it.copy(moreLikeThis = emptyList()) }
-                return@launch
-            }
+            val rawRecommendations = when (source) {
+                MoreLikeThisSource.TRAKT -> {
+                    runCatching {
+                        traktRelatedService.getRelated(
+                            meta = meta,
+                            fallbackItemId = itemId,
+                            fallbackItemType = itemType
+                        )
+                    }.getOrElse {
+                        Log.w(TAG, "Failed to load Trakt related titles for ${meta.id}: ${it.message}")
+                        emptyList()
+                    }
+                }
 
-            val rawRecommendations = runCatching {
-                tmdbMetadataService.fetchMoreLikeThis(
-                    tmdbId = tmdbId,
-                    contentType = tmdbContentType,
-                    language = settings.language
-                )
-            }.getOrElse {
-                Log.w(TAG, "Failed to load More like this for ${meta.id}: ${it.message}")
-                emptyList()
+                MoreLikeThisSource.TMDB -> {
+                    val settings = tmdbSettingsDataStore.settings.first()
+                    val tmdbContentType = resolveTmdbContentType(meta)
+                    val tmdbLookupType = tmdbContentType.toApiString()
+                    val tmdbId = tmdbService.ensureTmdbId(meta.id, tmdbLookupType)
+                        ?: tmdbService.ensureTmdbId(itemId, itemType)
+                    if (tmdbId.isNullOrBlank()) {
+                        _uiState.update { it.copy(moreLikeThis = emptyList(), moreLikeThisSource = null) }
+                        return@launch
+                    }
+
+                    runCatching {
+                        tmdbMetadataService.fetchMoreLikeThis(
+                            tmdbId = tmdbId,
+                            contentType = tmdbContentType,
+                            language = settings.language
+                        )
+                    }.getOrElse {
+                        Log.w(TAG, "Failed to load More like this for ${meta.id}: ${it.message}")
+                        emptyList()
+                    }
+                }
             }
 
             val recommendations = if (hideUnreleasedContent) {
@@ -687,7 +1038,10 @@ class MetaDetailsViewModel @Inject constructor(
 
             _uiState.update { state ->
                 if (state.meta == null || state.meta.id == meta.id) {
-                    state.copy(moreLikeThis = recommendations)
+                    state.copy(
+                        moreLikeThis = recommendations,
+                        moreLikeThisSource = source.takeIf { recommendations.isNotEmpty() }
+                    )
                 } else {
                     state
                 }
@@ -697,6 +1051,15 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun shouldLoadMoreLikeThis(settings: TmdbSettings): Boolean {
         return settings.enabled && settings.useMoreLikeThis
+    }
+
+    private fun shouldLoadTraktMoreLikeThis(meta: Meta): Boolean {
+        if (!traktAuthenticated) return false
+        return when (meta.type) {
+            ContentType.MOVIE -> true
+            ContentType.SERIES, ContentType.TV -> true
+            else -> meta.apiType in listOf("movie", "series", "tv", "show")
+        }
     }
 
     private fun loadCollectionAsync(collectionId: Int, collectionName: String?, settings: TmdbSettings) {
@@ -798,7 +1161,7 @@ class MetaDetailsViewModel @Inject constructor(
                             state.copy(
                                 episodeImdbRatings = emptyMap(),
                                 isEpisodeRatingsLoading = false,
-                                episodeRatingsError = context.getString(R.string.ratings_unavailable)
+                                episodeRatingsError = localizedContext.getString(R.string.ratings_unavailable)
                             )
                         }
                     }
@@ -832,7 +1195,7 @@ class MetaDetailsViewModel @Inject constructor(
                         state.copy(
                             episodeImdbRatings = emptyMap(),
                             isEpisodeRatingsLoading = false,
-                            episodeRatingsError = context.getString(R.string.ratings_load_error)
+                            episodeRatingsError = localizedContext.getString(R.string.ratings_load_error)
                         )
                     }
                 }
@@ -892,17 +1255,26 @@ class MetaDetailsViewModel @Inject constructor(
             if (enrichment.genres.isNotEmpty()) {
                 updated = updated.copy(genres = enrichment.genres)
             }
-            updated = updated.copy(imdbRating = enrichment.rating?.toFloat() ?: updated.imdbRating)
+        }
+
+        // Store TMDB rating separately so it can be shown with its own icon on the details screen.
+        if (enrichment?.rating != null && settings.useBasicInfo) {
+            _uiState.update { it.copy(tmdbRating = enrichment.rating.toFloat()) }
         }
 
         if (enrichment != null && settings.useDetails) {
             updated = updated.copy(
                 runtime = enrichment.runtimeMinutes?.toString() ?: updated.runtime,
-                releaseInfo = enrichment.releaseInfo ?: updated.releaseInfo,
                 status = enrichment.status ?: updated.status,
                 ageRating = enrichment.ageRating ?: updated.ageRating,
                 country = enrichment.countries?.joinToString(", ") ?: updated.country,
                 language = enrichment.language ?: updated.language
+            )
+        }
+
+        if (enrichment != null && settings.useReleaseDates) {
+            updated = updated.copy(
+                releaseInfo = enrichment.releaseInfo ?: updated.releaseInfo
             )
         }
 
@@ -935,6 +1307,19 @@ class MetaDetailsViewModel @Inject constructor(
             updated = updated.copy(networks = enrichment.networks)
         }
 
+        if (enrichment != null && settings.useTrailers && enrichment.trailers.isNotEmpty()) {
+            val mergedTrailers = mergeTrailers(
+                existing = updated.trailers,
+                incoming = enrichment.trailers
+            )
+            if (mergedTrailers.isNotEmpty()) {
+                updated = updated.copy(
+                    trailers = mergedTrailers,
+                    trailerYtIds = mergedTrailers.mapNotNull { it.ytId }.distinct()
+                )
+            }
+        }
+
         if (!episodeMap.isNullOrEmpty()) {
             updated = updated.copy(
                 videos = meta.videos.map { video ->
@@ -943,7 +1328,7 @@ class MetaDetailsViewModel @Inject constructor(
                     video.copy(
                         title = ep?.title ?: video.title,
                         overview = ep?.overview ?: video.overview,
-                        released = ep?.airDate ?: video.released,
+                        released = if (settings.useReleaseDates) ep?.airDate ?: video.released else video.released,
                         thumbnail = ep?.thumbnail ?: video.thumbnail,
                         runtime = ep?.runtimeMinutes
                     )
@@ -982,7 +1367,8 @@ class MetaDetailsViewModel @Inject constructor(
     }
 
     private fun selectSeason(season: Int) {
-        val episodes = _uiState.value.meta?.videos?.let { getEpisodesForSeason(it, season) } ?: emptyList()
+        val meta = _uiState.value.meta ?: return
+        val episodes = getEpisodesForSeason(meta.videos, season)
         _uiState.update {
             it.copy(
                 selectedSeason = season,
@@ -992,88 +1378,291 @@ class MetaDetailsViewModel @Inject constructor(
     }
 
     private fun getEpisodesForSeason(videos: List<Video>, season: Int): List<Video> {
-        return videos
-            .filter { it.season == season }
-            .sortedBy { it.episode }
+        val filtered = videos.filter { it.season == season }
+        if (filtered.isNotEmpty()) return filtered.sortedBy { it.episode }
+        // Fallback: if no videos match the season (e.g. "other" type with
+        // null seasons), return all videos with synthetic season/episode
+        // numbers so the episode UI can track watched state.
+        if (videos.isNotEmpty() && videos.all { it.season == null }) {
+            return videos.mapIndexed { index, video ->
+                video.copy(season = 1, episode = index + 1)
+            }
+        }
+        return emptyList()
+    }
+
+    private fun selectCommentsMode(mode: CommentsMode) {
+        val meta = _uiState.value.meta ?: return
+        if (_uiState.value.commentsMode == mode) return
+        val nextTarget = resolveCommentsEpisodeTarget(
+            meta = meta,
+            preferredSeason = _uiState.value.selectedSeason,
+            existingTarget = _uiState.value.commentsEpisodeTarget
+        )
+        _uiState.update {
+            it.copy(
+                commentsMode = mode,
+                commentsEpisodeTarget = nextTarget,
+                selectedComment = null
+            )
+        }
+        if (traktCommentsEnabled && traktAuthenticated && supportsComments(meta)) {
+            loadComments(meta, forceRefresh = true)
+        }
+    }
+
+    private fun selectCommentsEpisode(video: Video) {
+        val meta = _uiState.value.meta ?: return
+        if (_uiState.value.commentsEpisodeTarget?.id == video.id && _uiState.value.commentsMode == CommentsMode.EPISODE) {
+            return
+        }
+        _uiState.update {
+            it.copy(
+                commentsMode = CommentsMode.EPISODE,
+                commentsEpisodeTarget = video,
+                selectedComment = null
+            )
+        }
+        if (traktCommentsEnabled && traktAuthenticated && supportsComments(meta)) {
+            loadComments(meta, forceRefresh = true)
+        }
+    }
+
+    private fun currentCommentsEpisodeTarget(meta: Meta): Video? {
+        val state = _uiState.value
+        if (state.commentsMode != CommentsMode.EPISODE) return null
+        return resolveCommentsEpisodeTarget(
+            meta = meta,
+            preferredSeason = state.selectedSeason,
+            existingTarget = state.commentsEpisodeTarget
+        )
+    }
+
+    private fun resolveCommentsEpisodeTarget(
+        meta: Meta,
+        preferredSeason: Int,
+        existingTarget: Video?
+    ): Video? {
+        val allEpisodes = meta.videos.filter { it.season != null && it.episode != null }
+        if (allEpisodes.isEmpty()) return null
+
+        existingTarget
+            ?.takeIf { target ->
+                allEpisodes.any { episode ->
+                    episode.season == target.season && episode.episode == target.episode
+                }
+            }
+            ?.let { return it }
+
+        val nextToWatch = _uiState.value.nextToWatch
+        nextToWatch?.nextVideoId
+            ?.let { nextVideoId ->
+                allEpisodes.firstOrNull { episode -> episode.id == nextVideoId }
+            }
+            ?.let { return it }
+
+        nextToWatch
+            ?.takeIf { it.nextSeason != null && it.nextEpisode != null }
+            ?.let { target ->
+                allEpisodes.firstOrNull { episode ->
+                    episode.season == target.nextSeason && episode.episode == target.nextEpisode
+                }
+            }
+            ?.let { return it }
+
+        return allEpisodes.firstOrNull { it.season == preferredSeason }
+            ?: allEpisodes.firstOrNull { (it.season ?: 0) > 0 }
+            ?: allEpisodes.first()
+    }
+
+    private fun reevaluateSeriesWatchedBadge() {
+        val contentId = _effectiveContentId.value
+        val meta = _uiState.value.meta ?: return
+        val isSeries = meta.apiType.equals("series", ignoreCase = true) ||
+            meta.apiType.equals("tv", ignoreCase = true)
+        if (!isSeries) return
+
+        val episodes = meta.watchableEpisodes()
+        if (episodes.isEmpty()) return
+
+        val watchedEpisodes = _uiState.value.watchedEpisodes
+        val progressMap = _uiState.value.episodeProgressMap
+
+        val allWatched = episodes.all { video ->
+            val key = video.season!! to video.episode!!
+            key in watchedEpisodes || progressMap[key]?.isCompleted() == true
+        }
+
+        val current = watchedSeriesStateHolder.fullyWatchedSeriesIds.value
+        // Include both effectiveContentId and meta.id so badges match
+        // regardless of whether the catalog uses IMDB or TMDB IDs.
+        val allIds = buildSet {
+            add(contentId)
+            meta.id.takeIf { it.isNotBlank() && it != contentId }?.let { add(it) }
+            itemId.takeIf { it.isNotBlank() && it != contentId }?.let { add(it) }
+        }
+        val updated = if (allWatched) current + allIds else current - allIds
+        if (updated != current) {
+            watchedSeriesStateHolder.updateWithValidation(updated, allIds)
+        }
     }
 
     private fun calculateNextToWatch() {
         val meta = _uiState.value.meta ?: return
         val progressMap = _uiState.value.episodeProgressMap
-        val isSeries = meta.apiType in listOf("series", "tv")
+        val watchedEpisodes = _uiState.value.watchedEpisodes
         nextToWatchJob?.cancel()
 
         nextToWatchJob = viewModelScope.launch {
-            if (!isSeries) {
-                // For movies, check if there's an in-progress watch
-                val progress = watchProgressRepository.getProgress(itemId).first()
-                val nextToWatch = if (progress != null && shouldResumeProgress(progress)) {
-                    NextToWatch(
-                        watchProgress = progress,
-                        isResume = true,
-                        nextVideoId = meta.id,
-                        nextSeason = null,
-                        nextEpisode = null,
-                        displayText = context.getString(R.string.detail_btn_resume)
-                    )
-                } else {
-                    NextToWatch(
-                        watchProgress = null,
-                        isResume = false,
-                        nextVideoId = meta.id,
-                        nextSeason = null,
-                        nextEpisode = null,
-                        displayText = context.getString(R.string.detail_btn_play)
-                    )
-                }
-                updateNextToWatch(nextToWatch)
-                return@launch
-            }
-
-            val allEpisodes = meta.videos
-                .filter { it.season != null && it.episode != null }
-                .filter { it.available != false }
-                .sortedWith(compareBy({ it.season }, { it.episode }))
-
-            if (allEpisodes.isEmpty()) {
-                updateNextToWatch(
-                    NextToWatch(
-                        watchProgress = null,
-                        isResume = false,
-                        nextVideoId = meta.id,
-                        nextSeason = null,
-                        nextEpisode = null,
-                        displayText = context.getString(R.string.detail_btn_play)
-                    )
-                )
-                return@launch
-            }
-
-            val nonSpecialEpisodes = allEpisodes.filter { (it.season ?: 0) > 0 }
-            val episodePool = if (nonSpecialEpisodes.isNotEmpty()) nonSpecialEpisodes else allEpisodes
-            val latestSeriesProgress = progressMap.values.maxByOrNull { it.lastWatched }
-            val defaultEpisode = findPreferredDefaultEpisode(meta)?.takeIf { preferred ->
-                episodePool.any { it.id == preferred.id }
-            }
-
-            val nextToWatch = buildNextToWatchFromLatestProgress(
-                latestProgress = latestSeriesProgress,
-                episodes = episodePool,
-                fallbackProgressMap = progressMap,
-                metaId = meta.id,
-                defaultEpisode = defaultEpisode
-            )
-
+            val nextToWatch = computeNextToWatch(meta, progressMap, watchedEpisodes)
             updateNextToWatch(nextToWatch)
         }
+    }
+
+    private suspend fun computeNextToWatch(
+        meta: Meta,
+        progressMap: Map<Pair<Int, Int>, WatchProgress> = emptyMap(),
+        watchedEpisodes: Set<Pair<Int, Int>> = emptySet()
+    ): NextToWatch {
+        val isSeries = meta.apiType in listOf("series", "tv")
+
+        if (!isSeries) {
+            val progress = watchProgressRepository.getProgress(_effectiveContentId.value).first()
+            return if (progress != null && shouldResumeProgress(progress)) {
+                NextToWatch(
+                    watchProgress = progress,
+                    isResume = true,
+                    nextVideoId = meta.id,
+                    nextSeason = null,
+                    nextEpisode = null,
+                    displayText = localizedContext.getString(R.string.detail_btn_resume)
+                )
+            } else {
+                NextToWatch(
+                    watchProgress = null,
+                    isResume = false,
+                    nextVideoId = meta.id,
+                    nextSeason = null,
+                    nextEpisode = null,
+                    displayText = localizedContext.getString(R.string.detail_btn_play)
+                )
+            }
+        }
+
+        val allEpisodes = meta.videos
+            .filter { it.season != null && it.episode != null }
+            .filter { it.available != false }
+            .sortedWith(compareBy({ it.season }, { it.episode }))
+
+        if (allEpisodes.isEmpty()) {
+            return NextToWatch(
+                watchProgress = null,
+                isResume = false,
+                nextVideoId = meta.id,
+                nextSeason = null,
+                nextEpisode = null,
+                displayText = localizedContext.getString(R.string.detail_btn_play)
+            )
+        }
+
+        val nonSpecialEpisodes = allEpisodes.filter { (it.season ?: 0) > 0 }
+        val episodePool = if (nonSpecialEpisodes.isNotEmpty()) nonSpecialEpisodes else allEpisodes
+        val useFurthestEpisode = layoutPreferenceDataStore.nextUpFromFurthestEpisode.first()
+        val latestSeriesProgress = if (useFurthestEpisode) {
+            // When using furthest episode mode, consider both progressMap entries
+            // AND watchedEpisodes (batch marks) to find the furthest watched episode.
+            val furthestFromProgress = progressMap.values
+                .filter { it.isCompleted() || shouldResumeProgress(it) }
+                .maxWithOrNull(
+                    compareBy<WatchProgress> { it.season ?: 0 }
+                        .thenBy { it.episode ?: 0 }
+                )
+            val furthestFromWatched = watchedEpisodes
+                .maxWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second })
+                ?.let { (s, e) ->
+                    // Only use watchedEpisodes entry if it's further than progressMap
+                    val progressFurthest = furthestFromProgress?.let { (it.season ?: 0) to (it.episode ?: 0) }
+                    if (progressFurthest == null || s > progressFurthest.first || (s == progressFurthest.first && e > progressFurthest.second)) {
+                        episodePool.firstOrNull { it.season == s && it.episode == e }?.let { video ->
+                            WatchProgress(
+                                contentId = _effectiveContentId.value,
+                                contentType = "series",
+                                name = "",
+                                poster = null, backdrop = null, logo = null,
+                                videoId = video.id,
+                                season = video.season,
+                                episode = video.episode,
+                                episodeTitle = video.title,
+                                position = 1L, duration = 1L,
+                                lastWatched = System.currentTimeMillis(),
+                                progressPercent = 100f
+                            )
+                        }
+                    } else null
+                }
+            furthestFromWatched ?: furthestFromProgress
+        } else {
+            progressMap.values
+                .sortedWith(
+                    compareByDescending<WatchProgress> { it.lastWatched }
+                        .thenByDescending { it.season ?: 0 }
+                        .thenByDescending { it.episode ?: 0 }
+                )
+                .firstOrNull()
+        }
+        val effectiveLatestProgress = latestSeriesProgress ?: run {
+            if (watchedEpisodes.isEmpty()) null
+            else {
+                val watchedWithTimestamps = watchedItemsPreferences
+                    .getWatchedEpisodesWithTimestamps(_effectiveContentId.value)
+                    .first()
+                val highest = watchedWithTimestamps.entries
+                    .maxWithOrNull(compareBy<Map.Entry<Pair<Int, Int>, Long>> { it.value }
+                        .thenBy { it.key.first }
+                        .thenBy { it.key.second })
+                highest?.let { (key, watchedAt) ->
+                    val (s, e) = key
+                    episodePool.firstOrNull { it.season == s && it.episode == e }?.let { video ->
+                        WatchProgress(
+                            contentId = _effectiveContentId.value,
+                            contentType = "series",
+                            name = "",
+                            poster = null, backdrop = null, logo = null,
+                            videoId = video.id,
+                            season = video.season,
+                            episode = video.episode,
+                            episodeTitle = video.title,
+                            position = 1L, duration = 1L,
+                            lastWatched = watchedAt,
+                            progressPercent = 100f
+                        )
+                    }
+                }
+            }
+        }
+        val defaultEpisode = findPreferredDefaultEpisode(meta)?.takeIf { preferred ->
+            episodePool.any { it.id == preferred.id }
+        }
+
+        return buildNextToWatchFromLatestProgress(
+            latestProgress = effectiveLatestProgress,
+            episodes = episodePool,
+            fallbackProgressMap = progressMap,
+            watchedEpisodes = watchedEpisodes,
+            metaId = meta.id,
+            defaultEpisode = defaultEpisode,
+            isRewatchMode = !useFurthestEpisode
+        )
     }
 
     private fun buildNextToWatchFromLatestProgress(
         latestProgress: WatchProgress?,
         episodes: List<Video>,
         fallbackProgressMap: Map<Pair<Int, Int>, WatchProgress>,
+        watchedEpisodes: Set<Pair<Int, Int>> = emptySet(),
         metaId: String,
-        defaultEpisode: Video? = null
+        defaultEpisode: Video? = null,
+        isRewatchMode: Boolean = false
     ): NextToWatch {
         if (episodes.isEmpty()) {
             return NextToWatch(
@@ -1082,7 +1671,7 @@ class MetaDetailsViewModel @Inject constructor(
                 nextVideoId = metaId,
                 nextSeason = null,
                 nextEpisode = null,
-                displayText = context.getString(R.string.detail_btn_play)
+                displayText = localizedContext.getString(R.string.detail_btn_play)
             )
         }
 
@@ -1099,21 +1688,44 @@ class MetaDetailsViewModel @Inject constructor(
                     nextVideoId = matchedEpisode?.id ?: latestProgress.videoId,
                     nextSeason = season,
                     nextEpisode = episode,
-                    displayText = context.getString(R.string.detail_btn_resume_episode, season, episode)
+                    displayText = localizedContext.getString(R.string.detail_btn_resume_episode, season, episode)
                 )
             }
 
             if (latestProgress.isCompleted() && matchedIndex >= 0) {
-                val next = episodes.getOrNull(matchedIndex + 1)
-                if (next != null) {
-                    return NextToWatch(
-                        watchProgress = null,
-                        isResume = false,
-                        nextVideoId = next.id,
-                        nextSeason = next.season,
-                        nextEpisode = next.episode,
-                        displayText = context.getString(R.string.detail_btn_next_episode, next.season, next.episode)
-                    )
+                if (isRewatchMode) {
+                    // In rewatch mode, simply take the next episode regardless of watched state
+                    val next = episodes.getOrNull(matchedIndex + 1)
+                    if (next != null) {
+                        return NextToWatch(
+                            watchProgress = null,
+                            isResume = false,
+                            nextVideoId = next.id,
+                            nextSeason = next.season,
+                            nextEpisode = next.episode,
+                            displayText = localizedContext.getString(R.string.detail_btn_next_episode, next.season, next.episode)
+                        )
+                    }
+                } else {
+                    // Normal mode: skip already watched episodes
+                    val nextUnwatched = episodes.subList(matchedIndex + 1, episodes.size)
+                        .firstOrNull { candidate ->
+                            val s = candidate.season ?: return@firstOrNull true
+                            val e = candidate.episode ?: return@firstOrNull true
+                            val progress = fallbackProgressMap[s to e]
+                            val isWatched = progress?.isCompleted() == true || (s to e) in watchedEpisodes
+                            !isWatched
+                        }
+                    if (nextUnwatched != null) {
+                        return NextToWatch(
+                            watchProgress = null,
+                            isResume = false,
+                            nextVideoId = nextUnwatched.id,
+                            nextSeason = nextUnwatched.season,
+                            nextEpisode = nextUnwatched.episode,
+                            displayText = localizedContext.getString(R.string.detail_btn_next_episode, nextUnwatched.season, nextUnwatched.episode)
+                        )
+                    }
                 }
             }
         }
@@ -1135,7 +1747,13 @@ class MetaDetailsViewModel @Inject constructor(
                 } else if (progress.isCompleted()) {
                     continue
                 }
-            } else {
+            }
+            // Check watchedEpisodes — covers both batch marks and episodes
+            // that haven't propagated to episodeProgressMap yet.
+            if (progress == null && (season to ep) in watchedEpisodes) {
+                continue
+            }
+            if (progress == null) {
                 if (nextUnwatchedEpisode == null) {
                     nextUnwatchedEpisode = episode
                 }
@@ -1153,7 +1771,7 @@ class MetaDetailsViewModel @Inject constructor(
                     nextVideoId = resumeEpisode.id,
                     nextSeason = resumeEpisode.season,
                     nextEpisode = resumeEpisode.episode,
-                    displayText = context.getString(R.string.detail_btn_resume_episode, resumeEpisode.season, resumeEpisode.episode)
+                    displayText = localizedContext.getString(R.string.detail_btn_resume_episode, resumeEpisode.season, resumeEpisode.episode)
                 )
             }
             nextUnwatchedEpisode != null -> {
@@ -1168,9 +1786,9 @@ class MetaDetailsViewModel @Inject constructor(
                     nextSeason = s,
                     nextEpisode = e,
                     displayText = if (hasWatchedSomething) {
-                        context.getString(R.string.detail_btn_next_episode, s, e)
+                        localizedContext.getString(R.string.detail_btn_next_episode, s, e)
                     } else {
-                        context.getString(R.string.detail_btn_play_episode, s, e)
+                        localizedContext.getString(R.string.detail_btn_play_episode, s, e)
                     }
                 )
             }
@@ -1183,9 +1801,9 @@ class MetaDetailsViewModel @Inject constructor(
                     nextSeason = firstEpisode?.season,
                     nextEpisode = firstEpisode?.episode,
                     displayText = if (firstEpisode != null) {
-                        context.getString(R.string.detail_btn_play_episode, firstEpisode.season, firstEpisode.episode)
+                        localizedContext.getString(R.string.detail_btn_play_episode, firstEpisode.season, firstEpisode.episode)
                     } else {
-                        context.getString(R.string.detail_btn_play)
+                        localizedContext.getString(R.string.detail_btn_play)
                     }
                 )
             }
@@ -1216,10 +1834,10 @@ class MetaDetailsViewModel @Inject constructor(
             val wasInLibrary = _uiState.value.isInLibrary
             runCatching {
                 libraryRepository.toggleDefault(input)
-                val message = if (_uiState.value.librarySourceMode == LibrarySourceMode.TRAKT) {
-                    if (wasInWatchlist) context.getString(R.string.watchlist_removed) else context.getString(R.string.watchlist_added)
+                val message = if (wasInLibrary || wasInWatchlist) {
+                    localizedContext.getString(R.string.detail_removed_from_library)
                 } else {
-                    if (wasInLibrary) context.getString(R.string.detail_removed_from_library) else context.getString(R.string.detail_added_to_library)
+                    localizedContext.getString(R.string.detail_added_to_library)
                 }
                 showMessage(message)
             }.onFailure { error ->
@@ -1232,7 +1850,6 @@ class MetaDetailsViewModel @Inject constructor(
     }
 
     private fun openListPicker() {
-        if (_uiState.value.librarySourceMode != LibrarySourceMode.TRAKT) return
         val meta = _uiState.value.meta ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(pickerPending = true, pickerError = null) }
@@ -1273,7 +1890,6 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun savePickerMembership() {
         if (_uiState.value.pickerPending) return
-        if (_uiState.value.librarySourceMode != LibrarySourceMode.TRAKT) return
         val meta = _uiState.value.meta ?: return
 
         viewModelScope.launch {
@@ -1293,7 +1909,7 @@ class MetaDetailsViewModel @Inject constructor(
                         pickerError = null
                     )
                 }
-                showMessage(context.getString(R.string.detail_lists_updated))
+                showMessage(localizedContext.getString(R.string.detail_lists_updated))
             }.onFailure { error ->
                 _uiState.update {
                     it.copy(
@@ -1325,11 +1941,11 @@ class MetaDetailsViewModel @Inject constructor(
             _uiState.update { it.copy(isMovieWatchedPending = true) }
             runCatching {
                 if (_uiState.value.isMovieWatched) {
-                    watchProgressRepository.removeFromHistory(itemId, videoId = resolveFallbackVideoId())
-                    showMessage(context.getString(R.string.detail_movie_marked_unwatched))
+                    watchProgressRepository.removeFromHistory(_effectiveContentId.value, videoId = resolveFallbackVideoId())
+                    showMessage(localizedContext.getString(R.string.detail_movie_marked_unwatched))
                 } else {
                     watchProgressRepository.markAsCompleted(buildCompletedMovieProgress(meta))
-                    showMessage(context.getString(R.string.detail_movie_marked_watched))
+                    showMessage(localizedContext.getString(R.string.detail_movie_marked_watched))
                 }
             }.onFailure { error ->
                 showMessage(
@@ -1357,11 +1973,11 @@ class MetaDetailsViewModel @Inject constructor(
                 || _uiState.value.watchedEpisodes.contains(season to episode)
             runCatching {
                 if (isWatched) {
-                    watchProgressRepository.removeFromHistory(itemId, videoId = resolveFallbackVideoId(), season = season, episode = episode)
-                    showMessage(context.getString(R.string.detail_episode_marked_unwatched))
+                    watchProgressRepository.removeFromHistory(_effectiveContentId.value, videoId = video.id, season = season, episode = episode)
+                    showMessage(localizedContext.getString(R.string.detail_episode_marked_unwatched))
                 } else {
                     watchProgressRepository.markAsCompleted(buildCompletedEpisodeProgress(meta, video))
-                    showMessage(context.getString(R.string.detail_episode_marked_watched))
+                    showMessage(localizedContext.getString(R.string.detail_episode_marked_watched))
                 }
             }.onFailure { error ->
                 showMessage(
@@ -1379,7 +1995,13 @@ class MetaDetailsViewModel @Inject constructor(
     fun isSeasonFullyWatched(season: Int): Boolean {
         val state = _uiState.value
         val meta = state.meta ?: return false
-        val episodes = meta.videos.filter { it.season == season && it.episode != null }
+        // For "other" type, use episodesForSeason which has synthetic season/episode.
+        // For regular series, use meta.videos to support checking any season.
+        val episodes = if (meta.apiType.equals("other", ignoreCase = true)) {
+            state.episodesForSeason.filter { it.season == season && it.episode != null }
+        } else {
+            meta.videos.filter { it.season == season && it.episode != null }
+        }
         if (episodes.isEmpty()) return false
         return episodes.all { video ->
             val s = video.season ?: return@all false
@@ -1391,8 +2013,13 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun markSeasonWatched(season: Int) {
         val meta = _uiState.value.meta ?: return
+        suppressSeasonAutoSwitch = true
         viewModelScope.launch {
-            val episodes = meta.videos.filter { it.season == season && it.episode != null }
+            val episodes = if (meta.apiType.equals("other", ignoreCase = true)) {
+                _uiState.value.episodesForSeason.filter { it.season == season && it.episode != null }
+            } else {
+                meta.videos.filter { it.season == season && it.episode != null }
+            }
             val unwatched = episodes.filter { video ->
                 val s = video.season!!
                 val e = video.episode!!
@@ -1401,7 +2028,7 @@ class MetaDetailsViewModel @Inject constructor(
                 !isWatched
             }
             if (unwatched.isEmpty()) {
-                showMessage(context.getString(R.string.detail_all_episodes_watched))
+                showMessage(localizedContext.getString(R.string.detail_all_episodes_watched))
                 return@launch
             }
 
@@ -1410,28 +2037,29 @@ class MetaDetailsViewModel @Inject constructor(
                 it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys + pendingKeys)
             }
 
-            var marked = 0
-            for (video in unwatched) {
-                val key = episodePendingKey(video)
-                runCatching {
-                    watchProgressRepository.markAsCompleted(buildCompletedEpisodeProgress(meta, video))
-                    marked++
-                }.onFailure { error ->
-                    Log.w(TAG, "Failed to mark S${video.season}E${video.episode} as watched: ${error.message}")
-                }
-                _uiState.update {
-                    it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - key)
-                }
+            runCatching {
+                val progressList = unwatched.map { buildCompletedEpisodeProgress(meta, it) }
+                watchProgressRepository.markAsCompletedBatch(progressList)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to batch mark season $season as watched: ${error.message}")
             }
 
-            showMessage(context.getString(R.string.detail_marked_episodes_watched, marked))
+            _uiState.update {
+                it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - pendingKeys)
+            }
+            showMessage(localizedContext.getString(R.string.detail_marked_episodes_watched, unwatched.size))
         }
     }
 
     private fun markSeasonUnwatched(season: Int) {
         val meta = _uiState.value.meta ?: return
+        suppressSeasonAutoSwitch = true
         viewModelScope.launch {
-            val episodes = meta.videos.filter { it.season == season && it.episode != null }
+            val episodes = if (meta.apiType.equals("other", ignoreCase = true)) {
+                _uiState.value.episodesForSeason.filter { it.season == season && it.episode != null }
+            } else {
+                meta.videos.filter { it.season == season && it.episode != null }
+            }
             val watched = episodes.filter { video ->
                 val s = video.season!!
                 val e = video.episode!!
@@ -1439,7 +2067,7 @@ class MetaDetailsViewModel @Inject constructor(
                     || _uiState.value.watchedEpisodes.contains(s to e)
             }
             if (watched.isEmpty()) {
-                showMessage(context.getString(R.string.detail_no_watched_episodes))
+                showMessage(localizedContext.getString(R.string.detail_no_watched_episodes))
                 return@launch
             }
 
@@ -1448,21 +2076,21 @@ class MetaDetailsViewModel @Inject constructor(
                 it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys + pendingKeys)
             }
 
-            var unmarked = 0
-            for (video in watched) {
-                val key = episodePendingKey(video)
-                runCatching {
-                    watchProgressRepository.removeFromHistory(itemId, videoId = resolveFallbackVideoId(), season = video.season!!, episode = video.episode!!)
-                    unmarked++
-                }.onFailure { error ->
-                    Log.w(TAG, "Failed to unmark S${video.season}E${video.episode}: ${error.message}")
-                }
-                _uiState.update {
-                    it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - key)
-                }
+            runCatching {
+                val episodePairs = watched.map { it.season!! to it.episode!! }
+                watchProgressRepository.removeFromHistoryBatch(
+                    contentId = _effectiveContentId.value,
+                    videoId = resolveFallbackVideoId(),
+                    episodes = episodePairs
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to batch unmark season $season: ${error.message}")
             }
 
-            showMessage(context.getString(R.string.detail_marked_episodes_unwatched, unmarked))
+            _uiState.update {
+                it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - pendingKeys)
+            }
+            showMessage(localizedContext.getString(R.string.detail_marked_episodes_unwatched, watched.size))
         }
     }
 
@@ -1472,8 +2100,14 @@ class MetaDetailsViewModel @Inject constructor(
         val targetEpisode = video.episode ?: return
 
         viewModelScope.launch {
-            val previous = meta.videos.filter { v ->
-                v.season == targetSeason && v.episode != null && v.episode < targetEpisode
+            val previous = if (meta.apiType.equals("other", ignoreCase = true)) {
+                _uiState.value.episodesForSeason.filter { v ->
+                    v.season == targetSeason && v.episode != null && v.episode < targetEpisode
+                }
+            } else {
+                meta.videos.filter { v ->
+                    v.season == targetSeason && v.episode != null && v.episode < targetEpisode
+                }
             }
             val unwatched = previous.filter { v ->
                 val s = v.season!!
@@ -1483,7 +2117,7 @@ class MetaDetailsViewModel @Inject constructor(
                 !isWatched
             }
             if (unwatched.isEmpty()) {
-                showMessage(context.getString(R.string.detail_all_previous_watched))
+                showMessage(localizedContext.getString(R.string.detail_all_previous_watched))
                 return@launch
             }
 
@@ -1492,21 +2126,17 @@ class MetaDetailsViewModel @Inject constructor(
                 it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys + pendingKeys)
             }
 
-            var marked = 0
-            for (ep in unwatched) {
-                val key = episodePendingKey(ep)
-                runCatching {
-                    watchProgressRepository.markAsCompleted(buildCompletedEpisodeProgress(meta, ep))
-                    marked++
-                }.onFailure { error ->
-                    Log.w(TAG, "Failed to mark S${ep.season}E${ep.episode} as watched: ${error.message}")
-                }
-                _uiState.update {
-                    it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - key)
-                }
+            runCatching {
+                val progressList = unwatched.map { buildCompletedEpisodeProgress(meta, it) }
+                watchProgressRepository.markAsCompletedBatch(progressList)
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to batch mark previous episodes as watched: ${error.message}")
             }
 
-            showMessage(context.getString(R.string.detail_marked_previous_watched, marked))
+            _uiState.update {
+                it.copy(episodeWatchedPendingKeys = it.episodeWatchedPendingKeys - pendingKeys)
+            }
+            showMessage(localizedContext.getString(R.string.detail_marked_previous_watched, unwatched.size))
         }
     }
 
@@ -1517,7 +2147,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun buildCompletedMovieProgress(meta: Meta): WatchProgress {
         return WatchProgress(
-            contentId = itemId,
+            contentId = _effectiveContentId.value,
             contentType = meta.apiType,
             name = meta.name,
             poster = meta.poster,
@@ -1537,7 +2167,7 @@ class MetaDetailsViewModel @Inject constructor(
     private fun buildCompletedEpisodeProgress(meta: Meta, video: Video): WatchProgress {
         val runtimeMs = video.runtime?.toLong()?.times(60_000L) ?: 1L
         return WatchProgress(
-            contentId = itemId,
+            contentId = _effectiveContentId.value,
             contentType = meta.apiType,
             name = meta.name,
             poster = meta.poster,
@@ -1644,17 +2274,31 @@ class MetaDetailsViewModel @Inject constructor(
                 null
             }
 
-            val source = trailerService.getTrailerPlaybackSource(
-                title = meta.name,
-                year = year,
-                tmdbId = tmdbId,
-                type = meta.apiType
-            ) ?: meta.trailerYtIds.firstOrNull()?.let { ytId ->
-                trailerService.getTrailerPlaybackSourceFromYouTubeUrl(
-                    youtubeUrl = "https://www.youtube.com/watch?v=$ytId",
+            val source = if (AppFeaturePolicy.inAppTrailerPlaybackEnabled) {
+                trailerService.getTrailerPlaybackSource(
                     title = meta.name,
-                    year = year
-                )
+                    year = year,
+                    tmdbId = tmdbId,
+                    type = meta.apiType
+                ) ?: meta.trailerYtIds.firstOrNull()?.let { ytId ->
+                    trailerService.getTrailerPlaybackSourceFromYouTubeUrl(
+                        youtubeUrl = "https://www.youtube.com/watch?v=$ytId",
+                        title = meta.name,
+                        year = year
+                    )
+                }
+            } else {
+                val externalUrl = if (AppFeaturePolicy.externalTrailerPlaybackEnabled) {
+                    trailerService.getExternalTrailerUrl(
+                        tmdbId = tmdbId,
+                        type = meta.apiType
+                    ) ?: meta.trailerYtIds.firstOrNull()?.let { ytId ->
+                        "https://www.youtube.com/watch?v=$ytId"
+                    }
+                } else {
+                    null
+                }
+                externalUrl?.let { com.nuvio.tv.data.trailer.TrailerPlaybackSource(videoUrl = it) }
             }
             val url = source?.videoUrl
             val audioUrl = source?.audioUrl
@@ -1674,7 +2318,7 @@ class MetaDetailsViewModel @Inject constructor(
                 }
             }
 
-            if (url != null && isPlayButtonFocused) {
+            if (url != null && isPlayButtonFocused && AppFeaturePolicy.inAppTrailerPlaybackEnabled) {
                 startIdleTimer()
             }
         }
@@ -1682,6 +2326,7 @@ class MetaDetailsViewModel @Inject constructor(
 
     private fun startIdleTimer() {
         idleTimerJob?.cancel()
+        if (!AppFeaturePolicy.inAppTrailerPlaybackEnabled) return
 
         val state = _uiState.value
         if (state.trailerUrl == null || state.isTrailerPlaying) return
@@ -1729,6 +2374,7 @@ class MetaDetailsViewModel @Inject constructor(
     private fun handleLifecyclePause() {
         idleTimerJob?.cancel()
         isPlayButtonFocused = false
+        dismissSharedTrailerOverlay()
         val state = _uiState.value
         if (state.isTrailerPlaying && !state.showTrailerControls) {
             trailerHasPlayed = true
@@ -1739,6 +2385,10 @@ class MetaDetailsViewModel @Inject constructor(
     private fun handleTrailerButtonClick() {
         val state = _uiState.value
         if (state.trailerUrl.isNullOrBlank()) return
+        if (!AppFeaturePolicy.inAppTrailerPlaybackEnabled) {
+            openExternalTrailer(state.trailerUrl)
+            return
+        }
         idleTimerJob?.cancel()
         isPlayButtonFocused = false
         setTrailerPlaybackState(
@@ -1756,6 +2406,122 @@ class MetaDetailsViewModel @Inject constructor(
             showControls = false,
             hideLogo = false
         )
+    }
+
+    private fun handleSharedTrailerSelected(trailer: MetaTrailer) {
+        val ytId = trailer.ytId?.trim().orEmpty()
+        if (ytId.isBlank()) {
+            _uiState.update { state ->
+                state.copy(
+                    isSharedTrailerOverlayVisible = true,
+                    isSharedTrailerLoading = false,
+                    sharedTrailerUrl = null,
+                    sharedTrailerAudioUrl = null,
+                    sharedTrailerErrorMessage = localizedContext.getString(R.string.detail_trailer_error),
+                    selectedSharedTrailer = trailer
+                )
+            }
+            return
+        }
+
+        if (!AppFeaturePolicy.inAppTrailerPlaybackEnabled && AppFeaturePolicy.externalTrailerPlaybackEnabled) {
+            openExternalTrailer("https://www.youtube.com/watch?v=$ytId")
+            return
+        }
+
+        idleTimerJob?.cancel()
+        isPlayButtonFocused = false
+        if (_uiState.value.isTrailerPlaying) {
+            setTrailerPlaybackState(
+                isPlaying = false,
+                showControls = false,
+                hideLogo = false
+            )
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                isSharedTrailerOverlayVisible = true,
+                isSharedTrailerLoading = true,
+                sharedTrailerUrl = null,
+                sharedTrailerAudioUrl = null,
+                sharedTrailerErrorMessage = null,
+                selectedSharedTrailer = trailer
+            )
+        }
+
+        viewModelScope.launch {
+            val meta = _uiState.value.meta
+            val year = meta?.releaseInfo?.let { info ->
+                if (info.isBlank()) null else Regex("""\b(19|20)\d{2}\b""").find(info)?.value
+            }
+            val source = trailerService.getTrailerPlaybackSourceFromYouTubeUrl(
+                youtubeUrl = "https://www.youtube.com/watch?v=$ytId",
+                title = meta?.name,
+                year = year
+            )
+
+            _uiState.update { state ->
+                if (state.selectedSharedTrailer?.ytId != trailer.ytId) {
+                    state
+                } else {
+                    state.copy(
+                        isSharedTrailerOverlayVisible = true,
+                        isSharedTrailerLoading = false,
+                        sharedTrailerUrl = source?.videoUrl,
+                        sharedTrailerAudioUrl = source?.audioUrl,
+                        sharedTrailerErrorMessage = if (source == null) {
+                            localizedContext.getString(R.string.detail_trailer_error)
+                        } else {
+                            null
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    private fun openExternalTrailer(url: String) {
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+    }
+
+    private fun retrySharedTrailer() {
+        _uiState.value.selectedSharedTrailer?.let(::handleSharedTrailerSelected)
+    }
+
+    private fun dismissSharedTrailerOverlay() {
+        _uiState.update { state ->
+            state.copy(
+                isSharedTrailerOverlayVisible = false,
+                isSharedTrailerLoading = false,
+                sharedTrailerUrl = null,
+                sharedTrailerAudioUrl = null,
+                sharedTrailerErrorMessage = null
+            )
+        }
+    }
+
+    private fun mergeTrailers(existing: List<MetaTrailer>, incoming: List<MetaTrailer>): List<MetaTrailer> {
+        if (existing.isEmpty()) return incoming.distinctBy { it.ytId ?: it.name ?: it.type ?: "" }
+        if (incoming.isEmpty()) return existing
+
+        val merged = LinkedHashMap<String, MetaTrailer>()
+
+        fun keyOf(trailer: MetaTrailer): String {
+            val yt = trailer.ytId?.trim().orEmpty()
+            if (yt.isNotBlank()) return "yt:$yt"
+            val fallback = listOf(trailer.name, trailer.type, trailer.lang)
+                .joinToString("|") { it?.trim()?.lowercase().orEmpty() }
+            return "meta:$fallback"
+        }
+
+        existing.forEach { trailer -> merged.putIfAbsent(keyOf(trailer), trailer) }
+        incoming.forEach { trailer -> merged.putIfAbsent(keyOf(trailer), trailer) }
+        return merged.values.toList()
     }
 
     override fun onCleared() {

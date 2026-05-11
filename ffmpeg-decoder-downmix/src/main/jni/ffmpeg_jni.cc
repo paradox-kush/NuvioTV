@@ -470,13 +470,6 @@ int decodePacket(DecoderContext* decoderContext, AVPacket* packet,
       logError("swr_convert", convertedSamples);
       return AUDIO_DECODER_ERROR_INVALID_DATA;
     }
-    int available = swr_get_out_samples(decoderContext->resample_context, 0);
-    if (available != 0) {
-      LOGE("Expected no samples remaining after resampling, but found %d.",
-           available);
-      return AUDIO_DECODER_ERROR_INVALID_DATA;
-    }
-
     int writtenSize = outSampleSize * outputChannelCount * convertedSamples;
     outputBuffer += writtenSize;
     outSize += writtenSize;

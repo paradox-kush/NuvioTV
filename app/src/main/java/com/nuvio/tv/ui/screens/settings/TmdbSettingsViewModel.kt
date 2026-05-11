@@ -51,10 +51,12 @@ class TmdbSettingsViewModel @Inject constructor(
             is TmdbSettingsEvent.ToggleArtwork -> update { dataStore.setUseArtwork(event.enabled) }
             is TmdbSettingsEvent.ToggleBasicInfo -> update { dataStore.setUseBasicInfo(event.enabled) }
             is TmdbSettingsEvent.ToggleDetails -> update { dataStore.setUseDetails(event.enabled) }
+            is TmdbSettingsEvent.ToggleReleaseDates -> update { dataStore.setUseReleaseDates(event.enabled) }
             is TmdbSettingsEvent.ToggleCredits -> update { dataStore.setUseCredits(event.enabled) }
             is TmdbSettingsEvent.ToggleProductions -> update { dataStore.setUseProductions(event.enabled) }
             is TmdbSettingsEvent.ToggleNetworks -> update { dataStore.setUseNetworks(event.enabled) }
             is TmdbSettingsEvent.ToggleEpisodes -> update { dataStore.setUseEpisodes(event.enabled) }
+            is TmdbSettingsEvent.ToggleTrailers -> update { dataStore.setUseTrailers(event.enabled) }
             is TmdbSettingsEvent.ToggleMoreLikeThis -> update { dataStore.setUseMoreLikeThis(event.enabled) }
             is TmdbSettingsEvent.ToggleCollections -> update { dataStore.setUseCollections(event.enabled) }
         }
@@ -73,10 +75,12 @@ data class TmdbSettingsUiState(
     val useArtwork: Boolean = true,
     val useBasicInfo: Boolean = true,
     val useDetails: Boolean = true,
+    val useReleaseDates: Boolean = true,
     val useCredits: Boolean = true,
     val useProductions: Boolean = true,
     val useNetworks: Boolean = true,
     val useEpisodes: Boolean = true,
+    val useTrailers: Boolean = true,
     val useMoreLikeThis: Boolean = true,
     val useCollections: Boolean = true
 ) {
@@ -88,10 +92,12 @@ data class TmdbSettingsUiState(
         useArtwork = settings.useArtwork,
         useBasicInfo = settings.useBasicInfo,
         useDetails = settings.useDetails,
+        useReleaseDates = settings.useReleaseDates,
         useCredits = settings.useCredits,
         useProductions = settings.useProductions,
         useNetworks = settings.useNetworks,
         useEpisodes = settings.useEpisodes,
+        useTrailers = settings.useTrailers,
         useMoreLikeThis = settings.useMoreLikeThis,
         useCollections = settings.useCollections
     )
@@ -105,10 +111,12 @@ sealed class TmdbSettingsEvent {
     data class ToggleArtwork(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleBasicInfo(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleDetails(val enabled: Boolean) : TmdbSettingsEvent()
+    data class ToggleReleaseDates(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleCredits(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleProductions(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleNetworks(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleEpisodes(val enabled: Boolean) : TmdbSettingsEvent()
+    data class ToggleTrailers(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleMoreLikeThis(val enabled: Boolean) : TmdbSettingsEvent()
     data class ToggleCollections(val enabled: Boolean) : TmdbSettingsEvent()
 }

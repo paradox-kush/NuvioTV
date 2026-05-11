@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
@@ -88,6 +89,7 @@ import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Text
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
+import com.nuvio.tv.core.sync.SetProfilePinResult
 import com.nuvio.tv.data.remote.supabase.AvatarCatalogItem
 import com.nuvio.tv.domain.model.UserProfile
 import com.nuvio.tv.ui.components.AvatarPickerGrid
@@ -142,6 +144,7 @@ private sealed interface ProfilePinOverlayState {
     data class Set(override val profile: UserProfile, val currentPin: String? = null) : ProfilePinOverlayState
     data class VerifyCurrentForChange(override val profile: UserProfile) : ProfilePinOverlayState
     data class VerifyCurrentForRemove(override val profile: UserProfile) : ProfilePinOverlayState
+    data class VerifyCurrentForDelete(override val profile: UserProfile) : ProfilePinOverlayState
 }
 
 private enum class ProfilePinEntryStage {
@@ -161,6 +164,7 @@ fun ProfileSelectionScreen(
     onBackPress: (() -> Unit)? = null,
     viewModel: ProfileSelectionViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
     val profiles by viewModel.profiles.collectAsState()
     val activeProfileId by viewModel.activeProfileId.collectAsState()
     val avatarCatalog by viewModel.avatarCatalog.collectAsState()
@@ -293,13 +297,22 @@ fun ProfileSelectionScreen(
                                     activePinOverlay.profile.id,
                                     pin,
                                     activePinOverlay.currentPin
-                                ) { success ->
-                                    if (success) {
-                                        pinOverlayState = null
-                                        pinOverlayError = null
-                                        pinActionMessage = "PIN saved for ${activePinOverlay.profile.name}."
-                                    } else {
-                                        pinOverlayError = "Could not save PIN. Try again."
+                                ) { result ->
+                                    when (result) {
+                                        is SetProfilePinResult.Success -> {
+                                            pinOverlayState = null
+                                            pinOverlayError = null
+                                            pinActionMessage = "PIN saved for ${activePinOverlay.profile.name}."
+                                        }
+                                        is SetProfilePinResult.CurrentPinRequired -> {
+                                            pinOverlayState = ProfilePinOverlayState.VerifyCurrentForChange(
+                                                activePinOverlay.profile
+                                            )
+                                            pinOverlayError = context.getString(R.string.profile_pin_current_required)
+                                        }
+                                        is SetProfilePinResult.Failure -> {
+                                            pinOverlayError = context.getString(R.string.profile_pin_save_error)
+                                        }
                                     }
                                 }
                             }
@@ -316,13 +329,13 @@ fun ProfileSelectionScreen(
                                             )
                                         } else {
                                             pinOverlayError = if (verify.retryAfterSeconds > 0) {
-                                                "Profile is locked. Try again in ${verify.retryAfterSeconds}s."
+                                                context.getString(R.string.profile_pin_locked, verify.retryAfterSeconds)
                                             } else {
-                                                "Invalid PIN. Try again."
+                                                context.getString(R.string.profile_pin_invalid)
                                             }
                                         }
                                     }.onFailure {
-                                        pinOverlayError = "Could not verify PIN. Try again."
+                                        pinOverlayError = context.getString(R.string.profile_pin_verify_error)
                                     }
                                 }
                             }
@@ -338,13 +351,13 @@ fun ProfileSelectionScreen(
                                             )
                                         } else {
                                             pinOverlayError = if (verify.retryAfterSeconds > 0) {
-                                                "Profile is locked. Try again in ${verify.retryAfterSeconds}s."
+                                                context.getString(R.string.profile_pin_locked, verify.retryAfterSeconds)
                                             } else {
-                                                "Current PIN is incorrect."
+                                                context.getString(R.string.profile_pin_incorrect)
                                             }
                                         }
                                     }.onFailure {
-                                        pinOverlayError = "Could not verify PIN. Try again."
+                                        pinOverlayError = context.getString(R.string.profile_pin_verify_error)
                                     }
                                 }
                             }
@@ -359,7 +372,27 @@ fun ProfileSelectionScreen(
                                         pinOverlayState = null
                                         pinActionMessage = "PIN lock removed for ${activePinOverlay.profile.name}."
                                     } else {
-                                        pinOverlayError = "Current PIN is incorrect."
+                                        pinOverlayError = context.getString(R.string.profile_pin_incorrect)
+                                    }
+                                }
+                            }
+
+                            is ProfilePinOverlayState.VerifyCurrentForDelete -> {
+                                viewModel.verifyProfilePin(activePinOverlay.profile.id, pin) { result ->
+                                    result.onSuccess { verify ->
+                                        if (verify.unlocked) {
+                                            pinOverlayError = null
+                                            pinOverlayState = null
+                                            profileToDelete = activePinOverlay.profile
+                                        } else {
+                                            pinOverlayError = if (verify.retryAfterSeconds > 0) {
+                                                context.getString(R.string.profile_pin_locked, verify.retryAfterSeconds)
+                                            } else {
+                                                context.getString(R.string.profile_pin_incorrect)
+                                            }
+                                        }
+                                    }.onFailure {
+                                        pinOverlayError = context.getString(R.string.profile_pin_verify_error)
                                     }
                                 }
                             }
@@ -512,7 +545,12 @@ fun ProfileSelectionScreen(
                     Button(
                         onClick = {
                             longPressedProfile = null
-                            profileToDelete = profile
+                            if (profilePinEnabled[profile.id] == true) {
+                                pinOverlayError = null
+                                pinOverlayState = ProfilePinOverlayState.VerifyCurrentForDelete(profile)
+                            } else {
+                                profileToDelete = profile
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.colors(
@@ -626,7 +664,7 @@ private fun ProfileSelectionMainContent(
     ) {
         Image(
             painter = painterResource(id = R.drawable.app_logo_wordmark),
-            contentDescription = "NuvioTV",
+            contentDescription = stringResource(R.string.cd_nuvio_logo),
             modifier = Modifier
                 .width(ProfileSelectionSpacing.LogoWidth)
                 .height(ProfileSelectionSpacing.LogoHeight),
@@ -728,7 +766,8 @@ private fun ProfileGrid(
                 profiles.forEachIndexed { index, profile ->
                     ProfileCard(
                         profile = profile,
-                        avatarImageUrl = profile.avatarId?.let(avatarImageUrlsById::get),
+                        avatarImageUrl = profile.avatarUrl?.takeIf { it.isNotBlank() }
+                            ?: profile.avatarId?.let(avatarImageUrlsById::get),
                         focusRequester = focusRequesters[index],
                         onFocused = { onProfileFocused(profile.avatarColorHex) },
                         onClick = { onProfileSelected(profile) },
@@ -1174,6 +1213,15 @@ private fun CreateProfileOverlay(
                         textAlign = TextAlign.Center
                     )
 
+                    Text(
+                        text = stringResource(R.string.profile_custom_avatar_web_panel_note),
+                        modifier = Modifier.fillMaxWidth(),
+                        color = NuvioColors.TextTertiary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+
                     if (avatarCatalog.isNotEmpty()) {
                         AvatarPickerGrid(
                             avatars = avatarCatalog,
@@ -1315,9 +1363,11 @@ private fun EditProfileOverlay(
     val selectedAvatar = remember(avatarCatalog, selectedAvatarId) {
         avatarCatalog.find { it.id == selectedAvatarId }
     }
+    val hasChangedAvatarSelection = selectedAvatarId != profile.avatarId
     val previewAvatarImageUrl = when {
         selectedAvatar != null -> selectedAvatar.imageUrl
-        selectedAvatarId == profile.avatarId -> avatarUrlResolver(profile.avatarId)
+        !hasChangedAvatarSelection -> profile.avatarUrl?.takeIf { it.isNotBlank() }
+            ?: avatarUrlResolver(profile.avatarId)
         else -> null
     }
     val nameFocusRequester = remember { FocusRequester() }
@@ -1374,7 +1424,7 @@ private fun EditProfileOverlay(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Edit Profile",
+                        text = stringResource(R.string.profile_edit_header),
                         color = NuvioColors.TextSecondary,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -1396,7 +1446,8 @@ private fun EditProfileOverlay(
                             profile.copy(
                                 name = profileName,
                                 avatarColorHex = selectedColorHex,
-                                avatarId = selectedAvatarId
+                                avatarId = selectedAvatarId,
+                                avatarUrl = if (hasChangedAvatarSelection) null else profile.avatarUrl
                             )
                         )
                     }
@@ -1462,6 +1513,15 @@ private fun EditProfileOverlay(
                         modifier = Modifier.fillMaxWidth(),
                         color = NuvioColors.TextSecondary,
                         fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = stringResource(R.string.profile_custom_avatar_web_panel_note),
+                        modifier = Modifier.fillMaxWidth(),
+                        color = NuvioColors.TextTertiary,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
                     )
@@ -1634,8 +1694,12 @@ private fun ProfilePinOverlay(
 
     LaunchedEffect(pin, entryStage, isWorking) {
         if (pin.length != ProfilePinLength || isWorking) return@LaunchedEffect
+        // Clear pin before dispatching so the effect can't re-trigger with the
+        // same input after isWorking flips back to false at the end of the RPC.
         if (isSingleEntryMode) {
-            onSubmit(pin)
+            val submitted = pin
+            pin = ""
+            onSubmit(submitted)
         } else {
             if (entryStage == ProfilePinEntryStage.Create) {
                 draftPin = pin
@@ -1643,7 +1707,9 @@ private fun ProfilePinOverlay(
                 internalErrorMessage = null
                 entryStage = ProfilePinEntryStage.Confirm
             } else if (draftPin == pin) {
-                onSubmit(pin)
+                val submitted = pin
+                pin = ""
+                onSubmit(submitted)
             } else {
                 pin = ""
                 draftPin = null
@@ -1707,6 +1773,7 @@ private fun ProfilePinOverlay(
             state is ProfilePinOverlayState.Unlock -> stringResource(R.string.profile_pin_overlay_unlock_heading, state.profile.name)
             state is ProfilePinOverlayState.VerifyCurrentForChange -> stringResource(R.string.profile_pin_overlay_change_verify_heading, state.profile.name)
             state is ProfilePinOverlayState.VerifyCurrentForRemove -> stringResource(R.string.profile_pin_overlay_remove_verify_heading, state.profile.name)
+            state is ProfilePinOverlayState.VerifyCurrentForDelete -> stringResource(R.string.profile_pin_overlay_delete_verify_heading, state.profile.name)
             entryStage == ProfilePinEntryStage.Confirm -> stringResource(R.string.profile_pin_overlay_confirm_heading)
             else -> stringResource(R.string.profile_pin_overlay_set_heading, state.profile.name)
         }
@@ -1717,6 +1784,7 @@ private fun ProfilePinOverlay(
             state is ProfilePinOverlayState.Unlock -> stringResource(R.string.profile_pin_overlay_unlock_support)
             state is ProfilePinOverlayState.VerifyCurrentForChange -> stringResource(R.string.profile_pin_overlay_change_verify_support)
             state is ProfilePinOverlayState.VerifyCurrentForRemove -> stringResource(R.string.profile_pin_overlay_remove_verify_support)
+            state is ProfilePinOverlayState.VerifyCurrentForDelete -> stringResource(R.string.profile_pin_overlay_delete_verify_support)
             entryStage == ProfilePinEntryStage.Confirm -> stringResource(R.string.profile_pin_overlay_confirm_support)
             else -> stringResource(R.string.profile_pin_overlay_set_support)
         }
@@ -1774,7 +1842,8 @@ private fun ProfilePinOverlay(
 
             if (state is ProfilePinOverlayState.Unlock ||
                 state is ProfilePinOverlayState.VerifyCurrentForChange ||
-                state is ProfilePinOverlayState.VerifyCurrentForRemove
+                state is ProfilePinOverlayState.VerifyCurrentForRemove ||
+                state is ProfilePinOverlayState.VerifyCurrentForDelete
             ) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(

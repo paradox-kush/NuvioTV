@@ -102,7 +102,22 @@ class StreamRepositoryImpl @Inject constructor(
                                             )
                                         )
                                     } else {
-                                        attemptedFailures += buildMissingStreamFailure(addon)
+                                        // Stream endpoint returned empty - try inline
+                                        // streams from meta response as fallback.
+                                        val inlineStreams = fetchInlineStreamsFromMeta(
+                                            addon, type, videoId
+                                        )
+                                        if (inlineStreams.isNotEmpty()) {
+                                            resultChannel.send(
+                                                AddonStreams(
+                                                    addonName = addon.displayName,
+                                                    addonLogo = addon.logo,
+                                                    streams = inlineStreams
+                                                )
+                                            )
+                                        } else {
+                                            attemptedFailures += buildMissingStreamFailure(addon)
+                                        }
                                     }
                                 }
                                 is NetworkResult.Error -> {
@@ -226,19 +241,18 @@ class StreamRepositoryImpl @Inject constructor(
                             val baseName = result.name?.takeIf { it.isNotBlank() }
                             val quality = result.quality?.takeIf { it.isNotBlank() }
 
-                            val displayTitle = buildString {
-                                append(baseTitle ?: baseName ?: scraperName)
-                                if (!quality.isNullOrBlank() && !(baseTitle ?: "").contains(quality)) {
-                                    append(" ").append(quality)
+                            // Only show quality in the name field as "Name - resolution"
+                            val qualityLabel = quality ?: "Unknown"
+                            val displayName = buildString {
+                                append(baseName ?: baseTitle ?: scraperName)
+                                if (!toString().contains(qualityLabel)) {
+                                    append(" - ").append(qualityLabel)
                                 }
                             }.takeIf { it.isNotBlank() }
 
-                            val displayName = buildString {
-                                append(baseName ?: baseTitle ?: scraperName)
-                                if (!quality.isNullOrBlank() && !(baseName ?: "").contains(quality)) {
-                                    append(" - ").append(quality)
-                                }
-                            }.takeIf { it.isNotBlank() }
+                            // Title stays clean — no quality appended
+                            val displayTitle = (baseTitle ?: baseName ?: scraperName)
+                                .takeIf { it.isNotBlank() }
 
                             Stream(
                                 name = displayName,
@@ -258,7 +272,9 @@ class StreamRepositoryImpl @Inject constructor(
                                 infoHash = result.infoHash,
                                 fileIdx = null,
                                 ytId = null,
-                                externalUrl = null
+                                externalUrl = null,
+                                quality = quality,
+                                qualityValue = parseQualityValue(quality)
                             )
                         }
                     )
@@ -278,11 +294,25 @@ class StreamRepositoryImpl @Inject constructor(
      * Build a description string from scraper result
      */
     private fun buildDescription(result: com.nuvio.tv.domain.model.LocalScraperResult): String? {
+        // Quality is shown in the stream name — only show size/language in description
         val parts = mutableListOf<String>()
-        result.quality?.let { parts.add(it) }
         result.size?.let { parts.add(it) }
         result.language?.let { parts.add(it) }
         return if (parts.isNotEmpty()) parts.joinToString(" • ") else null
+    }
+
+    private fun parseQualityValue(quality: String?): Int {
+        if (quality == null) return -1
+        val lower = quality.lowercase()
+        return when {
+            lower.contains("4k") || lower.contains("2160") -> 2160
+            lower.contains("1080") -> 1080
+            lower.contains("800") -> 800
+            lower.contains("720") -> 720
+            lower.contains("480") -> 480
+            lower.contains("360") -> 360
+            else -> -1
+        }
     }
 
     override suspend fun getStreamsFromAddon(
@@ -291,9 +321,12 @@ class StreamRepositoryImpl @Inject constructor(
         videoId: String
     ): NetworkResult<List<Stream>> {
         val cleanBaseUrl = baseUrl.trimEnd('/')
+        val queryStart = cleanBaseUrl.indexOf('?')
+        val basePath = if (queryStart >= 0) cleanBaseUrl.substring(0, queryStart).trimEnd('/') else cleanBaseUrl
+        val baseQuery = if (queryStart >= 0) cleanBaseUrl.substring(queryStart) else ""
         val encodedType = encodePathSegment(type)
         val encodedVideoId = encodePathSegment(videoId)
-        val streamUrl = "$cleanBaseUrl/stream/$encodedType/$encodedVideoId.json"
+        val streamUrl = "$basePath/stream/$encodedType/$encodedVideoId.json$baseQuery"
         Log.d(TAG, "Fetching streams type=$type videoId=$videoId url=$streamUrl")
 
         // First, get addon info for name and logo
@@ -333,6 +366,58 @@ class StreamRepositoryImpl @Inject constructor(
         return resources.any { resource ->
             resource.name == "stream" && 
             (resource.types.isEmpty() || resource.types.contains(type))
+        }
+    }
+
+    /**
+     * Fetch meta for the given content and extract inline streams from the
+     * matching video entry.  Returns an empty list when the addon doesn't
+     * support meta or the video has no inline streams.
+     */
+    private suspend fun fetchInlineStreamsFromMeta(
+        addon: Addon,
+        type: String,
+        videoId: String
+    ): List<Stream> {
+        // For inline streams the meta is fetched using the content-level ID
+        // (everything before the video-specific suffix).  For "other" type
+        // the videoId IS the content ID; for series it is contentId:S:E.
+        val contentId = videoId.substringBefore(":")
+            .takeIf { it.isNotBlank() }
+            ?: videoId
+        // Reconstruct a content-level ID that keeps the addon-specific prefix.
+        // e.g. "realdebrid:ABC:3" → "realdebrid:ABC"
+        val metaId = run {
+            val parts = videoId.split(":")
+            // Drop trailing numeric segment(s) that represent video index
+            val contentParts = parts.dropLastWhile { it.toIntOrNull() != null }
+            if (contentParts.isNotEmpty()) contentParts.joinToString(":") else videoId
+        }
+        val cleanBaseUrl = addon.baseUrl.trimEnd('/')
+        val queryStart = cleanBaseUrl.indexOf('?')
+        val basePath = if (queryStart >= 0) cleanBaseUrl.substring(0, queryStart).trimEnd('/') else cleanBaseUrl
+        val baseQuery = if (queryStart >= 0) cleanBaseUrl.substring(queryStart) else ""
+        val encodedType = encodePathSegment(type)
+        val encodedMetaId = encodePathSegment(metaId)
+        val metaUrl = "$basePath/meta/$encodedType/$encodedMetaId.json$baseQuery"
+        Log.d(TAG, "Fetching inline streams via meta type=$type metaId=$metaId videoId=$videoId url=$metaUrl")
+        return try {
+            when (val result = safeApiCall { api.getMeta(metaUrl) }) {
+                is NetworkResult.Success -> {
+                    val metaDto = result.data.meta ?: return emptyList()
+                    val matchingVideo = metaDto.videos?.firstOrNull { it.id == videoId }
+                    val streams = matchingVideo?.streams
+                        ?.mapNotNull { it.toDomain(addon.displayName, addon.logo) }
+                        ?: emptyList()
+                    Log.d(TAG, "Inline streams from meta: addon=${addon.displayName} videoId=$videoId found=${streams.size}")
+                    streams
+                }
+                else -> emptyList()
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            Log.w(TAG, "Failed to fetch inline streams from meta for ${addon.displayName}: ${e.message}")
+            emptyList()
         }
     }
 

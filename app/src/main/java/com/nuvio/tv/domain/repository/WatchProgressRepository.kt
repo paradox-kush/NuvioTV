@@ -44,10 +44,21 @@ interface WatchProgressRepository {
     fun observeNextUpSeeds(): Flow<List<WatchProgress>>
 
     /**
+     * Emits true when the remote progress source has completed its initial load.
+     */
+    fun observeRemoteProgressLoaded(): Flow<Boolean>
+
+    /**
      * Emits immediate optimistic updates that should patch Continue Watching
      * without waiting for the regular progress flows to settle.
      */
     fun observeOptimisticContinueWatchingUpdates(): Flow<WatchProgress>
+
+    /**
+     * Remap a Trakt episode seed to addon numbering (for anime with different season structure).
+     * Returns the remapped progress or the original if no remapping is needed.
+     */
+    suspend fun remapEpisodeSeed(progress: WatchProgress): WatchProgress
 
 
     /**
@@ -57,6 +68,18 @@ interface WatchProgressRepository {
     fun isWatched(contentId: String, videoId: String? = null, season: Int? = null, episode: Int? = null): Flow<Boolean>
     
     fun observeWatchedMovieIds(): Flow<Set<String>>
+
+    /**
+     * Returns per-show watched episodes from the active source.
+     * Empty map when no data is available.
+     */
+    suspend fun getWatchedShowEpisodes(): Map<String, Set<Pair<Int, Int>>>
+
+    /**
+     * Returns sibling ID mapping: each content ID maps to its alternate IDs
+     * from the same show (e.g. IMDB ↔ TMDB). Empty map for non-Trakt sources.
+     */
+    suspend fun getShowIdSiblings(): Map<String, Set<String>>
 
     /**
      * Save or update watch progress
@@ -82,9 +105,34 @@ interface WatchProgressRepository {
      * Mark content as completed
      */
     suspend fun markAsCompleted(progress: WatchProgress)
+
+    /**
+     * Mark multiple episodes as completed in a single batch operation.
+     * More efficient than calling [markAsCompleted] in a loop.
+     */
+    suspend fun markAsCompletedBatch(progressList: List<WatchProgress>)
+
+    /**
+     * Remove multiple episodes from history in a single batch operation.
+     */
+    suspend fun removeFromHistoryBatch(
+        contentId: String,
+        videoId: String?,
+        episodes: List<Pair<Int, Int>>
+    )
     
     /**
      * Clear all watch progress
      */
     suspend fun clearAll()
+
+    /**
+     * Returns true if the show is dropped/hidden from progress on the active source.
+     */
+    fun isDroppedShow(contentId: String): Boolean
+
+    /**
+     * Returns true if Trakt is both configured AND authenticated as the active progress source.
+     */
+    suspend fun isTraktProgressActive(): Boolean
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -53,6 +54,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.nuvio.tv.core.build.AppFeaturePolicy
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
 import com.nuvio.tv.ui.components.ClassicLayoutPreview
@@ -79,6 +81,7 @@ private enum class LayoutSettingsSection {
     HOME_LAYOUT,
     HOME_CONTENT,
     DETAIL_PAGE,
+    CONTINUE_WATCHING,
     FOCUSED_POSTER,
     POSTER_CARD_STYLE
 }
@@ -86,19 +89,22 @@ private enum class LayoutSettingsSection {
 @Composable
 fun LayoutSettingsContent(
     viewModel: LayoutSettingsViewModel = hiltViewModel(),
-    initialFocusRequester: FocusRequester? = null
+    initialFocusRequester: FocusRequester? = null,
+    essentialMode: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var homeLayoutExpanded by rememberSaveable { mutableStateOf(false) }
+    var homeLayoutExpanded by rememberSaveable(essentialMode) { mutableStateOf(essentialMode) }
     var homeContentExpanded by rememberSaveable { mutableStateOf(false) }
     var detailPageExpanded by rememberSaveable { mutableStateOf(false) }
+    var continueWatchingExpanded by rememberSaveable { mutableStateOf(false) }
     var focusedPosterExpanded by rememberSaveable { mutableStateOf(false) }
     var posterCardStyleExpanded by rememberSaveable { mutableStateOf(false) }
 
     val defaultHomeLayoutHeaderFocus = remember { FocusRequester() }
     val homeContentHeaderFocus = remember { FocusRequester() }
     val detailPageHeaderFocus = remember { FocusRequester() }
+    val continueWatchingHeaderFocus = remember { FocusRequester() }
     val focusedPosterHeaderFocus = remember { FocusRequester() }
     val posterCardStyleHeaderFocus = remember { FocusRequester() }
     val homeLayoutHeaderFocus = initialFocusRequester ?: defaultHomeLayoutHeaderFocus
@@ -121,6 +127,11 @@ fun LayoutSettingsContent(
             detailPageHeaderFocus.requestFocus()
         }
     }
+    LaunchedEffect(continueWatchingExpanded, focusedSection) {
+        if (!continueWatchingExpanded && focusedSection == LayoutSettingsSection.CONTINUE_WATCHING) {
+            continueWatchingHeaderFocus.requestFocus()
+        }
+    }
     LaunchedEffect(focusedPosterExpanded, focusedSection) {
         if (!focusedPosterExpanded && focusedSection == LayoutSettingsSection.FOCUSED_POSTER) {
             focusedPosterHeaderFocus.requestFocus()
@@ -138,7 +149,9 @@ fun LayoutSettingsContent(
     ) {
         SettingsDetailHeader(
             title = stringResource(R.string.layout_title),
-            subtitle = stringResource(R.string.layout_subtitle)
+            subtitle = stringResource(
+                if (essentialMode) R.string.layout_selection_subtitle else R.string.layout_subtitle
+            )
         )
 
         SettingsGroupCard(
@@ -146,10 +159,11 @@ fun LayoutSettingsContent(
                 .fillMaxWidth()
                 .weight(1f)
         ) {
+        val layoutListState = rememberLazyListState()
+        Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            state = layoutListState,
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -223,6 +237,34 @@ fun LayoutSettingsContent(
                         )
                     }
 
+                    if (uiState.selectedLayout == HomeLayout.MODERN) {
+                        CompactToggleRow(
+                            title = stringResource(R.string.layout_fullscreen_hero_backdrop),
+                            subtitle = stringResource(R.string.layout_fullscreen_hero_backdrop_sub),
+                            checked = uiState.modernHeroFullScreenBackdropEnabled,
+                            onToggle = {
+                                viewModel.onEvent(
+                                    LayoutSettingsEvent.SetModernHeroFullScreenBackdropEnabled(!uiState.modernHeroFullScreenBackdropEnabled)
+                                )
+                            },
+                            onFocused = { focusedSection = LayoutSettingsSection.HOME_LAYOUT }
+                        )
+                    }
+
+                    if (uiState.selectedLayout == HomeLayout.CLASSIC) {
+                        CompactToggleRow(
+                            title = stringResource(R.string.layout_classic_focus_gradient),
+                            subtitle = stringResource(R.string.layout_classic_focus_gradient_sub),
+                            checked = uiState.classicFocusGradientEnabled,
+                            onToggle = {
+                                viewModel.onEvent(
+                                    LayoutSettingsEvent.SetClassicFocusGradientEnabled(!uiState.classicFocusGradientEnabled)
+                                )
+                            },
+                            onFocused = { focusedSection = LayoutSettingsSection.HOME_LAYOUT }
+                        )
+                    }
+
                     if (uiState.heroSectionEnabled && uiState.availableCatalogs.isNotEmpty() && uiState.selectedLayout != HomeLayout.MODERN) {
                         Text(
                             text = stringResource(R.string.layout_hero_catalogs),
@@ -256,6 +298,7 @@ fun LayoutSettingsContent(
                 }
             }
 
+            if (!essentialMode) {
             item(key = "home_content_section") {
                 CollapsibleSectionCard(
                     title = stringResource(R.string.layout_section_content),
@@ -440,6 +483,67 @@ fun LayoutSettingsContent(
                 }
             }
 
+            item(key = "continue_watching_section") {
+                CollapsibleSectionCard(
+                    title = stringResource(R.string.layout_section_continue_watching),
+                    description = stringResource(R.string.layout_section_continue_watching_desc),
+                    expanded = continueWatchingExpanded,
+                    onToggle = { continueWatchingExpanded = !continueWatchingExpanded },
+                    focusRequester = continueWatchingHeaderFocus,
+                    onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
+                ) {
+                    CompactToggleRow(
+                        title = stringResource(R.string.layout_use_episode_thumbnails_cw),
+                        subtitle = stringResource(R.string.layout_use_episode_thumbnails_cw_sub),
+                        checked = uiState.useEpisodeThumbnailsInCw,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetUseEpisodeThumbnailsInCw(!uiState.useEpisodeThumbnailsInCw)
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
+                    )
+
+                    if (uiState.useEpisodeThumbnailsInCw) {
+                        CompactToggleRow(
+                            title = stringResource(R.string.layout_blur_cw_next_up),
+                            subtitle = stringResource(R.string.layout_blur_cw_next_up_sub),
+                            checked = uiState.blurContinueWatchingNextUp,
+                            onToggle = {
+                                viewModel.onEvent(
+                                    LayoutSettingsEvent.SetBlurContinueWatchingNextUp(!uiState.blurContinueWatchingNextUp)
+                                )
+                            },
+                            onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
+                        )
+                    }
+
+                    CompactToggleRow(
+                        title = stringResource(R.string.layout_next_up_furthest_episode),
+                        subtitle = stringResource(R.string.layout_next_up_furthest_episode_sub),
+                        checked = uiState.nextUpFromFurthestEpisode,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetNextUpFromFurthestEpisode(!uiState.nextUpFromFurthestEpisode)
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
+                    )
+
+                    CompactToggleRow(
+                        title = stringResource(R.string.layout_show_unaired_next_up),
+                        subtitle = stringResource(R.string.layout_show_unaired_next_up_sub),
+                        checked = uiState.showUnairedNextUp,
+                        onToggle = {
+                            viewModel.onEvent(
+                                LayoutSettingsEvent.SetShowUnairedNextUp(!uiState.showUnairedNextUp)
+                            )
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.CONTINUE_WATCHING }
+                    )
+                }
+            }
+
             if (uiState.selectedLayout != HomeLayout.GRID) {
             item(key = "focused_poster_section") {
                 CollapsibleSectionCard(
@@ -452,7 +556,8 @@ fun LayoutSettingsContent(
                 ) {
                     val isModern = uiState.selectedLayout == HomeLayout.MODERN
                     val isModernLandscape = isModern && uiState.modernLandscapePostersEnabled
-                    val showAutoplayRow = uiState.focusedPosterBackdropExpandEnabled || isModernLandscape
+                    val showAutoplayRow = AppFeaturePolicy.inAppTrailerPlaybackEnabled &&
+                        (uiState.focusedPosterBackdropExpandEnabled || isModernLandscape)
 
                     if (!isModernLandscape) {
                         CompactToggleRow(
@@ -577,6 +682,9 @@ fun LayoutSettingsContent(
                     )
                 }
             }
+            }
+        }
+        SettingsVerticalScrollIndicators(state = layoutListState)
         }
         }
     }

@@ -79,6 +79,7 @@ import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
 import com.nuvio.tv.ui.util.formatAddonTypeLabel
+import com.nuvio.tv.ui.util.localizedGenreLabel
 import kotlinx.coroutines.delay
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
@@ -93,6 +94,15 @@ private fun localizedTypeLabel(key: String): String = when (key.lowercase()) {
     else -> formatAddonTypeLabel(key)
 }
 
+@Composable
+private fun LibraryListTab.localizedTitle(): String {
+    return if (type == LibraryListTab.Type.WATCHLIST) {
+        stringResource(R.string.library_watchlist)
+    } else {
+        title
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun LibraryScreen(
@@ -101,6 +111,8 @@ fun LibraryScreen(
     onNavigateToDetail: (String, String, String?) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val watchedMovieIds by viewModel.watchedMovieIds.collectAsState()
+    val watchedSeriesIds by viewModel.watchedSeriesIds.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var expandedPicker by remember { mutableStateOf<String?>(null) }
     val primaryFocusRequester = remember { FocusRequester() }
@@ -234,7 +246,11 @@ fun LibraryScreen(
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = if (uiState.sourceMode == LibrarySourceMode.TRAKT) "TRAKT" else stringResource(R.string.library_source_local),
+                    text = when {
+                        uiState.sourceMode == LibrarySourceMode.TRAKT -> "TRAKT"
+                        uiState.isNuvioAccount -> "NUVIO"
+                        else -> stringResource(R.string.library_source_local)
+                    },
                     style = MaterialTheme.typography.labelLarge,
                     color = if (showBuiltInHeader) NuvioColors.TextTertiary else Color.Transparent,
                     fontWeight = FontWeight.Medium,
@@ -249,9 +265,13 @@ fun LibraryScreen(
                 listTabs = uiState.listTabs,
                 typeTabs = uiState.availableTypeTabs,
                 sortOptions = uiState.availableSortOptions,
+                genres = uiState.availableGenres,
+                years = uiState.availableYears,
                 selectedListKey = uiState.selectedListKey,
                 selectedTypeTab = uiState.selectedTypeTab,
                 selectedSortOption = uiState.selectedSortOption,
+                selectedGenre = uiState.selectedGenre,
+                selectedYear = uiState.selectedYear,
                 primaryFocusRequester = primaryFocusRequester,
                 expandedPicker = expandedPicker,
                 onExpandedChange = { picker, shouldExpand ->
@@ -268,11 +288,19 @@ fun LibraryScreen(
                 onSelectSort = { sort ->
                     viewModel.onSelectSortOption(sort)
                     expandedPicker = null
+                },
+                onSelectGenre = { key ->
+                    viewModel.onSelectGenre(key)
+                    expandedPicker = null
+                },
+                onSelectYear = { key ->
+                    viewModel.onSelectYear(key)
+                    expandedPicker = null
                 }
             )
         }
 
-        if (uiState.sourceMode == LibrarySourceMode.TRAKT) {
+        if (uiState.sourceMode == LibrarySourceMode.TRAKT && uiState.isTraktAuthenticated) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 LibraryActionsRow(
                     pending = uiState.pendingOperation,
@@ -286,13 +314,15 @@ fun LibraryScreen(
         if (uiState.visibleItems.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 val selectedTypeLabel = uiState.selectedTypeTab?.let { localizedTypeLabel(it.key) }?.lowercase() ?: stringResource(R.string.library_type_items)
-                val title = when (uiState.sourceMode) {
-                    LibrarySourceMode.LOCAL -> stringResource(R.string.library_empty_local_title, selectedTypeLabel)
-                    LibrarySourceMode.TRAKT -> stringResource(R.string.library_empty_trakt_title, selectedTypeLabel)
+                val title = when {
+                    uiState.sourceMode == LibrarySourceMode.TRAKT && !uiState.isTraktAuthenticated -> stringResource(R.string.library_empty_trakt_not_auth_title)
+                    uiState.sourceMode == LibrarySourceMode.TRAKT -> stringResource(R.string.library_empty_trakt_title, selectedTypeLabel)
+                    else -> stringResource(R.string.library_empty_local_title, selectedTypeLabel)
                 }
-                val subtitle = when (uiState.sourceMode) {
-                    LibrarySourceMode.LOCAL -> stringResource(R.string.library_empty_local_subtitle)
-                    LibrarySourceMode.TRAKT -> stringResource(R.string.library_empty_trakt_subtitle)
+                val subtitle = when {
+                    uiState.sourceMode == LibrarySourceMode.TRAKT && !uiState.isTraktAuthenticated -> stringResource(R.string.library_empty_trakt_not_auth_subtitle)
+                    uiState.sourceMode == LibrarySourceMode.TRAKT -> stringResource(R.string.library_empty_trakt_subtitle)
+                    else -> stringResource(R.string.library_empty_local_subtitle)
                 }
                 EmptyScreenState(
                     title = title,
@@ -304,9 +334,14 @@ fun LibraryScreen(
 
         items(uiState.visibleItems, key = { "${it.type}:${it.id}" }) { item ->
             val focusKey = "${item.type}:${item.id}"
+            val isSeries = item.type.equals("series", ignoreCase = true) || item.type.equals("tv", ignoreCase = true)
+            val previewForLongPress = remember(item) {
+                item.toMetaPreview().copy(posterShape = PosterShape.POSTER)
+            }
             GridContentCard(
-                item = item.toMetaPreview().copy(posterShape = PosterShape.POSTER),
+                item = previewForLongPress,
                 posterCardStyle = posterCardStyle,
+                isWatched = if (isSeries) item.id in watchedSeriesIds else item.id in watchedMovieIds,
                 focusRequester = posterFocusRequesters[focusKey],
                 showLabel = true,
                 onFocused = {
@@ -315,6 +350,10 @@ fun LibraryScreen(
                 onClick = {
                     lastFocusedPosterKey = focusKey
                     onNavigateToDetail(item.id, item.type, item.addonBaseUrl)
+                },
+                onLongPress = {
+                    lastFocusedPosterKey = focusKey
+                    viewModel.posterOptions.show(previewForLongPress, item.addonBaseUrl)
                 }
             )
         }
@@ -380,6 +419,15 @@ fun LibraryScreen(
             )
         }
     }
+
+    val posterOptionsState by viewModel.posterOptions.state.collectAsState()
+    com.nuvio.tv.ui.components.posteroptions.PosterOptionsHost(
+        state = posterOptionsState,
+        controller = viewModel.posterOptions,
+        onNavigateToDetail = { id, type, addonBaseUrl ->
+            onNavigateToDetail(id, type, addonBaseUrl.takeIf { it.isNotBlank() })
+        }
+    )
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -389,72 +437,138 @@ private fun LibrarySelectorsRow(
     listTabs: List<LibraryListTab>,
     typeTabs: List<LibraryTypeTab>,
     sortOptions: List<LibrarySortOption>,
+    genres: List<FilterOption>,
+    years: List<FilterOption>,
     selectedListKey: String?,
     selectedTypeTab: LibraryTypeTab?,
     selectedSortOption: LibrarySortOption,
+    selectedGenre: String?,
+    selectedYear: String?,
     primaryFocusRequester: FocusRequester,
     expandedPicker: String?,
     onExpandedChange: (String, Boolean) -> Unit,
     onSelectList: (String) -> Unit,
     onSelectType: (LibraryTypeTab) -> Unit,
-    onSelectSort: (LibrarySortOption) -> Unit
+    onSelectSort: (LibrarySortOption) -> Unit,
+    onSelectGenre: (String?) -> Unit,
+    onSelectYear: (String?) -> Unit
 ) {
-    val selectedListLabel = listTabs.firstOrNull { it.key == selectedListKey }?.title ?: "Select"
-    val selectedTypeLabel = selectedTypeTab?.let { localizedTypeLabel(it.key) } ?: stringResource(R.string.library_type_all)
+    val selectedListLabel = listTabs.firstOrNull { it.key == selectedListKey }?.localizedTitle()
+        ?: stringResource(R.string.action_select)
+    val selectedTypeLabel = selectedTypeTab?.let {
+        if (it.key == LibraryTypeTab.ALL_KEY) stringResource(R.string.library_type_all) else localizedTypeLabel(it.key)
+    } ?: stringResource(R.string.library_type_all)
     val selectedSortLabel = stringResource(selectedSortOption.labelResId)
+    val allLabel = stringResource(R.string.library_type_all)
+    val selectedGenreLabel = selectedGenre?.let { localizedGenreLabel(it) } ?: allLabel
+    val selectedYearLabel = selectedYear ?: allLabel
 
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (sourceMode == LibrarySourceMode.TRAKT) {
-            LibraryDropdownPicker(
-                modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(primaryFocusRequester),
-                title = stringResource(R.string.library_filter_list),
-                value = selectedListLabel,
-                selectedValue = selectedListKey,
-                expanded = expandedPicker == "list",
-                options = listTabs.map { LibraryOption(it.title, it.key) },
-                onExpandedChange = { onExpandedChange("list", it) },
-                onSelect = { onSelectList(it.value) }
-            )
-        }
-
-        LibraryDropdownPicker(
-            modifier = if (sourceMode == LibrarySourceMode.TRAKT) {
-                Modifier.weight(1f)
-            } else {
-                Modifier
-                    .width(420.dp)
-                    .focusRequester(primaryFocusRequester)
-            },
-            title = stringResource(R.string.library_filter_type),
-            value = selectedTypeLabel,
-            selectedValue = selectedTypeTab?.key,
-            expanded = expandedPicker == "type",
-            options = typeTabs.map { LibraryOption(localizedTypeLabel(it.key), it.key) },
-            onExpandedChange = { onExpandedChange("type", it) },
-            onSelect = { option ->
-                typeTabs.firstOrNull { it.key == option.value }?.let(onSelectType)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (sourceMode == LibrarySourceMode.TRAKT) {
+                LibraryDropdownPicker(
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(primaryFocusRequester),
+                    title = stringResource(R.string.library_filter_list),
+                    value = selectedListLabel,
+                    selectedValue = selectedListKey,
+                    expanded = expandedPicker == "list",
+                    options = listTabs.map { LibraryOption(it.localizedTitle(), it.key) },
+                    onExpandedChange = { onExpandedChange("list", it) },
+                    onSelect = { onSelectList(it.value) }
+                )
             }
-        )
 
-        if (sortOptions.isNotEmpty()) {
             LibraryDropdownPicker(
-                modifier = Modifier
-                    .weight(1f),
-                title = stringResource(R.string.library_filter_sort),
-                value = selectedSortLabel,
-                selectedValue = selectedSortOption.key,
-                expanded = expandedPicker == "sort",
-                options = sortOptions.map { LibraryOption(stringResource(it.labelResId), it.key) },
-                onExpandedChange = { onExpandedChange("sort", it) },
+                modifier = if (sourceMode == LibrarySourceMode.TRAKT) {
+                    Modifier.weight(1f)
+                } else {
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(primaryFocusRequester)
+                },
+                title = stringResource(R.string.library_filter_type),
+                value = selectedTypeLabel,
+                selectedValue = selectedTypeTab?.key,
+                expanded = expandedPicker == "type",
+                options = typeTabs.map {
+                    val label = if (it.key == LibraryTypeTab.ALL_KEY) it.label else {
+                        val countPart = it.label.substringAfterLast("(", "").removeSuffix(")")
+                        val localizedName = localizedTypeLabel(it.key)
+                        if (countPart.isNotBlank()) "$localizedName ($countPart)" else localizedName
+                    }
+                    LibraryOption(label, it.key)
+                },
+                onExpandedChange = { onExpandedChange("type", it) },
                 onSelect = { option ->
-                    sortOptions.firstOrNull { it.key == option.value }?.let(onSelectSort)
+                    typeTabs.firstOrNull { it.key == option.value }?.let(onSelectType)
                 }
             )
+
+            if (sortOptions.isNotEmpty()) {
+                LibraryDropdownPicker(
+                    modifier = Modifier.weight(1f),
+                    title = stringResource(R.string.library_filter_sort),
+                    value = selectedSortLabel,
+                    selectedValue = selectedSortOption.key,
+                    expanded = expandedPicker == "sort",
+                    options = sortOptions.map { LibraryOption(stringResource(it.labelResId), it.key) },
+                    onExpandedChange = { onExpandedChange("sort", it) },
+                    onSelect = { option ->
+                        sortOptions.firstOrNull { it.key == option.value }?.let(onSelectSort)
+                    }
+                )
+            }
+        }
+
+        if (genres.isNotEmpty() || years.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (genres.isNotEmpty()) {
+                    val genreAllOption = LibraryOption(allLabel, "__all__")
+                    LibraryDropdownPicker(
+                        modifier = Modifier.weight(1f),
+                        title = stringResource(R.string.library_filter_genre),
+                        value = selectedGenreLabel,
+                        selectedValue = selectedGenre ?: "__all__",
+                        expanded = expandedPicker == "genre",
+                        options = listOf(genreAllOption) + genres.map {
+                            LibraryOption("${localizedGenreLabel(it.label)} (${it.count})", it.key)
+                        },
+                        onExpandedChange = { onExpandedChange("genre", it) },
+                        onSelect = { option ->
+                            onSelectGenre(if (option.value == "__all__") null else option.value)
+                        }
+                    )
+                }
+
+                if (years.isNotEmpty()) {
+                    val yearAllOption = LibraryOption(allLabel, "__all__")
+                    LibraryDropdownPicker(
+                        modifier = Modifier.weight(1f),
+                        title = stringResource(R.string.library_filter_year),
+                        value = selectedYearLabel,
+                        selectedValue = selectedYear ?: "__all__",
+                        expanded = expandedPicker == "year",
+                        options = listOf(yearAllOption) + years.map {
+                            LibraryOption("${it.label} (${it.count})", it.key)
+                        },
+                        onExpandedChange = { onExpandedChange("year", it) },
+                        onSelect = { option ->
+                            onSelectYear(if (option.value == "__all__") null else option.value)
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -527,7 +641,7 @@ private fun LibraryDropdownPicker(
                     )
                     Icon(
                         imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (expanded) "Collapse $title" else "Expand $title",
+                        contentDescription = if (expanded) stringResource(R.string.cd_collapse, title) else stringResource(R.string.cd_expand, title),
                         tint = if (isFocused) NuvioColors.FocusRing else NuvioColors.TextSecondary
                     )
                 }
@@ -632,7 +746,7 @@ private fun LibraryActionsRow(
                 contentColor = NuvioColors.TextPrimary
             )
         ) {
-            Text(if (isSyncing) "Syncing..." else "Sync")
+            Text(if (isSyncing) stringResource(R.string.library_syncing_btn) else stringResource(R.string.library_sync_btn))
         }
     }
 }
@@ -718,7 +832,7 @@ private fun ManageListsDialog(
                                 )
                             ) {
                                 Text(
-                                    text = tab.title,
+                                    text = tab.localizedTitle(),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -815,7 +929,7 @@ private fun ListEditorDialog(
 
     NuvioDialog(
         onDismiss = onCancel,
-        title = if (state.mode == LibraryListEditorState.Mode.CREATE) "Create List" else "Edit List",
+        title = if (state.mode == LibraryListEditorState.Mode.CREATE) stringResource(R.string.library_list_create_dialog_title) else stringResource(R.string.library_list_edit_dialog_title),
         width = 560.dp
     ) {
         androidx.compose.material3.OutlinedTextField(
@@ -932,7 +1046,7 @@ private fun ListEditorDialog(
                 contentColor = NuvioColors.TextPrimary
             )
         ) {
-            Text(if (pending) "Saving..." else "Save")
+            Text(if (pending) stringResource(R.string.action_saving) else stringResource(R.string.action_save))
         }
     }
 }

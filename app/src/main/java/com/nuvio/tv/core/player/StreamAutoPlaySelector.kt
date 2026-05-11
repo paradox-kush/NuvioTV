@@ -1,5 +1,6 @@
 package com.nuvio.tv.core.player
 
+import com.nuvio.tv.core.build.AppFeaturePolicy
 import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
 import com.nuvio.tv.domain.model.AddonStreams
@@ -17,11 +18,8 @@ object StreamAutoPlaySelector {
         return orderedAddons + pluginEntries
     }
 
-    private fun resolvePlayableUrl(stream: Stream): String? {
-        val url = stream.getStreamUrl() ?: return null
-
-        return url
-    }
+    private fun isPlayable(stream: Stream): Boolean =
+        stream.getStreamUrl() != null || stream.isTorrent()
 
 
 
@@ -34,11 +32,18 @@ object StreamAutoPlaySelector {
         selectedAddons: Set<String>,
         selectedPlugins: Set<String>,
         preferredBingeGroup: String? = null,
-        preferBingeGroupInSelection: Boolean = false
+        preferBingeGroupInSelection: Boolean = false,
+        bingeGroupOnly: Boolean = false
     ): Stream? {
         if (streams.isEmpty()) return null
 
-        val sourceScopedStreams = when (source) {
+        val effectiveSource = if (!AppFeaturePolicy.pluginsEnabled && source == StreamAutoPlaySource.ENABLED_PLUGINS_ONLY) {
+            StreamAutoPlaySource.INSTALLED_ADDONS_ONLY
+        } else {
+            source
+        }
+
+        val sourceScopedStreams = when (effectiveSource) {
             StreamAutoPlaySource.ALL_SOURCES -> streams
             StreamAutoPlaySource.INSTALLED_ADDONS_ONLY -> streams.filter { it.addonName in installedAddonNames }
             StreamAutoPlaySource.ENABLED_PLUGINS_ONLY -> streams.filter { it.addonName !in installedAddonNames }
@@ -57,14 +62,18 @@ object StreamAutoPlaySelector {
         val targetBingeGroup = preferredBingeGroup?.trim().orEmpty()
         if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
             val bingeGroupMatch = candidateStreams.firstOrNull { stream ->
-                stream.behaviorHints?.bingeGroup == targetBingeGroup && stream.getStreamUrl() != null
+                stream.behaviorHints?.bingeGroup == targetBingeGroup && isPlayable(stream)
             }
             if (bingeGroupMatch != null) return bingeGroupMatch
+            // When bingeGroupOnly is set (MANUAL mode with only binge-group
+            // preference enabled), don't fall back to a non-matching stream —
+            // return null so the caller shows the stream picker instead.
+            if (bingeGroupOnly) return null
         }
 
         return when (mode) {
             StreamAutoPlayMode.MANUAL -> null
-            StreamAutoPlayMode.FIRST_STREAM -> candidateStreams.firstOrNull { it.getStreamUrl() != null }
+            StreamAutoPlayMode.FIRST_STREAM -> candidateStreams.firstOrNull { isPlayable(it) }
             StreamAutoPlayMode.REGEX_MATCH -> {
                 val pattern = regexPattern.trim()
  
@@ -87,14 +96,15 @@ object StreamAutoPlaySelector {
 
                 // 1. Build list of ALL regex‑matching streams
                 val matchingStreams = candidateStreams.filter { stream ->
-                    val url = stream.getStreamUrl() ?: return@filter false
+                    if (!isPlayable(stream)) return@filter false
 
                     val searchableText = buildString {
                         append(stream.addonName).append(' ')
                         append(stream.name.orEmpty()).append(' ')
                         append(stream.title.orEmpty()).append(' ')
                         append(stream.description.orEmpty()).append(' ')
-                        append(url)
+                        append(stream.getStreamUrl().orEmpty())
+                        if (stream.isTorrent()) append(' ').append(stream.infoHash.orEmpty())
                     }
 
                     // Must match include pattern
@@ -109,7 +119,7 @@ object StreamAutoPlaySelector {
                 }
 
                 if (matchingStreams.isEmpty()) return null
-                matchingStreams.firstOrNull { resolvePlayableUrl(it) != null }
+                matchingStreams.firstOrNull { isPlayable(it) }
             }
 
         }

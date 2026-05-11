@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.nuvio.tv.core.auth.AuthManager
 import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.data.local.ExperienceModeDataStore
 import com.nuvio.tv.data.local.ProfileDataStoreFactory
 import com.nuvio.tv.data.remote.supabase.SupabaseProfileSettingsBlob
 import io.github.jan.supabase.postgrest.Postgrest
@@ -54,6 +55,7 @@ private const val TAG = "ProfileSettingsSyncService"
 private const val SETTINGS_PUSH_DEBOUNCE_MS = 1500L
 private const val FOREGROUND_PULL_DELAY_MS = 2500L
 private const val FOREGROUND_PULL_MIN_INTERVAL_MS = 60_000L
+private const val SETTINGS_SYNC_PLATFORM = "tv"
 
 @Singleton
 class ProfileSettingsSyncService @Inject constructor(
@@ -74,12 +76,20 @@ class ProfileSettingsSyncService @Inject constructor(
     private val syncedFeatures = listOf(
         "theme_settings",
         "layout_settings",
+        ExperienceModeDataStore.FEATURE,
         "player_settings",
         "trailer_settings",
         "tmdb_settings",
         "mdblist_settings",
+        "trakt_settings",
         "animeskip_settings",
         "track_preference"
+    )
+
+    private val catalogKeysExcludedFromBlob = setOf(
+        "home_catalog_order_keys",
+        "disabled_home_catalog_keys",
+        "custom_catalog_titles"
     )
 
     init {
@@ -104,6 +114,7 @@ class ProfileSettingsSyncService @Inject constructor(
                 val params = buildJsonObject {
                     put("p_profile_id", profileId)
                     put("p_settings_json", settingsJson)
+                    put("p_platform", SETTINGS_SYNC_PLATFORM)
                 }
 
                 withJwtRefreshRetry {
@@ -125,6 +136,7 @@ class ProfileSettingsSyncService @Inject constructor(
                 val profileId = profileManager.activeProfileId.value
                 val params = buildJsonObject {
                     put("p_profile_id", profileId)
+                    put("p_platform", SETTINGS_SYNC_PLATFORM)
                 }
 
                 val response = withJwtRefreshRetry {
@@ -180,6 +192,7 @@ class ProfileSettingsSyncService @Inject constructor(
                 val prefs = profileDataStoreFactory.get(profileId, feature).data.first()
                 val serialized = buildJsonObject {
                     prefs.asMap().forEach { (key, rawValue) ->
+                        if (feature == "layout_settings" && key.name in catalogKeysExcludedFromBlob) return@forEach
                         val encoded = encodePreferenceValue(rawValue) ?: return@forEach
                         put(key.name, encoded)
                     }
@@ -200,9 +213,35 @@ class ProfileSettingsSyncService @Inject constructor(
             syncedFeatures.forEach { feature ->
                 val featureJson = featuresJson[feature]?.jsonObject ?: return@forEach
                 profileDataStoreFactory.get(profileId, feature).edit { mutablePrefs ->
+                    val preservedEntries = if (feature == "layout_settings") {
+                        val entries = mutableMapOf<Preferences.Key<*>, Any>()
+                        catalogKeysExcludedFromBlob.forEach { keyName ->
+                            val strKey = stringPreferencesKey(keyName)
+                            mutablePrefs[strKey]?.let { entries[strKey] = it }
+                            val boolKey = booleanPreferencesKey(keyName)
+                            mutablePrefs[boolKey]?.let { entries[boolKey] = it }
+                        }
+                        entries
+                    } else {
+                        emptyMap()
+                    }
+
                     mutablePrefs.clear()
                     featureJson.forEach { (keyName, encodedValue) ->
+                        if (feature == "layout_settings" && keyName in catalogKeysExcludedFromBlob) return@forEach
                         applyEncodedPreference(mutablePrefs, keyName, encodedValue)
+                    }
+
+                    @Suppress("UNCHECKED_CAST")
+                    preservedEntries.forEach { (key, value) ->
+                        when (value) {
+                            is String -> mutablePrefs[key as Preferences.Key<String>] = value
+                            is Boolean -> mutablePrefs[key as Preferences.Key<Boolean>] = value
+                            is Int -> mutablePrefs[key as Preferences.Key<Int>] = value
+                            is Long -> mutablePrefs[key as Preferences.Key<Long>] = value
+                            is Float -> mutablePrefs[key as Preferences.Key<Float>] = value
+                            is Double -> mutablePrefs[key as Preferences.Key<Double>] = value
+                        }
                     }
                 }
             }
@@ -218,7 +257,7 @@ class ProfileSettingsSyncService @Inject constructor(
                     val featureFlows = syncedFeatures.map { feature ->
                         profileDataStoreFactory.get(profileId, feature).data
                             .map { prefs ->
-                                "$feature={${buildFeatureSignature(prefs)}}"
+                                "$feature={${buildFeatureSignature(prefs, feature)}}"
                             }
                     }
                     combine(featureFlows) { signatures ->
@@ -231,6 +270,12 @@ class ProfileSettingsSyncService @Inject constructor(
                 .collect { signature ->
                     if (!authManager.isAuthenticated) return@collect
                     if (applyingRemoteBlob) return@collect
+                    if (profileDataStoreFactory.corruptedFileNames.isNotEmpty()) {
+                        Log.w(TAG, "DataStore corruption detected (${profileDataStoreFactory.corruptedFileNames}) — pulling from remote instead of pushing")
+                        profileDataStoreFactory.corruptedFileNames.clear()
+                        pullCurrentProfileFromRemote()
+                        return@collect
+                    }
                     if (signature == skipNextPushSignature) {
                         skipNextPushSignature = null
                         return@collect
@@ -244,7 +289,7 @@ class ProfileSettingsSyncService @Inject constructor(
         val signatures = ArrayList<String>(syncedFeatures.size)
         syncedFeatures.forEach { feature ->
             val prefs = profileDataStoreFactory.get(profileId, feature).data.first()
-            signatures += "$feature={${buildFeatureSignature(prefs)}}"
+            signatures += "$feature={${buildFeatureSignature(prefs, feature)}}"
         }
         return signatures.joinToString(separator = "||")
     }
@@ -256,10 +301,11 @@ class ProfileSettingsSyncService @Inject constructor(
         }
     }
 
-    private fun buildFeatureSignature(prefs: Preferences): String {
+    private fun buildFeatureSignature(prefs: Preferences, feature: String = ""): String {
         return prefs.asMap()
             .entries
             .mapNotNull { (key, rawValue) ->
+                if (feature == "layout_settings" && key.name in catalogKeysExcludedFromBlob) return@mapNotNull null
                 encodePreferenceValue(rawValue)?.let { encoded ->
                     key.name to encoded.toString()
                 }

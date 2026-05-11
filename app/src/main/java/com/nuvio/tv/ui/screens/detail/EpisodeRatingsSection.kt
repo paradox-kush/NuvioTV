@@ -49,7 +49,9 @@ fun EpisodeRatingsSection(
     modifier: Modifier = Modifier,
     title: String = "Ratings",
     upFocusRequester: FocusRequester? = null,
-    firstItemFocusRequester: FocusRequester? = null
+    downFocusRequester: FocusRequester? = null,
+    firstItemFocusRequester: FocusRequester? = null,
+    ratingsGridFocusRequester: FocusRequester? = null
 ) {
     val seasonNumbers = remember(episodes) {
         episodes
@@ -62,6 +64,8 @@ fun EpisodeRatingsSection(
     val seasonFocusRequesters = remember(seasonNumbers) {
         seasonNumbers.associateWith { FocusRequester() }
     }
+    val internalRatingsGridFocusRequester = remember { FocusRequester() }
+    val effectiveRatingsGridFocusRequester = ratingsGridFocusRequester ?: internalRatingsGridFocusRequester
     val defaultSeason = remember(seasonNumbers) {
         seasonNumbers.firstOrNull { it > 0 } ?: seasonNumbers.firstOrNull() ?: 0
     }
@@ -101,7 +105,16 @@ fun EpisodeRatingsSection(
     }
     val hasTitle = title.isNotBlank()
     val upFocusModifier = if (upFocusRequester != null) {
-        Modifier.focusProperties { up = upFocusRequester }
+        Modifier.focusProperties {
+            up = upFocusRequester
+        }
+    } else {
+        Modifier
+    }
+    val downFocusModifier = if (downFocusRequester != null) {
+        Modifier.focusProperties {
+            down = downFocusRequester
+        }
     } else {
         Modifier
     }
@@ -149,7 +162,9 @@ fun EpisodeRatingsSection(
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRestorer(),
+                        .focusRestorer {
+                            seasonFocusRequesters[selectedSeason] ?: FocusRequester.Default
+                        },
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -165,6 +180,7 @@ fun EpisodeRatingsSection(
                             onClick = { selectedSeason = season },
                             modifier = modifierWithRequester
                                 .then(upFocusModifier)
+                                .focusProperties { down = effectiveRatingsGridFocusRequester }
                                 .onFocusChanged { state ->
                                     if (state.isFocused && selectedSeason != season) {
                                         selectedSeason = season
@@ -188,7 +204,7 @@ fun EpisodeRatingsSection(
                             scale = CardDefaults.scale(focusedScale = 1f)
                         ) {
                             Text(
-                                text = "S$season",
+                                text = stringResource(R.string.ratings_season_label, season),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = NuvioColors.TextPrimary,
                                 modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
@@ -207,6 +223,7 @@ fun EpisodeRatingsSection(
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(effectiveRatingsGridFocusRequester)
                         .focusRestorer(),
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -217,9 +234,11 @@ fun EpisodeRatingsSection(
                         Card(
                             onClick = { },
                             modifier = if (selectedSeasonUpRequester != null) {
-                                Modifier.focusProperties { up = selectedSeasonUpRequester }
+                                Modifier.focusProperties {
+                                    up = selectedSeasonUpRequester
+                                }.then(downFocusModifier)
                             } else {
-                                Modifier
+                                Modifier.then(downFocusModifier)
                             },
                             shape = CardDefaults.shape(shape = RoundedCornerShape(14.dp)),
                             colors = CardDefaults.colors(
@@ -242,7 +261,7 @@ fun EpisodeRatingsSection(
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = "E${episodeRating.episodeNumber}",
+                                    text = stringResource(R.string.ratings_episode_label, episodeRating.episodeNumber),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = episodeRating.chipTextColor
                                 )

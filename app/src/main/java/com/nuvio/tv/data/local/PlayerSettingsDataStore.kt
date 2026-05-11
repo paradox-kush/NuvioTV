@@ -150,6 +150,7 @@ data class BufferSettings(
 object AudioLanguageOption {
     const val DEFAULT = "default"  // Use media file default
     const val DEVICE = "device"    // Use device locale
+    const val ORIGINAL = "original"  // Use content's original language (from TMDB)
 }
 
 enum class AudioOutputChannels(
@@ -183,6 +184,8 @@ enum class AudioOutputChannels(
  */
 data class PlayerSettings(
     val playerPreference: PlayerPreference = PlayerPreference.INTERNAL,
+    val internalPlayerEngine: InternalPlayerEngine = InternalPlayerEngine.EXOPLAYER,
+    val autoSwitchInternalPlayerOnError: Boolean = false,
     val useLibass: Boolean = false,
     val libassRenderType: LibassRenderType = LibassRenderType.OVERLAY_OPEN_GL,
     val subtitleStyle: SubtitleStyleSettings = SubtitleStyleSettings(),
@@ -195,15 +198,20 @@ data class PlayerSettings(
     val tunnelingEnabled: Boolean = false,
     val skipSilence: Boolean = false,
     val audioAmplificationDb: Int = 0,
+    val centerMixLevelDb: Int = 0,
     val persistAudioAmplification: Boolean = false,
+    val rememberAudioDelayPerDevice: Boolean = true,
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
     val secondaryPreferredAudioLanguage: String? = null,
     val loadingOverlayEnabled: Boolean = true,
+    val showPlayerLoadingStatus: Boolean = true,
     val pauseOverlayEnabled: Boolean = true,
     val osdClockEnabled: Boolean = true,
     val skipIntroEnabled: Boolean = true,
+    val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
     // Dolby Vision Profile 7 → HEVC fallback (requires forked ExoPlayer)
     val mapDV7ToHevc: Boolean = false,
+    val mpvHardwareDecodeMode: MpvHardwareDecodeMode = MpvHardwareDecodeMode.AUTO_SAFE,
     // Display settings
     val frameRateMatchingMode: FrameRateMatchingMode = FrameRateMatchingMode.OFF,
     val resolutionMatchingEnabled: Boolean = false,
@@ -223,7 +231,7 @@ data class PlayerSettings(
     val streamReuseLastLinkCacheHours: Int = 24,
     val subtitleOrganizationMode: SubtitleOrganizationMode = SubtitleOrganizationMode.NONE,
     val addonSubtitleStartupMode: AddonSubtitleStartupMode = AddonSubtitleStartupMode.ALL_SUBTITLES,
-    val resizeMode: Int = 0 
+    val resizeMode: Int = 0
 )
 
 enum class StreamAutoPlayMode {
@@ -261,10 +269,42 @@ enum class AddonSubtitleStartupMode {
     ALL_SUBTITLES
 }
 
+enum class MpvHardwareDecodeMode {
+    LEGACY_DIRECT_COPY,
+    AUTO_SAFE,
+    HARDWARE_COPY,
+    HARDWARE_DIRECT,
+    DISABLED
+}
+
+enum class AutoSkipSegmentType(val storedValue: String) {
+    INTRO("intro"),
+    RECAP("recap"),
+    OUTRO("outro");
+
+    companion object {
+        fun fromStoredValue(value: String): AutoSkipSegmentType? =
+            values().firstOrNull { it.storedValue == value }
+
+        fun fromSkipIntervalType(type: String): AutoSkipSegmentType? = when (type.trim().lowercase()) {
+            "op", "opening", "mixed-op", "intro" -> INTRO
+            "recap" -> RECAP
+            "ed", "ending", "mixed-ed", "outro", "credits" -> OUTRO
+            else -> null
+        }
+    }
+}
+
 enum class PlayerPreference {
     INTERNAL,
     EXTERNAL,
     ASK_EVERY_TIME
+}
+
+enum class InternalPlayerEngine {
+    EXOPLAYER,
+    MVP_PLAYER,
+    AUTO
 }
 
 /**
@@ -288,6 +328,8 @@ class PlayerSettingsDataStore @Inject constructor(
         private const val FEATURE = "player_settings"
         private const val AUDIO_AMPLIFICATION_DB_MIN = 0
         private const val AUDIO_AMPLIFICATION_DB_MAX = 10
+        private const val CENTER_MIX_LEVEL_DB_MIN = -10
+        private const val CENTER_MIX_LEVEL_DB_MAX = 30
     }
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
@@ -297,6 +339,9 @@ class PlayerSettingsDataStore @Inject constructor(
 
     // Player preference key
     private val playerPreferenceKey = stringPreferencesKey("player_preference")
+    private val internalPlayerEngineKey = stringPreferencesKey("internal_player_engine")
+    private val autoSwitchInternalPlayerOnErrorKey =
+        booleanPreferencesKey("auto_switch_internal_player_on_error")
 
     // Libass settings keys
     private val useLibassKey = booleanPreferencesKey("use_libass")
@@ -313,14 +358,19 @@ class PlayerSettingsDataStore @Inject constructor(
     private val tunnelingEnabledKey = booleanPreferencesKey("tunneling_enabled")
     private val skipSilenceKey = booleanPreferencesKey("skip_silence")
     private val audioAmplificationDbKey = intPreferencesKey("audio_amplification_db")
+    private val centerMixLevelDbKey = intPreferencesKey("center_mix_level_db")
     private val persistAudioAmplificationKey = booleanPreferencesKey("persist_audio_amplification")
+    private val rememberAudioDelayPerDeviceKey = booleanPreferencesKey("remember_audio_delay_per_device")
     private val preferredAudioLanguageKey = stringPreferencesKey("preferred_audio_language")
     private val secondaryPreferredAudioLanguageKey = stringPreferencesKey("secondary_preferred_audio_language")
     private val loadingOverlayEnabledKey = booleanPreferencesKey("loading_overlay_enabled")
+    private val showPlayerLoadingStatusKey = booleanPreferencesKey("show_player_loading_status")
     private val pauseOverlayEnabledKey = booleanPreferencesKey("pause_overlay_enabled")
     private val osdClockEnabledKey = booleanPreferencesKey("osd_clock_enabled")
     private val skipIntroEnabledKey = booleanPreferencesKey("skip_intro_enabled")
+    private val autoSkipSegmentTypesKey = stringSetPreferencesKey("auto_skip_segment_types")
     private val mapDV7ToHevcKey = booleanPreferencesKey("map_dv7_to_hevc")
+    private val mpvHardwareDecodeModeKey = stringPreferencesKey("mpv_hardware_decode_mode")
     private val frameRateMatchingKey = booleanPreferencesKey("frame_rate_matching")
     private val frameRateMatchingModeKey = stringPreferencesKey("frame_rate_matching_mode")
     private val resolutionMatchingEnabledKey = booleanPreferencesKey("resolution_matching_enabled")
@@ -443,6 +493,10 @@ class PlayerSettingsDataStore @Inject constructor(
                 playerPreference = prefs[playerPreferenceKey]?.let {
                     runCatching { PlayerPreference.valueOf(it) }.getOrDefault(PlayerPreference.INTERNAL)
                 } ?: PlayerPreference.INTERNAL,
+                internalPlayerEngine = prefs[internalPlayerEngineKey]?.let {
+                    runCatching { InternalPlayerEngine.valueOf(it) }.getOrDefault(InternalPlayerEngine.EXOPLAYER)
+                } ?: InternalPlayerEngine.EXOPLAYER,
+                autoSwitchInternalPlayerOnError = prefs[autoSwitchInternalPlayerOnErrorKey] ?: false,
                 useLibass = prefs[useLibassKey] ?: false,
                 libassRenderType = prefs[libassRenderTypeKey]?.let {
                     try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
@@ -467,17 +521,28 @@ class PlayerSettingsDataStore @Inject constructor(
                     AUDIO_AMPLIFICATION_DB_MIN,
                     AUDIO_AMPLIFICATION_DB_MAX
                 ),
+                centerMixLevelDb = (prefs[centerMixLevelDbKey] ?: 0).coerceIn(
+                    CENTER_MIX_LEVEL_DB_MIN,
+                    CENTER_MIX_LEVEL_DB_MAX
+                ),
                 persistAudioAmplification = prefs[persistAudioAmplificationKey] ?: false,
+                rememberAudioDelayPerDevice = prefs[rememberAudioDelayPerDeviceKey] ?: true,
                 preferredAudioLanguage = normalizeSelectableLanguageCode(
                     prefs[preferredAudioLanguageKey] ?: AudioLanguageOption.DEVICE
                 ),
                 secondaryPreferredAudioLanguage = prefs[secondaryPreferredAudioLanguageKey]
                     ?.let(::normalizeSecondaryAudioLanguageCode),
                 loadingOverlayEnabled = prefs[loadingOverlayEnabledKey] ?: true,
+                showPlayerLoadingStatus = prefs[showPlayerLoadingStatusKey] ?: true,
                 pauseOverlayEnabled = prefs[pauseOverlayEnabledKey] ?: true,
                 osdClockEnabled = prefs[osdClockEnabledKey] ?: true,
                 skipIntroEnabled = prefs[skipIntroEnabledKey] ?: true,
+                autoSkipSegmentTypes = prefs[autoSkipSegmentTypesKey]
+                    ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
+                    ?.toSet()
+                    ?: emptySet(),
                 mapDV7ToHevc = prefs[mapDV7ToHevcKey] ?: false,
+                mpvHardwareDecodeMode = parseMpvHardwareDecodeMode(prefs[mpvHardwareDecodeModeKey]),
                 frameRateMatchingMode = prefs[frameRateMatchingModeKey]?.let {
                     runCatching { FrameRateMatchingMode.valueOf(it) }.getOrNull()
                 } ?: if (prefs[frameRateMatchingKey] == true) {
@@ -577,6 +642,18 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setInternalPlayerEngine(engine: InternalPlayerEngine) {
+        store().edit { prefs ->
+            prefs[internalPlayerEngineKey] = engine.name
+        }
+    }
+
+    suspend fun setAutoSwitchInternalPlayerOnError(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[autoSwitchInternalPlayerOnErrorKey] = enabled
+        }
+    }
+
     // Audio settings setters
 
     suspend fun setDecoderPriority(priority: Int) {
@@ -626,7 +703,20 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
-    suspend fun setPersistAudioAmplification(enabled: Boolean, dbToPersist: Int? = null) {
+    suspend fun setCenterMixLevelDb(db: Int) {
+        store().edit { prefs ->
+            prefs[centerMixLevelDbKey] = db.coerceIn(
+                CENTER_MIX_LEVEL_DB_MIN,
+                CENTER_MIX_LEVEL_DB_MAX
+            )
+        }
+    }
+
+    suspend fun setPersistAudioAmplification(
+        enabled: Boolean,
+        dbToPersist: Int? = null,
+        centerMixDbToPersist: Int? = null
+    ) {
         store().edit { prefs ->
             prefs[persistAudioAmplificationKey] = enabled
             if (enabled && dbToPersist != null) {
@@ -635,6 +725,18 @@ class PlayerSettingsDataStore @Inject constructor(
                     AUDIO_AMPLIFICATION_DB_MAX
                 )
             }
+            if (enabled && centerMixDbToPersist != null) {
+                prefs[centerMixLevelDbKey] = centerMixDbToPersist.coerceIn(
+                    CENTER_MIX_LEVEL_DB_MIN,
+                    CENTER_MIX_LEVEL_DB_MAX
+                )
+            }
+        }
+    }
+
+    suspend fun setRememberAudioDelayPerDevice(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[rememberAudioDelayPerDeviceKey] = enabled
         }
     }
 
@@ -677,9 +779,26 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setAutoSkipSegmentTypeEnabled(segmentType: AutoSkipSegmentType, enabled: Boolean) {
+        store().edit { prefs ->
+            val current = prefs[autoSkipSegmentTypesKey]
+                ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
+                ?.toSet()
+                ?: emptySet()
+            val updated = if (enabled) current + segmentType else current - segmentType
+            prefs[autoSkipSegmentTypesKey] = updated.map { it.storedValue }.toSet()
+        }
+    }
+
     suspend fun setLoadingOverlayEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[loadingOverlayEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setShowPlayerLoadingStatus(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[showPlayerLoadingStatusKey] = enabled
         }
     }
 
@@ -811,6 +930,8 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+
+
     private fun parseSubtitleOrganizationMode(value: String?): SubtitleOrganizationMode {
         return when (value) {
             null, "NONE" -> SubtitleOrganizationMode.NONE
@@ -829,6 +950,17 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    private fun parseMpvHardwareDecodeMode(value: String?): MpvHardwareDecodeMode {
+        return when (value) {
+            null, "AUTO_SAFE" -> MpvHardwareDecodeMode.AUTO_SAFE
+            "HARDWARE_COPY" -> MpvHardwareDecodeMode.HARDWARE_COPY
+            "HARDWARE_DIRECT" -> MpvHardwareDecodeMode.HARDWARE_DIRECT
+            "DISABLED" -> MpvHardwareDecodeMode.DISABLED
+            "LEGACY_DIRECT_COPY" -> MpvHardwareDecodeMode.LEGACY_DIRECT_COPY
+            else -> MpvHardwareDecodeMode.AUTO_SAFE
+        }
+    }
+
     private fun normalizeSelectableLanguageCode(language: String): String {
         val code = language.trim().lowercase()
         return when (code) {
@@ -844,6 +976,7 @@ class PlayerSettingsDataStore @Inject constructor(
         return when (normalized) {
             AudioLanguageOption.DEFAULT,
             AudioLanguageOption.DEVICE,
+            AudioLanguageOption.ORIGINAL,
             SUBTITLE_LANGUAGE_FORCED -> null
             else -> normalized
         }
@@ -852,6 +985,12 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setMapDV7ToHevc(enabled: Boolean) {
         store().edit { prefs ->
             prefs[mapDV7ToHevcKey] = enabled
+        }
+    }
+
+    suspend fun setMpvHardwareDecodeMode(mode: MpvHardwareDecodeMode) {
+        store().edit { prefs ->
+            prefs[mpvHardwareDecodeModeKey] = mode.name
         }
     }
 

@@ -3,6 +3,7 @@ package com.nuvio.tv.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
+import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
 import com.nuvio.tv.domain.repository.AddonRepository
@@ -25,12 +26,14 @@ data class LayoutSettingsUiState(
     val modernSidebarEnabled: Boolean = false,
     val modernSidebarBlurEnabled: Boolean = false,
     val modernLandscapePostersEnabled: Boolean = false,
+    val modernHeroFullScreenBackdropEnabled: Boolean = false,
     val heroSectionEnabled: Boolean = true,
     val searchDiscoverEnabled: Boolean = true,
     val posterLabelsEnabled: Boolean = true,
     val catalogAddonNameEnabled: Boolean = true,
     val catalogTypeSuffixEnabled: Boolean = true,
-    val focusedPosterBackdropExpandEnabled: Boolean = false,
+    val classicFocusGradientEnabled: Boolean = false,
+    val focusedPosterBackdropExpandEnabled: Boolean = true,
     val focusedPosterBackdropExpandDelaySeconds: Int = 3,
     val focusedPosterBackdropTrailerEnabled: Boolean = false,
     val focusedPosterBackdropTrailerMuted: Boolean = true,
@@ -40,10 +43,14 @@ data class LayoutSettingsUiState(
     val posterCardHeightDp: Int = 189,
     val posterCardCornerRadiusDp: Int = 12,
     val blurUnwatchedEpisodes: Boolean = false,
-    val detailPageTrailerButtonEnabled: Boolean = false,
+    val blurContinueWatchingNextUp: Boolean = false,
+    val useEpisodeThumbnailsInCw: Boolean = true,
+    val detailPageTrailerButtonEnabled: Boolean = true,
     val preferExternalMetaAddonDetail: Boolean = false,
     val hideUnreleasedContent: Boolean = false,
-    val showFullReleaseDate: Boolean = true
+    val showFullReleaseDate: Boolean = true,
+    val nextUpFromFurthestEpisode: Boolean = true,
+    val showUnairedNextUp: Boolean = true
 )
 
 data class CatalogInfo(
@@ -59,11 +66,13 @@ sealed class LayoutSettingsEvent {
     data class SetModernSidebarEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetModernSidebarBlurEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetModernLandscapePostersEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetModernHeroFullScreenBackdropEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetHeroSectionEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetSearchDiscoverEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetPosterLabelsEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetCatalogAddonNameEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetCatalogTypeSuffixEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetClassicFocusGradientEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetFocusedPosterBackdropExpandEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetFocusedPosterBackdropExpandDelaySeconds(val seconds: Int) : LayoutSettingsEvent()
     data class SetFocusedPosterBackdropTrailerEnabled(val enabled: Boolean) : LayoutSettingsEvent()
@@ -74,16 +83,21 @@ sealed class LayoutSettingsEvent {
     data class SetPosterCardWidth(val widthDp: Int) : LayoutSettingsEvent()
     data class SetPosterCardCornerRadius(val cornerRadiusDp: Int) : LayoutSettingsEvent()
     data class SetBlurUnwatchedEpisodes(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetBlurContinueWatchingNextUp(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetUseEpisodeThumbnailsInCw(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetDetailPageTrailerButtonEnabled(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetPreferExternalMetaAddonDetail(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetHideUnreleasedContent(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetShowFullReleaseDate(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetNextUpFromFurthestEpisode(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetShowUnairedNextUp(val enabled: Boolean) : LayoutSettingsEvent()
     data object ResetPosterCardStyle : LayoutSettingsEvent()
 }
 
 @HiltViewModel
 class LayoutSettingsViewModel @Inject constructor(
     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
+    private val traktSettingsDataStore: TraktSettingsDataStore,
     private val addonRepository: AddonRepository,
     private val metaRepository: com.nuvio.tv.domain.repository.MetaRepository
 ) : ViewModel() {
@@ -137,6 +151,11 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            layoutPreferenceDataStore.modernHeroFullScreenBackdropEnabled.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(modernHeroFullScreenBackdropEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
             layoutPreferenceDataStore.heroSectionEnabled.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(heroSectionEnabled = enabled) }
             }
@@ -159,6 +178,11 @@ class LayoutSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             layoutPreferenceDataStore.catalogTypeSuffixEnabled.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(catalogTypeSuffixEnabled = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.classicFocusGradientEnabled.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(classicFocusGradientEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -207,6 +231,16 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            layoutPreferenceDataStore.blurContinueWatchingNextUp.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(blurContinueWatchingNextUp = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.useEpisodeThumbnailsInCw.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(useEpisodeThumbnailsInCw = enabled) }
+            }
+        }
+        viewModelScope.launch {
             layoutPreferenceDataStore.detailPageTrailerButtonEnabled.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(detailPageTrailerButtonEnabled = enabled) }
             }
@@ -226,6 +260,16 @@ class LayoutSettingsViewModel @Inject constructor(
                 updateUiStateIfChanged { it.copy(showFullReleaseDate = enabled) }
             }
         }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.nextUpFromFurthestEpisode.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(nextUpFromFurthestEpisode = enabled) }
+            }
+        }
+        viewModelScope.launch {
+            layoutPreferenceDataStore.showUnairedNextUp.distinctUntilChanged().collectLatest { enabled ->
+                updateUiStateIfChanged { it.copy(showUnairedNextUp = enabled) }
+            }
+        }
         loadAvailableCatalogs()
     }
 
@@ -237,11 +281,13 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetModernSidebarEnabled -> setModernSidebarEnabled(event.enabled)
             is LayoutSettingsEvent.SetModernSidebarBlurEnabled -> setModernSidebarBlurEnabled(event.enabled)
             is LayoutSettingsEvent.SetModernLandscapePostersEnabled -> setModernLandscapePostersEnabled(event.enabled)
+            is LayoutSettingsEvent.SetModernHeroFullScreenBackdropEnabled -> setModernHeroFullScreenBackdropEnabled(event.enabled)
             is LayoutSettingsEvent.SetHeroSectionEnabled -> setHeroSectionEnabled(event.enabled)
             is LayoutSettingsEvent.SetSearchDiscoverEnabled -> setSearchDiscoverEnabled(event.enabled)
             is LayoutSettingsEvent.SetPosterLabelsEnabled -> setPosterLabelsEnabled(event.enabled)
             is LayoutSettingsEvent.SetCatalogAddonNameEnabled -> setCatalogAddonNameEnabled(event.enabled)
             is LayoutSettingsEvent.SetCatalogTypeSuffixEnabled -> setCatalogTypeSuffixEnabled(event.enabled)
+            is LayoutSettingsEvent.SetClassicFocusGradientEnabled -> setClassicFocusGradientEnabled(event.enabled)
             is LayoutSettingsEvent.SetFocusedPosterBackdropExpandEnabled -> setFocusedPosterBackdropExpandEnabled(event.enabled)
             is LayoutSettingsEvent.SetFocusedPosterBackdropExpandDelaySeconds -> setFocusedPosterBackdropExpandDelaySeconds(event.seconds)
             is LayoutSettingsEvent.SetFocusedPosterBackdropTrailerEnabled -> setFocusedPosterBackdropTrailerEnabled(event.enabled)
@@ -251,10 +297,14 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetPosterCardWidth -> setPosterCardWidth(event.widthDp)
             is LayoutSettingsEvent.SetPosterCardCornerRadius -> setPosterCardCornerRadius(event.cornerRadiusDp)
             is LayoutSettingsEvent.SetBlurUnwatchedEpisodes -> setBlurUnwatchedEpisodes(event.enabled)
+            is LayoutSettingsEvent.SetBlurContinueWatchingNextUp -> setBlurContinueWatchingNextUp(event.enabled)
+            is LayoutSettingsEvent.SetUseEpisodeThumbnailsInCw -> setUseEpisodeThumbnailsInCw(event.enabled)
             is LayoutSettingsEvent.SetDetailPageTrailerButtonEnabled -> setDetailPageTrailerButtonEnabled(event.enabled)
             is LayoutSettingsEvent.SetPreferExternalMetaAddonDetail -> setPreferExternalMetaAddonDetail(event.enabled)
             is LayoutSettingsEvent.SetHideUnreleasedContent -> setHideUnreleasedContent(event.enabled)
             is LayoutSettingsEvent.SetShowFullReleaseDate -> setShowFullReleaseDate(event.enabled)
+            is LayoutSettingsEvent.SetNextUpFromFurthestEpisode -> setNextUpFromFurthestEpisode(event.enabled)
+            is LayoutSettingsEvent.SetShowUnairedNextUp -> setShowUnairedNextUp(event.enabled)
             LayoutSettingsEvent.ResetPosterCardStyle -> resetPosterCardStyle()
         }
     }
@@ -306,6 +356,13 @@ class LayoutSettingsViewModel @Inject constructor(
         }
     }
 
+    private fun setModernHeroFullScreenBackdropEnabled(enabled: Boolean) {
+        if (_uiState.value.modernHeroFullScreenBackdropEnabled == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setModernHeroFullScreenBackdropEnabled(enabled)
+        }
+    }
+
     private fun setHeroSectionEnabled(enabled: Boolean) {
         if (_uiState.value.heroSectionEnabled == enabled) return
         viewModelScope.launch {
@@ -338,6 +395,13 @@ class LayoutSettingsViewModel @Inject constructor(
         if (_uiState.value.catalogTypeSuffixEnabled == enabled) return
         viewModelScope.launch {
             layoutPreferenceDataStore.setCatalogTypeSuffixEnabled(enabled)
+        }
+    }
+
+    private fun setClassicFocusGradientEnabled(enabled: Boolean) {
+        if (_uiState.value.classicFocusGradientEnabled == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setClassicFocusGradientEnabled(enabled)
         }
     }
 
@@ -405,6 +469,20 @@ class LayoutSettingsViewModel @Inject constructor(
         }
     }
 
+    private fun setBlurContinueWatchingNextUp(enabled: Boolean) {
+        if (_uiState.value.blurContinueWatchingNextUp == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setBlurContinueWatchingNextUp(enabled)
+        }
+    }
+
+    private fun setUseEpisodeThumbnailsInCw(enabled: Boolean) {
+        if (_uiState.value.useEpisodeThumbnailsInCw == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setUseEpisodeThumbnailsInCw(enabled)
+        }
+    }
+
     private fun setPreferExternalMetaAddonDetail(enabled: Boolean) {
         if (_uiState.value.preferExternalMetaAddonDetail == enabled) return
         viewModelScope.launch {
@@ -424,6 +502,20 @@ class LayoutSettingsViewModel @Inject constructor(
         if (_uiState.value.showFullReleaseDate == enabled) return
         viewModelScope.launch {
             layoutPreferenceDataStore.setShowFullReleaseDate(enabled)
+        }
+    }
+
+    private fun setNextUpFromFurthestEpisode(enabled: Boolean) {
+        if (_uiState.value.nextUpFromFurthestEpisode == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setNextUpFromFurthestEpisode(enabled)
+        }
+    }
+
+    private fun setShowUnairedNextUp(enabled: Boolean) {
+        if (_uiState.value.showUnairedNextUp == enabled) return
+        viewModelScope.launch {
+            layoutPreferenceDataStore.setShowUnairedNextUp(enabled)
         }
     }
 

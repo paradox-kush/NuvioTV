@@ -20,6 +20,12 @@ import javax.inject.Singleton
 
 private const val TAG = "ProfileSyncService"
 
+sealed class SetProfilePinResult {
+    object Success : SetProfilePinResult()
+    object CurrentPinRequired : SetProfilePinResult()
+    data class Failure(val throwable: Throwable) : SetProfilePinResult()
+}
+
 @Singleton
 class ProfileSyncService @Inject constructor(
     private val authManager: AuthManager,
@@ -49,7 +55,8 @@ class ProfileSyncService @Inject constructor(
                             put("avatar_color_hex", profile.avatarColorHex)
                             put("uses_primary_addons", profile.usesPrimaryAddons)
                             put("uses_primary_plugins", profile.usesPrimaryPlugins)
-                            put("avatar_id", profile.avatarId)
+                            put("avatar_id", if (profile.avatarUrl.isNullOrBlank()) profile.avatarId else null)
+                            put("avatar_url", profile.avatarUrl?.takeIf { it.isNotBlank() })
                         }
                     }
                 })
@@ -82,7 +89,8 @@ class ProfileSyncService @Inject constructor(
                     avatarColorHex = entry.avatarColorHex,
                     usesPrimaryAddons = entry.usesPrimaryAddons,
                     usesPrimaryPlugins = entry.usesPrimaryPlugins,
-                    avatarId = entry.avatarId
+                    avatarId = entry.avatarId,
+                    avatarUrl = entry.avatarUrl
                 )
             }
 
@@ -129,7 +137,7 @@ class ProfileSyncService @Inject constructor(
         }
     }
 
-    suspend fun setProfilePin(profileId: Int, pin: String, currentPin: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun setProfilePin(profileId: Int, pin: String, currentPin: String? = null): SetProfilePinResult = withContext(Dispatchers.IO) {
         try {
             val params = buildJsonObject {
                 put("p_profile_id", profileId)
@@ -141,12 +149,19 @@ class ProfileSyncService @Inject constructor(
             withJwtRefreshRetry {
                 postgrest.rpc("set_profile_pin", params)
             }
-            Result.success(Unit)
+            SetProfilePinResult.Success
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set profile PIN", e)
-            Result.failure(e)
+            if (isCurrentPinRequiredError(e)) {
+                SetProfilePinResult.CurrentPinRequired
+            } else {
+                SetProfilePinResult.Failure(e)
+            }
         }
     }
+
+    private fun isCurrentPinRequiredError(e: Throwable): Boolean =
+        e.message?.contains("Current PIN is required", ignoreCase = true) == true
 
     suspend fun clearProfilePin(profileId: Int, currentPin: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {

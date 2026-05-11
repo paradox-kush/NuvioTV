@@ -2,6 +2,7 @@ package com.nuvio.tv.data.local
 
 import android.util.Log
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.nuvio.tv.core.profile.ProfileManager
 import com.google.gson.Gson
@@ -28,6 +29,19 @@ class LibraryPreferences @Inject constructor(
 
     private val gson = Gson()
     private val libraryItemsKey = stringSetPreferencesKey("library_items")
+    private val sortOptionKey = stringPreferencesKey("library_sort_option")
+
+    val sortOption: Flow<String?> = profileManager.activeProfileId.flatMapLatest { pid ->
+        factory.get(pid, FEATURE).data.map { preferences ->
+            preferences[sortOptionKey]
+        }
+    }
+
+    suspend fun setSortOption(key: String) {
+        store().edit { preferences ->
+            preferences[sortOptionKey] = key
+        }
+    }
 
     val libraryItems: Flow<List<SavedLibraryItem>> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { preferences ->
@@ -75,6 +89,21 @@ class LibraryPreferences @Inject constructor(
 
     suspend fun getAllItems(): List<SavedLibraryItem> {
         return libraryItems.first()
+    }
+
+    suspend fun updateLogo(id: String, type: String, logo: String) {
+        store().edit { preferences ->
+            val current = preferences[libraryItemsKey] ?: emptySet()
+            val updated = current.map { json ->
+                val item = runCatching {
+                    gson.fromJson(json, SavedLibraryItem::class.java)
+                }.getOrNull() ?: return@map json
+                if (item.id == id && item.type.equals(type, ignoreCase = true))
+                    gson.toJson(item.copy(logo = logo))
+                else json
+            }.toSet()
+            preferences[libraryItemsKey] = updated
+        }
     }
 
     suspend fun mergeRemoteItems(remoteItems: List<SavedLibraryItem>) {

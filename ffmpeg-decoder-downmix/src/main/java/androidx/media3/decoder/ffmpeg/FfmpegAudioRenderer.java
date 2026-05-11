@@ -155,17 +155,18 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     int initialInputBufferSize =
         format.maxInputSize != Format.NO_VALUE ? format.maxInputSize : DEFAULT_INPUT_BUFFER_SIZE;
     int outputChannelCount = resolveOutputChannelCount(format.channelCount);
+    boolean shouldRequestDownmix = requestedOutputChannelCount > 0 && outputChannelCount < format.channelCount;
     @Nullable
-    String outputLayoutName =
-        outputChannelCount < format.channelCount ? requestedOutputLayoutName : null;
-    downmixActive = outputChannelCount < format.channelCount;
+    String outputLayoutName = shouldRequestDownmix ? requestedOutputLayoutName : null;
+    int nativeOutputChannelCount = shouldRequestDownmix ? outputChannelCount : 0;
+    downmixActive = shouldRequestDownmix;
     FfmpegAudioDecoder decoder =
         new FfmpegAudioDecoder(
             format,
             NUM_BUFFERS,
             NUM_BUFFERS,
             initialInputBufferSize,
-            outputChannelCount,
+            nativeOutputChannelCount,
             outputLayoutName);
     decoder.setUserCenterMixLevelDb(userCenterMixLevelDb);
     decoder.setDownmixNormalizationEnabled(downmixNormalizationEnabled);

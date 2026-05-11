@@ -13,6 +13,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import java.util.Locale
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateDp
@@ -56,6 +57,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -87,6 +89,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.nuvio.tv.core.runtime.PluginRuntimeHooks
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,6 +99,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.tv.material3.DrawerValue
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ModalNavigationDrawer
@@ -105,13 +110,17 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
 import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.core.auth.AuthManager
+import com.nuvio.tv.core.build.AppFeaturePolicy
 import com.nuvio.tv.data.local.AppOnboardingDataStore
+import com.nuvio.tv.data.local.ExperienceModeDataStore
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
 import com.nuvio.tv.data.local.ThemeDataStore
 import com.nuvio.tv.data.repository.TraktProgressService
 import com.nuvio.tv.domain.model.AppFont
 import com.nuvio.tv.domain.model.AppTheme
 import com.nuvio.tv.domain.model.AuthState
+import com.nuvio.tv.domain.model.ExperienceMode
+import com.nuvio.tv.domain.repository.AddonRepository
 import com.nuvio.tv.core.sync.ProfileSettingsSyncService
 import com.nuvio.tv.core.sync.ProfileSyncService
 import com.nuvio.tv.core.sync.StartupSyncService
@@ -121,9 +130,12 @@ import com.nuvio.tv.ui.navigation.Screen
 import com.nuvio.tv.ui.components.NuvioScrollDefaults
 import com.nuvio.tv.ui.components.ProfileAvatarCircle
 import com.nuvio.tv.ui.screens.account.AuthQrSignInScreen
+import com.nuvio.tv.ui.screens.addon.EssentialAddonSetupScreen
 import com.nuvio.tv.ui.screens.profile.ProfileSelectionScreen
 import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.theme.NuvioTheme
+import com.nuvio.tv.ui.util.LocalFastHorizontalNavigationEnabled
+import com.nuvio.tv.ui.util.LocalRecompositionHighlighterEnabled
 import com.nuvio.tv.updater.UpdateViewModel
 import com.nuvio.tv.updater.ui.UpdatePromptDialog
 import dagger.hilt.android.AndroidEntryPoint
@@ -134,9 +146,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import coil.compose.rememberAsyncImagePainter
-import coil.decode.SvgDecoder
-import coil.request.ImageRequest
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 
@@ -153,10 +164,18 @@ data class DrawerItem(
 private data class MainUiPrefs(
     val theme: AppTheme = AppTheme.WHITE,
     val font: AppFont = AppFont.INTER,
+    val amoledMode: Boolean = false,
+    val amoledSurfacesMode: Boolean = false,
     val hasChosenLayout: Boolean? = null,
+    val experienceMode: ExperienceMode? = null,
+    val experienceModeLoaded: Boolean = false,
+    val addonSetupSkipped: Boolean = false,
     val sidebarCollapsed: Boolean = false,
     val modernSidebarEnabled: Boolean = false,
-    val modernSidebarBlurPref: Boolean = false
+    val modernSidebarBlurPref: Boolean = false,
+    val smoothBringIntoViewEnabled: Boolean = true,
+    val fastHorizontalNavigationEnabled: Boolean = false,
+    val composeHighlighterEnabled: Boolean = false
 )
 
 @AndroidEntryPoint
@@ -167,6 +186,12 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var layoutPreferenceDataStore: LayoutPreferenceDataStore
+
+    @Inject
+    lateinit var experienceModeDataStore: ExperienceModeDataStore
+
+    @Inject
+    lateinit var addonRepository: AddonRepository
 
     @Inject
     lateinit var traktProgressService: TraktProgressService
@@ -196,8 +221,8 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
     override fun attachBaseContext(newBase: Context) {
-        val tag = newBase.getSharedPreferences("app_locale", Context.MODE_PRIVATE)
-            .getString("locale_tag", null)
+        val tag = LocaleCache.localeTag.takeIf { it != LocaleCache.UNSET }
+
         if (!tag.isNullOrEmpty()) {
             val locale = Locale.forLanguageTag(tag)
             Locale.setDefault(locale)
@@ -205,9 +230,9 @@ class MainActivity : ComponentActivity() {
             config.setLocale(locale)
             super.attachBaseContext(newBase.createConfigurationContext(config))
         } else {
-            val systemLocale = ConfigurationCompat.getLocales(newBase.resources.configuration)[0]
-                ?: Locale.getDefault(Locale.Category.DISPLAY)
-            Locale.setDefault(systemLocale)
+            // Cache not ready yet (very early cold start) — use system locale
+            // The IO coroutine in Application.onCreate will finish before any activity
+            // is usually created, but if not, we just use system locale until next launch
             super.attachBaseContext(newBase)
         }
     }
@@ -217,14 +242,26 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         window?.setBackgroundDrawable(null)
+
+        PluginRuntimeHooks.onActivityCreate(this)
+
+        window?.decorView?.post {
+            val snapshot = com.nuvio.tv.core.player.DisplayCapabilities.detect(this)
+            com.nuvio.tv.core.player.DisplayCapabilities.logSummary(snapshot)
+        }
+
+        // Extract extras set by the Continue Watching launcher channel preview programs.
+        val launchContentId = intent?.getStringExtra("contentId")
+        val launchContentType = intent?.getStringExtra("contentType")
+
         setContent {
-            var hasSelectedProfileThisSession by remember { mutableStateOf(false) }
+            var hasSelectedProfileThisSession by rememberSaveable { mutableStateOf(false) }
             var onboardingCompletedThisSession by remember { mutableStateOf(false) }
             var onboardingProfileSyncInProgress by remember { mutableStateOf(false) }
-            val hasSeenAuthQrOnFirstLaunch by appOnboardingDataStore
-                .hasSeenAuthQrOnFirstLaunch
-                .map<Boolean, Boolean?> { it }
-                .collectAsState(initial = null)
+            val hasSeenAuthQrFlow = remember(appOnboardingDataStore) {
+                appOnboardingDataStore.hasSeenAuthQrOnFirstLaunch.map<Boolean, Boolean?> { it }
+            }
+            val hasSeenAuthQrOnFirstLaunch by hasSeenAuthQrFlow.collectAsState(initial = null)
             val authState by authManager.authState.collectAsState()
 
             LaunchedEffect(hasSeenAuthQrOnFirstLaunch, authState) {
@@ -236,6 +273,8 @@ class MainActivity : ComponentActivity() {
 
             val activeProfileId by profileManager.activeProfileId.collectAsState()
             val profiles by profileManager.profiles.collectAsState()
+            val hasEverSelectedProfile by profileManager.hasEverSelectedProfile.collectAsState()
+            val rememberLastProfileEnabled by profileManager.rememberLastProfileEnabled.collectAsState()
             val activeProfile = remember(activeProfileId, profiles) {
                 profiles.firstOrNull { it.id == activeProfileId }
             }
@@ -254,6 +293,16 @@ class MainActivity : ComponentActivity() {
             val activeProfileHasPin = remember(activeProfileId, profilePinStates) {
                 profilePinStates[activeProfileId] == true
             }
+
+            LaunchedEffect(hasEverSelectedProfile, activeProfileHasPin, rememberLastProfileEnabled) {
+                if (rememberLastProfileEnabled && hasEverSelectedProfile && !activeProfileHasPin && !hasSelectedProfileThisSession) {
+                    hasSelectedProfileThisSession = true
+                    if (authManager.authState.value is AuthState.FullAccount) {
+                        startupSyncService.requestSyncNow()
+                    }
+                }
+            }
+
             var avatarCatalog by remember { mutableStateOf(emptyList<com.nuvio.tv.data.remote.supabase.AvatarCatalogItem>()) }
 
             LaunchedEffect(Unit) {
@@ -262,10 +311,11 @@ class MainActivity : ComponentActivity() {
             }
 
             val activeProfileAvatarImageUrl = remember(activeProfile, avatarCatalog) {
-                activeProfile?.avatarId?.let { avatarRepository.getAvatarImageUrl(it, avatarCatalog) }
+                activeProfile?.avatarUrl?.takeIf { it.isNotBlank() }
+                    ?: activeProfile?.avatarId?.let { avatarRepository.getAvatarImageUrl(it, avatarCatalog) }
             }
 
-            val mainUiPrefsFlow = remember(themeDataStore, layoutPreferenceDataStore) {
+            val mainUiPrefsFlow = remember(themeDataStore, layoutPreferenceDataStore, experienceModeDataStore) {
                 combine(
                     themeDataStore.selectedTheme,
                     themeDataStore.selectedFont,
@@ -280,15 +330,45 @@ class MainActivity : ComponentActivity() {
                         sidebarCollapsed = sidebarCollapsed,
                         modernSidebarEnabled = modernSidebarEnabled,
                     )
+                }.combine(experienceModeDataStore.mode) { prefs, experienceMode ->
+                    prefs.copy(experienceMode = experienceMode, experienceModeLoaded = true)
+                }.combine(experienceModeDataStore.addonSetupSkipped) { prefs, addonSetupSkipped ->
+                    prefs.copy(addonSetupSkipped = addonSetupSkipped)
+                }.combine(themeDataStore.amoledMode) { prefs, amoledMode ->
+                    prefs.copy(amoledMode = amoledMode)
+                }.combine(themeDataStore.amoledSurfacesMode) { prefs, amoledSurfacesMode ->
+                    prefs.copy(amoledSurfacesMode = amoledSurfacesMode)
                 }.combine(layoutPreferenceDataStore.modernSidebarBlurEnabled) { prefs, modernSidebarBlurPref ->
                     prefs.copy(modernSidebarBlurPref = modernSidebarBlurPref)
+                }.combine(layoutPreferenceDataStore.smoothBringIntoViewEnabled) { prefs, smoothBringIntoViewEnabled ->
+                    prefs.copy(smoothBringIntoViewEnabled = smoothBringIntoViewEnabled)
+                }.combine(layoutPreferenceDataStore.fastHorizontalNavigationEnabled) { prefs, fastHorizontalNavigationEnabled ->
+                    prefs.copy(fastHorizontalNavigationEnabled = fastHorizontalNavigationEnabled)
+                }.combine(layoutPreferenceDataStore.composeHighlighterEnabled) { prefs, composeHighlighterEnabled ->
+                    prefs.copy(composeHighlighterEnabled = composeHighlighterEnabled)
                 }
             }
             val mainUiPrefs by mainUiPrefsFlow.collectAsState(initial = MainUiPrefs(hasChosenLayout = null))
+            val installedAddons by remember(addonRepository) {
+                addonRepository.getInstalledAddons()
+            }.collectAsState(initial = null)
 
-            NuvioTheme(appTheme = mainUiPrefs.theme, appFont = mainUiPrefs.font) {
+            NuvioTheme(
+                appTheme = mainUiPrefs.theme,
+                appFont = mainUiPrefs.font,
+                amoledMode = mainUiPrefs.amoledMode,
+                amoledSurfacesMode = mainUiPrefs.amoledSurfacesMode
+            ) {
+                val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
+                val bringIntoViewSpec = if (mainUiPrefs.smoothBringIntoViewEnabled) {
+                    NuvioScrollDefaults.smoothScrollSpec
+                } else {
+                    defaultBringIntoViewSpec
+                }
                 CompositionLocalProvider(
-                    LocalBringIntoViewSpec provides NuvioScrollDefaults.smoothScrollSpec
+                    LocalBringIntoViewSpec provides bringIntoViewSpec,
+                    LocalFastHorizontalNavigationEnabled provides mainUiPrefs.fastHorizontalNavigationEnabled,
+                    LocalRecompositionHighlighterEnabled provides mainUiPrefs.composeHighlighterEnabled
                 ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -368,11 +448,29 @@ class MainActivity : ComponentActivity() {
                     }
 
                     val layoutChosen = mainUiPrefs.hasChosenLayout
-                    if (layoutChosen == null) {
+                    if (layoutChosen == null || !mainUiPrefs.experienceModeLoaded || installedAddons == null) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(NuvioColors.Background)
+                        )
+                        return@Surface
+                    }
+                    val effectiveExperienceMode = mainUiPrefs.experienceMode
+                        ?: if (layoutChosen) ExperienceMode.ADVANCED else null
+                    val needsExperienceSelection = effectiveExperienceMode == null
+                    val needsEssentialAddonSetup =
+                        effectiveExperienceMode == ExperienceMode.ESSENTIAL &&
+                            installedAddons.orEmpty().isEmpty() &&
+                            !mainUiPrefs.addonSetupSkipped
+
+                    if (needsEssentialAddonSetup) {
+                        EssentialAddonSetupScreen(
+                            onSkip = {
+                                lifecycleScope.launch {
+                                    experienceModeDataStore.setAddonSetupSkipped(true)
+                                }
+                            }
                         )
                         return@Surface
                     }
@@ -382,13 +480,32 @@ class MainActivity : ComponentActivity() {
                         mainUiPrefs.modernSidebarBlurPref && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S
                     val hideBuiltInHeadersForFloatingPill = modernSidebarEnabled && !sidebarCollapsed
 
-                    val updateViewModel: UpdateViewModel = hiltViewModel(this@MainActivity)
-                    val updateState by updateViewModel.uiState.collectAsState()
-
-                    val startDestination = if (layoutChosen) Screen.Home.route else Screen.LayoutSelection.route
+                    val startDestination = when {
+                        needsExperienceSelection -> Screen.ExperienceModeSelection.route
+                        layoutChosen -> Screen.Home.route
+                        else -> Screen.LayoutSelection.route
+                    }
                     val navController = rememberNavController()
+                    var optimisticRoute by remember { mutableStateOf<String?>(null) }
                     val navBackStackEntry by navController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
+                    val actualRoute = navBackStackEntry?.destination?.route
+                    val currentRoute = optimisticRoute ?: actualRoute
+
+                    LaunchedEffect(actualRoute) {
+                        optimisticRoute = null
+                    }
+
+                    // Navigate to content when launched from the Continue Watching channel row.
+                    LaunchedEffect(navController) {
+                        if (launchContentId != null && launchContentType != null && layoutChosen) {
+                            navController.navigate(
+                                Screen.Detail.createRoute(
+                                    itemId = launchContentId,
+                                    itemType = launchContentType
+                                )
+                            )
+                        }
+                    }
 
                     val view = LocalView.current
                     LaunchedEffect(currentRoute) {
@@ -470,6 +587,7 @@ class MainActivity : ComponentActivity() {
                             activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
                             showProfileSelector = profiles.size > 1,
                             onSwitchProfile = { hasSelectedProfileThisSession = false },
+                            onNavigate = { optimisticRoute = it },
                             onExitApp = {
                                 finishAffinity()
                                 finishAndRemoveTask()
@@ -490,6 +608,7 @@ class MainActivity : ComponentActivity() {
                             activeProfileAvatarImageUrl = activeProfileAvatarImageUrl,
                             showProfileSelector = profiles.size > 1,
                             onSwitchProfile = { hasSelectedProfileThisSession = false },
+                            onNavigate = { optimisticRoute = it },
                             onExitApp = {
                                 finishAffinity()
                                 finishAndRemoveTask()
@@ -497,14 +616,18 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    UpdatePromptDialog(
-                        state = updateState,
-                        onDismiss = { updateViewModel.dismissDialog() },
-                        onDownload = { updateViewModel.downloadUpdate() },
-                        onInstall = { updateViewModel.installUpdateOrRequestPermission() },
-                        onIgnore = { updateViewModel.ignoreThisVersion() },
-                        onOpenUnknownSources = { updateViewModel.openUnknownSourcesSettings() }
-                    )
+                    if (AppFeaturePolicy.inAppUpdatesEnabled && !BuildConfig.IS_DEBUG_BUILD) {
+                        val updateViewModel: UpdateViewModel = hiltViewModel(this@MainActivity)
+                        val updateState by updateViewModel.uiState.collectAsState()
+                        UpdatePromptDialog(
+                            state = updateState,
+                            onDismiss = { updateViewModel.dismissDialog() },
+                            onDownload = { updateViewModel.downloadUpdate() },
+                            onInstall = { updateViewModel.installUpdateOrRequestPermission() },
+                            onIgnore = { updateViewModel.ignoreThisVersion() },
+                            onOpenUnknownSources = { updateViewModel.openUnknownSourcesSettings() }
+                        )
+                    }
                 }
             }
             }
@@ -538,6 +661,11 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         profileSettingsSyncService.requestForegroundPull()
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        PluginRuntimeHooks.onActivityDestroy()
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -556,6 +684,7 @@ private fun LegacySidebarScaffold(
     activeProfileAvatarImageUrl: String?,
     showProfileSelector: Boolean,
     onSwitchProfile: () -> Unit,
+    onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -570,8 +699,10 @@ private fun LegacySidebarScaffold(
 
     val closedDrawerWidth = if (sidebarCollapsed) 0.dp else 72.dp
     val openDrawerWidth = 196.dp
+    val openDrawerItemWidth = 148.dp
 
     val focusManager = LocalFocusManager.current
+    val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val contentFocusRequester = remember { FocusRequester() }
     var pendingContentFocusTransfer by remember { mutableStateOf(false) }
     var pendingSidebarFocusRequest by remember { mutableStateOf(false) }
@@ -616,7 +747,7 @@ private fun LegacySidebarScaffold(
         drawerContent = { drawerValue ->
             if (showSidebar) {
                 val drawerWidth = if (drawerValue == DrawerValue.Open) openDrawerWidth else closedDrawerWidth
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(drawerWidth)
@@ -624,7 +755,8 @@ private fun LegacySidebarScaffold(
                         .padding(12.dp)
                         .selectableGroup()
                         .onPreviewKeyEvent { keyEvent ->
-                            if (keyEvent.key == Key.DirectionRight && keyEvent.type == KeyEventType.KeyDown) {
+                            val closeKey = if (isRtl) Key.DirectionLeft else Key.DirectionRight
+                            if (keyEvent.key == closeKey && keyEvent.type == KeyEventType.KeyDown) {
                                 drawerState.setValue(DrawerValue.Closed)
                                 pendingContentFocusTransfer = false
                                 true
@@ -634,73 +766,80 @@ private fun LegacySidebarScaffold(
                         }
                 ) {
                     val isExpanded = drawerValue == DrawerValue.Open
-                    val itemWidth = if (isExpanded) 156.dp else 48.dp
+                    val itemWidth = if (isExpanded) openDrawerItemWidth else 48.dp
 
                     if (isExpanded) {
-                        Spacer(modifier = Modifier.height(30.dp))
-                        if (showProfileSelector && activeProfileName.isNotEmpty()) {
-                            var isProfileFocused by remember { mutableStateOf(false) }
-                            val profileItemShape = RoundedCornerShape(32.dp)
-                            val profileLeadingInset = 18.dp
-                            val profileAvatarSize = 34.dp
-                            val profileLabelStart = 60.dp
-                            val profileGapAfterAvatar =
-                                (profileLabelStart - profileLeadingInset - profileAvatarSize).coerceAtLeast(0.dp)
-                            val profileBgColor by animateColorAsState(
-                                targetValue = if (isProfileFocused) NuvioColors.FocusBackground else Color.Transparent,
-                                label = "legacyProfileItemBg"
-                            )
-                            Box(
-                                modifier = Modifier.fillMaxWidth(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .width(itemWidth)
-                                        .height(52.dp)
-                                        .background(color = profileBgColor, shape = profileItemShape)
-                                        .onFocusChanged { isProfileFocused = it.isFocused }
-                                        .clickable {
-                                            onSwitchProfile()
-                                            drawerState.setValue(DrawerValue.Closed)
-                                        },
-                                    verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .fillMaxWidth()
+                        ) {
+                            Spacer(modifier = Modifier.height(30.dp))
+                            if (showProfileSelector && activeProfileName.isNotEmpty()) {
+                                var isProfileFocused by remember { mutableStateOf(false) }
+                                val profileItemShape = RoundedCornerShape(32.dp)
+                                val profileLeadingInset = 18.dp
+                                val profileAvatarSize = 34.dp
+                                val profileLabelStart = 60.dp
+                                val profileGapAfterAvatar =
+                                    (profileLabelStart - profileLeadingInset - profileAvatarSize).coerceAtLeast(0.dp)
+                                val profileBgColor by animateColorAsState(
+                                    targetValue = if (isProfileFocused) NuvioColors.FocusBackground else Color.Transparent,
+                                    label = "legacyProfileItemBg"
+                                )
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Spacer(modifier = Modifier.width(profileLeadingInset))
-                                    ProfileAvatarCircle(
-                                        name = activeProfileName,
-                                        colorHex = activeProfileColorHex,
-                                        size = profileAvatarSize,
-                                        avatarImageUrl = activeProfileAvatarImageUrl
-                                    )
-                                    Spacer(modifier = Modifier.width(profileGapAfterAvatar))
-                                    Text(
-                                        text = activeProfileName,
-                                        color = if (isProfileFocused) NuvioColors.TextPrimary else NuvioColors.TextSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.Start,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .width(itemWidth)
+                                            .height(52.dp)
+                                            .background(color = profileBgColor, shape = profileItemShape)
+                                            .onFocusChanged { isProfileFocused = it.isFocused }
+                                            .clickable {
+                                                onSwitchProfile()
+                                                drawerState.setValue(DrawerValue.Closed)
+                                            },
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Spacer(modifier = Modifier.width(profileLeadingInset))
+                                        ProfileAvatarCircle(
+                                            name = activeProfileName,
+                                            colorHex = activeProfileColorHex,
+                                            size = profileAvatarSize,
+                                            avatarImageUrl = activeProfileAvatarImageUrl
+                                        )
+                                        Spacer(modifier = Modifier.width(profileGapAfterAvatar))
+                                        Text(
+                                            text = activeProfileName,
+                                            color = if (isProfileFocused) NuvioColors.TextPrimary else NuvioColors.TextSecondary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Start,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
                                 }
+                            } else {
+                                Image(
+                                    painter = painterResource(id = R.drawable.app_logo_wordmark),
+                                    contentDescription = stringResource(R.string.app_name),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(42.dp)
+                                )
                             }
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.app_logo_wordmark),
-                                contentDescription = "NuvioTV",
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(42.dp)
-                            )
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(y = 28.dp)
+                            .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = if (isExpanded) Alignment.CenterHorizontally else Alignment.Start
                     ) {
                         drawerItems.forEach { item ->
                             LegacySidebarButton(
@@ -710,6 +849,7 @@ private fun LegacySidebarScaffold(
                                 selected = selectedDrawerRoute == item.route,
                                 expanded = isExpanded,
                                 onClick = {
+                                    onNavigate(item.route)
                                     navigateToDrawerRoute(
                                         navController = navController,
                                         currentRoute = currentRoute,
@@ -724,8 +864,6 @@ private fun LegacySidebarScaffold(
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -740,13 +878,14 @@ private fun LegacySidebarScaffold(
                 .fillMaxSize()
                 .padding(start = contentStartPadding)
                 .onKeyEvent { keyEvent ->
+                    val openKey = if (isRtl) Key.DirectionRight else Key.DirectionLeft
                     if (
                         showSidebar &&
                         drawerState.currentValue == DrawerValue.Closed &&
                         keyEvent.type == KeyEventType.KeyDown &&
-                        keyEvent.key == Key.DirectionLeft
+                        keyEvent.key == openKey
                     ) {
-                        if (focusManager.moveFocus(FocusDirection.Left)) {
+                        if (focusManager.moveFocus(if (isRtl) FocusDirection.Right else FocusDirection.Left)) {
                             true
                         } else {
                             pendingSidebarFocusRequest = true
@@ -811,14 +950,26 @@ private fun LegacySidebarButton(
         label = "legacySidebarItemIconTint"
     )
 
-    Box(
+    Card(
+        onClick = onClick,
         modifier = modifier
             .height(52.dp)
             .focusProperties { canFocus = expanded }
-            .background(color = backgroundColor, shape = itemShape)
-            .onFocusChanged { isFocused = it.isFocused }
-            .clickable(onClick = onClick),
+            .onFocusChanged { isFocused = it.hasFocus },
+        colors = CardDefaults.colors(
+            containerColor = backgroundColor,
+            focusedContainerColor = backgroundColor,
+        ),
+        border = CardDefaults.border(
+            border = androidx.tv.material3.Border.None,
+            focusedBorder = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Transparent),
+                shape = itemShape
+            )
+        ),
+        shape = CardDefaults.shape(shape = itemShape)
     ) {
+        Box(modifier = Modifier.fillMaxSize()) {
         DrawerItemIcon(
             iconRes = iconRes,
             icon = icon,
@@ -827,7 +978,7 @@ private fun LegacySidebarButton(
                 Modifier
                     .size(22.dp)
                     .align(Alignment.CenterStart)
-                    .offset(x = 18.dp)
+                    .offset(x = 13.dp)
             } else {
                 Modifier
                     .size(22.dp)
@@ -835,11 +986,9 @@ private fun LegacySidebarButton(
             }
         )
         if (expanded) {
-            Text(
+            com.nuvio.tv.ui.components.AutoResizeText(
                 text = label,
                 color = contentColor,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 textAlign = TextAlign.Start,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -848,6 +997,7 @@ private fun LegacySidebarButton(
             )
         }
     }
+}
 }
 
 @Composable
@@ -867,6 +1017,7 @@ private fun ModernSidebarScaffold(
     activeProfileAvatarImageUrl: String?,
     showProfileSelector: Boolean,
     onSwitchProfile: () -> Unit,
+    onNavigate: (String) -> Unit,
     onExitApp: () -> Unit
 ) {
     val showSidebar = currentRoute in rootRoutes
@@ -874,6 +1025,7 @@ private fun ModernSidebarScaffold(
     val openSidebarWidth = 262.dp
 
     val focusManager = LocalFocusManager.current
+    val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val contentFocusRequester = remember { FocusRequester() }
     val drawerItemFocusRequesters = remember(drawerItems) {
         drawerItems.associate { item -> item.route to FocusRequester() }
@@ -949,14 +1101,17 @@ private fun ModernSidebarScaffold(
         },
         label = "sidebarWidth"
     )
+    val animationDuration = if (sidebarVisible) 400 else 300
+    val animationEasing = if (sidebarVisible) FastOutSlowInEasing else FastOutLinearInEasing
+
     val sidebarSlideX by animateDpAsState(
         targetValue = if (sidebarVisible) 0.dp else (-24).dp,
-        animationSpec = tween(durationMillis = 205, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = animationDuration, easing = animationEasing),
         label = "sidebarSlideX"
     )
     val sidebarSurfaceAlpha by animateFloatAsState(
         targetValue = if (sidebarVisible) 1f else 0f,
-        animationSpec = tween(durationMillis = 135, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = animationDuration, easing = animationEasing),
         label = "sidebarSurfaceAlpha"
     )
     val shouldApplySidebarHaze = showSidebar && modernSidebarBlurEnabled && (
@@ -1091,8 +1246,9 @@ private fun ModernSidebarScaffold(
                                 else -> Unit
                             }
                         }
-                        if (keyEvent.key == Key.DirectionLeft) {
-                            if (focusManager.moveFocus(FocusDirection.Left)) {
+                        val openKey = if (isRtl) Key.DirectionRight else Key.DirectionLeft
+                        if (keyEvent.key == openKey) {
+                            if (focusManager.moveFocus(if (isRtl) FocusDirection.Right else FocusDirection.Left)) {
                                 true
                             } else {
                                 isSidebarExpanded = true
@@ -1155,10 +1311,15 @@ private fun ModernSidebarScaffold(
                                 focusedDrawerIndex == drawerItems.lastIndex
                             }
 
-                            Key.DirectionRight -> {
-                                pendingContentFocusTransfer = false
-                                sidebarCollapsePending = true
-                                true
+                            Key.DirectionRight, Key.DirectionLeft -> {
+                                val collapseKey = if (isRtl) Key.DirectionLeft else Key.DirectionRight
+                                if (keyEvent.key == collapseKey) {
+                                    pendingContentFocusTransfer = false
+                                    sidebarCollapsePending = true
+                                    true
+                                } else {
+                                    false
+                                }
                             }
 
                             else -> false
@@ -1181,6 +1342,7 @@ private fun ModernSidebarScaffold(
                         drawerItemFocusRequesters = drawerItemFocusRequesters,
                         onDrawerItemFocused = { focusedDrawerIndex = it },
                         onDrawerItemClick = { targetRoute ->
+                            onNavigate(targetRoute)
                             navigateToDrawerRoute(
                                 navController = navController,
                                 currentRoute = currentRoute,
@@ -1341,6 +1503,12 @@ private fun navigateToDrawerRoute(
     targetRoute: String
 ) {
     if (currentRoute == targetRoute) {
+        if (targetRoute == Screen.Home.route) {
+            // Scroll Home to top by clearing saved focus/scroll state on the ViewModel.
+            val homeEntry = navController.getBackStackEntry(Screen.Home.route)
+            val homeViewModel = androidx.lifecycle.ViewModelProvider(homeEntry)[com.nuvio.tv.ui.screens.home.HomeViewModel::class.java]
+            homeViewModel.requestScrollToTop()
+        }
         return
     }
     navController.navigate(targetRoute) {
@@ -1386,9 +1554,19 @@ private fun DrawerItemIcon(
 }
 
 @Composable
-private fun rememberRawSvgPainter(rawIconRes: Int): Painter = rememberAsyncImagePainter(
-    model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
-        .data(rawIconRes)
-        .decoderFactory(SvgDecoder.Factory())
-        .build()
-)
+private fun rememberRawSvgPainter(rawIconRes: Int): Painter {
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val sizePx = with(density) { 24.dp.roundToPx() }
+    return rememberAsyncImagePainter(
+        model = ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+            .data(rawIconRes)
+            .size(sizePx)
+            .build()
+    )
+}
+
+object LocaleCache {
+    const val UNSET = "__UNSET__"
+    @Volatile
+    var localeTag: String = UNSET
+}

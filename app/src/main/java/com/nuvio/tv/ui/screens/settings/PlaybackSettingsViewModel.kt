@@ -3,6 +3,7 @@ package com.nuvio.tv.ui.screens.settings
 import androidx.lifecycle.ViewModel
 import com.nuvio.tv.core.plugin.PluginManager
 import com.nuvio.tv.data.local.LibassRenderType
+import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.local.PlayerPreference
@@ -12,9 +13,13 @@ import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
 import com.nuvio.tv.data.local.AddonSubtitleStartupMode
 import com.nuvio.tv.data.local.AudioOutputChannels
+import com.nuvio.tv.data.local.AutoSkipSegmentType
+import com.nuvio.tv.data.local.MpvHardwareDecodeMode
 import com.nuvio.tv.data.local.SubtitleOrganizationMode
 import com.nuvio.tv.data.local.TrailerSettings
 import com.nuvio.tv.data.local.TrailerSettingsDataStore
+import com.nuvio.tv.core.torrent.TorrentSettings
+import com.nuvio.tv.core.torrent.TorrentSettingsData
 import com.nuvio.tv.domain.repository.AddonRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -27,11 +32,16 @@ class PlaybackSettingsViewModel @Inject constructor(
     private val playerSettingsDataStore: PlayerSettingsDataStore,
     private val trailerSettingsDataStore: TrailerSettingsDataStore,
     private val addonRepository: AddonRepository,
-    private val pluginManager: PluginManager
+    private val pluginManager: PluginManager,
+    private val torrentSettings: TorrentSettings
 ) : ViewModel() {
 
     val playerSettings: Flow<PlayerSettings> = playerSettingsDataStore.playerSettings
     val trailerSettings: Flow<TrailerSettings> = trailerSettingsDataStore.settings
+    val torrentSettingsFlow: Flow<TorrentSettingsData> = torrentSettings.settings
+
+    fun setP2pEnabled(enabled: Boolean) = torrentSettings.setP2pEnabled(enabled)
+    fun setHideTorrentStats(enabled: Boolean) = torrentSettings.setHideTorrentStats(enabled)
     val installedAddonNames: Flow<List<String>> = addonRepository.getInstalledAddons().map { addons ->
         addons
             .filter { addon ->
@@ -56,6 +66,14 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setPlayerPreference(preference: PlayerPreference) {
         playerSettingsDataStore.setPlayerPreference(preference)
+    }
+
+    suspend fun setInternalPlayerEngine(engine: InternalPlayerEngine) {
+        playerSettingsDataStore.setInternalPlayerEngine(engine)
+    }
+
+    suspend fun setAutoSwitchInternalPlayerOnError(enabled: Boolean) {
+        playerSettingsDataStore.setAutoSwitchInternalPlayerOnError(enabled)
     }
 
     suspend fun setTrailerEnabled(enabled: Boolean) {
@@ -92,6 +110,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setSkipSilence(enabled)
     }
 
+    suspend fun setRememberAudioDelayPerDevice(enabled: Boolean) {
+        playerSettingsDataStore.setRememberAudioDelayPerDevice(enabled)
+    }
+
     suspend fun setPreferredAudioLanguage(language: String) {
         playerSettingsDataStore.setPreferredAudioLanguage(language)
     }
@@ -102,6 +124,10 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setLoadingOverlayEnabled(enabled: Boolean) {
         playerSettingsDataStore.setLoadingOverlayEnabled(enabled)
+    }
+
+    suspend fun setShowPlayerLoadingStatus(enabled: Boolean) {
+        playerSettingsDataStore.setShowPlayerLoadingStatus(enabled)
     }
 
     suspend fun setPauseOverlayEnabled(enabled: Boolean) {
@@ -116,6 +142,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setSkipIntroEnabled(enabled)
     }
 
+    suspend fun setAutoSkipSegmentTypeEnabled(segmentType: AutoSkipSegmentType, enabled: Boolean) {
+        playerSettingsDataStore.setAutoSkipSegmentTypeEnabled(segmentType, enabled)
+    }
+
     suspend fun setFrameRateMatchingMode(mode: FrameRateMatchingMode) {
         playerSettingsDataStore.setFrameRateMatchingMode(mode)
     }
@@ -124,8 +154,17 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setResolutionMatchingEnabled(enabled)
     }
 
+    suspend fun disableAfrAndResolution() {
+        playerSettingsDataStore.setFrameRateMatchingMode(FrameRateMatchingMode.OFF)
+        playerSettingsDataStore.setResolutionMatchingEnabled(false)
+    }
+
     suspend fun setMapDV7ToHevc(enabled: Boolean) {
         playerSettingsDataStore.setMapDV7ToHevc(enabled)
+    }
+
+    suspend fun setMpvHardwareDecodeMode(mode: MpvHardwareDecodeMode) {
+        playerSettingsDataStore.setMpvHardwareDecodeMode(mode)
     }
 
     /**

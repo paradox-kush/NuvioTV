@@ -3,13 +3,22 @@ package com.nuvio.tv.data.local
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.nuvio.tv.core.profile.ProfileManager
-import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.nuvio.tv.core.profile.ProfileManager
+import com.nuvio.tv.core.sync.LocalHomeCatalogSettingsState
+import com.nuvio.tv.core.sync.SyncHomeCatalogPayload
+import com.nuvio.tv.core.sync.buildHomeCatalogSyncPayload
+import com.nuvio.tv.core.sync.homeCatalogKey
+import com.nuvio.tv.core.sync.homeCollectionKey
+import com.nuvio.tv.domain.model.Addon
+import com.nuvio.tv.domain.model.Collection
+import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -40,6 +49,7 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val heroCatalogKeysKey = stringPreferencesKey("hero_catalog_keys")
     private val homeCatalogOrderKeysKey = stringPreferencesKey("home_catalog_order_keys")
     private val disabledHomeCatalogKeysKey = stringPreferencesKey("disabled_home_catalog_keys")
+    private val customCatalogTitlesKey = stringPreferencesKey("custom_catalog_titles")
     private val sidebarCollapsedKey = booleanPreferencesKey("sidebar_collapsed_by_default")
     private val modernSidebarEnabledKey = booleanPreferencesKey("modern_sidebar_enabled")
     private val legacyModernSidebarEnabledKey = booleanPreferencesKey("glass_sidepanel_enabled")
@@ -50,6 +60,7 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val posterLabelsEnabledKey = booleanPreferencesKey("poster_labels_enabled")
     private val catalogAddonNameEnabledKey = booleanPreferencesKey("catalog_addon_name_enabled")
     private val catalogTypeSuffixEnabledKey = booleanPreferencesKey("catalog_type_suffix_enabled")
+    private val classicFocusGradientEnabledKey = booleanPreferencesKey("classic_focus_gradient_enabled")
     private val focusedPosterBackdropExpandEnabledKey = booleanPreferencesKey("focused_poster_backdrop_expand_enabled")
     private val focusedPosterBackdropExpandDelaySecondsKey = intPreferencesKey("focused_poster_backdrop_expand_delay_seconds")
     private val focusedPosterBackdropTrailerEnabledKey = booleanPreferencesKey("focused_poster_backdrop_trailer_enabled")
@@ -60,10 +71,20 @@ class LayoutPreferenceDataStore @Inject constructor(
     private val posterCardHeightDpKey = intPreferencesKey("poster_card_height_dp")
     private val posterCardCornerRadiusDpKey = intPreferencesKey("poster_card_corner_radius_dp")
     private val blurUnwatchedEpisodesKey = booleanPreferencesKey("blur_unwatched_episodes")
+    private val useEpisodeThumbnailsInCwKey = booleanPreferencesKey("use_episode_thumbnails_in_cw")
+    private val showUnairedNextUpKey = booleanPreferencesKey("show_unaired_next_up")
+    private val nextUpFromFurthestEpisodeKey = booleanPreferencesKey("next_up_from_furthest_episode")
+    private val blurContinueWatchingNextUpKey = booleanPreferencesKey("blur_continue_watching_next_up")
     private val detailPageTrailerButtonEnabledKey = booleanPreferencesKey("detail_page_trailer_button_enabled")
     private val preferExternalMetaAddonDetailKey = booleanPreferencesKey("prefer_external_meta_addon_detail")
+    private val modernHeroFullScreenBackdropKey = booleanPreferencesKey("modern_hero_full_screen_backdrop")
     private val hideUnreleasedContentKey = booleanPreferencesKey("hide_unreleased_content")
     private val showFullReleaseDateKey = booleanPreferencesKey("show_full_release_date")
+    private val memoryOnlyVerticalScrollKey = booleanPreferencesKey("memory_only_vertical_scroll")
+    private val smoothBringIntoViewEnabledKey = booleanPreferencesKey("smooth_bring_into_view_enabled")
+    private val fastHorizontalNavigationEnabledKey = booleanPreferencesKey("fast_horizontal_navigation_enabled")
+    private val followAddonsOrderKey = booleanPreferencesKey("follow_addons_order")
+    private val composeHighlighterEnabledKey = booleanPreferencesKey("compose_highlighter_enabled")
 
     private fun <T> profileFlow(extract: (prefs: androidx.datastore.preferences.core.Preferences) -> T): Flow<T> =
         profileManager.activeProfileId.flatMapLatest { pid ->
@@ -108,6 +129,10 @@ class LayoutPreferenceDataStore @Inject constructor(
         parseCatalogKeys(prefs[disabledHomeCatalogKeysKey])
     }
 
+    val customCatalogTitles: Flow<Map<String, String>> = profileFlow { prefs ->
+        parseCustomTitles(prefs[customCatalogTitlesKey])
+    }
+
     val sidebarCollapsedByDefault: Flow<Boolean> = profileFlow { prefs ->
         val modernSidebarEnabled =
             prefs[modernSidebarEnabledKey] ?: prefs[legacyModernSidebarEnabledKey] ?: false
@@ -130,6 +155,10 @@ class LayoutPreferenceDataStore @Inject constructor(
         prefs[modernLandscapePostersEnabledKey] ?: false
     }
 
+    val modernHeroFullScreenBackdropEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[modernHeroFullScreenBackdropKey] ?: false
+    }
+
     val heroSectionEnabled: Flow<Boolean> = profileFlow { prefs ->
         prefs[heroSectionEnabledKey] ?: true
     }
@@ -150,8 +179,12 @@ class LayoutPreferenceDataStore @Inject constructor(
         prefs[catalogTypeSuffixEnabledKey] ?: true
     }
 
+    val classicFocusGradientEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[classicFocusGradientEnabledKey] ?: false
+    }
+
     val focusedPosterBackdropExpandEnabled: Flow<Boolean> = profileFlow { prefs ->
-        prefs[focusedPosterBackdropExpandEnabledKey] ?: false
+        prefs[focusedPosterBackdropExpandEnabledKey] ?: true
     }
 
     val focusedPosterBackdropExpandDelaySeconds: Flow<Int> = profileFlow { prefs ->
@@ -192,12 +225,28 @@ class LayoutPreferenceDataStore @Inject constructor(
         prefs[blurUnwatchedEpisodesKey] ?: false
     }
 
+    val useEpisodeThumbnailsInCw: Flow<Boolean> = profileFlow { prefs ->
+        prefs[useEpisodeThumbnailsInCwKey] ?: true
+    }
+
+    val showUnairedNextUp: Flow<Boolean> = profileFlow { prefs ->
+        prefs[showUnairedNextUpKey] ?: true
+    }
+
+    val nextUpFromFurthestEpisode: Flow<Boolean> = profileFlow { prefs ->
+        prefs[nextUpFromFurthestEpisodeKey] ?: true
+    }
+
+    val blurContinueWatchingNextUp: Flow<Boolean> = profileFlow { prefs ->
+        prefs[blurContinueWatchingNextUpKey] ?: false
+    }
+
     val detailPageTrailerButtonEnabled: Flow<Boolean> = profileFlow { prefs ->
-        prefs[detailPageTrailerButtonEnabledKey] ?: false
+        prefs[detailPageTrailerButtonEnabledKey] ?: true
     }
 
     val preferExternalMetaAddonDetail: Flow<Boolean> = profileFlow { prefs ->
-        prefs[preferExternalMetaAddonDetailKey] ?: false
+        prefs[preferExternalMetaAddonDetailKey] ?: true
     }
 
     val hideUnreleasedContent: Flow<Boolean> = profileFlow { prefs ->
@@ -206,6 +255,56 @@ class LayoutPreferenceDataStore @Inject constructor(
 
     val showFullReleaseDate: Flow<Boolean> = profileFlow { prefs ->
         prefs[showFullReleaseDateKey] ?: true
+    }
+
+    val memoryOnlyVerticalScroll: Flow<Boolean> = profileFlow { prefs ->
+        prefs[memoryOnlyVerticalScrollKey] ?: true
+    }
+
+    val smoothBringIntoViewEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[smoothBringIntoViewEnabledKey] ?: true
+    }
+
+    val fastHorizontalNavigationEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[fastHorizontalNavigationEnabledKey] ?: false
+    }
+
+    val followAddonsOrder: Flow<Boolean> = profileFlow { prefs ->
+        prefs[followAddonsOrderKey] ?: false
+    }
+
+    val composeHighlighterEnabled: Flow<Boolean> = profileFlow { prefs ->
+        prefs[composeHighlighterEnabledKey] ?: false
+    }
+
+    suspend fun setMemoryOnlyVerticalScroll(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[memoryOnlyVerticalScrollKey] = enabled
+        }
+    }
+
+    suspend fun setSmoothBringIntoViewEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[smoothBringIntoViewEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setFastHorizontalNavigationEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[fastHorizontalNavigationEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setFollowAddonsOrder(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[followAddonsOrderKey] = enabled
+        }
+    }
+
+    suspend fun setComposeHighlighterEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[composeHighlighterEnabledKey] = enabled
+        }
     }
 
     suspend fun setLayout(layout: HomeLayout) {
@@ -293,6 +392,12 @@ class LayoutPreferenceDataStore @Inject constructor(
         }
     }
 
+    suspend fun setModernHeroFullScreenBackdropEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[modernHeroFullScreenBackdropKey] = enabled
+        }
+    }
+
     suspend fun setHeroSectionEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[heroSectionEnabledKey] = enabled
@@ -320,6 +425,12 @@ class LayoutPreferenceDataStore @Inject constructor(
     suspend fun setCatalogTypeSuffixEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[catalogTypeSuffixEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setClassicFocusGradientEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[classicFocusGradientEnabledKey] = enabled
         }
     }
 
@@ -387,6 +498,30 @@ class LayoutPreferenceDataStore @Inject constructor(
         }
     }
 
+    suspend fun setUseEpisodeThumbnailsInCw(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[useEpisodeThumbnailsInCwKey] = enabled
+        }
+    }
+
+    suspend fun setShowUnairedNextUp(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[showUnairedNextUpKey] = enabled
+        }
+    }
+
+    suspend fun setNextUpFromFurthestEpisode(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[nextUpFromFurthestEpisodeKey] = enabled
+        }
+    }
+
+    suspend fun setBlurContinueWatchingNextUp(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[blurContinueWatchingNextUpKey] = enabled
+        }
+    }
+
     suspend fun setDetailPageTrailerButtonEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[detailPageTrailerButtonEnabledKey] = enabled
@@ -428,5 +563,84 @@ class LayoutPreferenceDataStore @Inject constructor(
             .filter { it.isNotEmpty() }
             .distinct()
             .toList()
+    }
+
+    private fun parseCustomTitles(json: String?): Map<String, String> {
+        if (json.isNullOrBlank()) return emptyMap()
+        return try {
+            val type = object : TypeToken<Map<String, String>>() {}.type
+            gson.fromJson<Map<String, String>>(json, type).orEmpty()
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    suspend fun setCustomCatalogTitles(titles: Map<String, String>) {
+        store().edit { prefs ->
+            val filtered = titles.filterValues { it.isNotBlank() }
+            if (filtered.isEmpty()) {
+                prefs.remove(customCatalogTitlesKey)
+            } else {
+                prefs[customCatalogTitlesKey] = gson.toJson(filtered)
+            }
+        }
+    }
+
+    internal suspend fun getHomeCatalogSettingsState(): LocalHomeCatalogSettingsState {
+        return readHomeCatalogSettingsState(store().data.first())
+    }
+
+    internal suspend fun exportCatalogSettingsToSyncPayload(
+        addons: List<Addon>,
+        collections: List<Collection>
+    ): SyncHomeCatalogPayload {
+        return buildHomeCatalogSyncPayload(
+            addons = addons,
+            collections = collections,
+            localState = getHomeCatalogSettingsState()
+        )
+    }
+
+    suspend fun applyCatalogSettingsFromRemote(payload: SyncHomeCatalogPayload) {
+        val sortedItems = payload.items.sortedBy { it.order }
+        val orderKeys = sortedItems.map { item ->
+            if (item.isCollection) homeCollectionKey(item.collectionId)
+            else homeCatalogKey(item.addonId, item.type, item.catalogId)
+        }
+        val disabledKeys = sortedItems.filter { !it.enabled }.map { item ->
+            if (item.isCollection) homeCollectionKey(item.collectionId)
+            else homeCatalogKey(item.addonId, item.type, item.catalogId)
+        }
+        val titles = sortedItems.associate { item ->
+            val key = if (item.isCollection) homeCollectionKey(item.collectionId)
+            else homeCatalogKey(item.addonId, item.type, item.catalogId)
+            key to item.customTitle
+        }.filterValues { it.isNotBlank() }
+
+        store().edit { prefs ->
+            if (orderKeys.isNotEmpty()) {
+                prefs[homeCatalogOrderKeysKey] = gson.toJson(orderKeys)
+            } else {
+                prefs.remove(homeCatalogOrderKeysKey)
+            }
+            if (disabledKeys.isNotEmpty()) {
+                prefs[disabledHomeCatalogKeysKey] = gson.toJson(disabledKeys)
+            } else {
+                prefs.remove(disabledHomeCatalogKeysKey)
+            }
+            if (titles.isNotEmpty()) {
+                prefs[customCatalogTitlesKey] = gson.toJson(titles)
+            } else {
+                prefs.remove(customCatalogTitlesKey)
+            }
+        }
+    }
+
+    private fun readHomeCatalogSettingsState(prefs: Preferences): LocalHomeCatalogSettingsState {
+        return LocalHomeCatalogSettingsState(
+            orderKeys = parseCatalogKeys(prefs[homeCatalogOrderKeysKey]),
+            disabledKeys = parseCatalogKeys(prefs[disabledHomeCatalogKeysKey]).toSet(),
+            customTitles = parseCustomTitles(prefs[customCatalogTitlesKey])
+        )
     }
 }
