@@ -258,7 +258,7 @@ class TmdbCollectionSourceResolver @Inject constructor(
                     filters.watchRegion?.takeIf { it.isNotBlank() } ?: "US"
                 } else null,
                 withWatchProviders = filters.withWatchProviders,
-                withWatchMonetizationTypes = if (!filters.withWatchProviders.isNullOrBlank()) "flatrate" else null
+                withWatchMonetizationTypes = if (!filters.withWatchProviders.isNullOrBlank()) "flatrate|free|ads|rent|buy" else null
             ).body()
             TmdbCollectionMediaType.TV -> tmdbApi.discoverTv(
                 apiKey = BuildConfig.TMDB_API_KEY,
@@ -288,7 +288,7 @@ class TmdbCollectionSourceResolver @Inject constructor(
                     filters.watchRegion?.takeIf { it.isNotBlank() } ?: "US"
                 } else null,
                 withWatchProviders = filters.withWatchProviders,
-                withWatchMonetizationTypes = if (!filters.withWatchProviders.isNullOrBlank()) "flatrate" else null
+                withWatchMonetizationTypes = if (!filters.withWatchProviders.isNullOrBlank()) "flatrate|free|ads|rent|buy" else null
             ).body()
         } ?: error(string(R.string.tmdb_error_discover_no_data))
         val items = response.results.orEmpty().mapNotNull { it.toPreview(mediaType) }.distinctBy { it.id }
