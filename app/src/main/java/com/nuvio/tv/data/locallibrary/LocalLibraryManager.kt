@@ -133,6 +133,53 @@ class LocalLibraryManager @Inject constructor(
         return Result.success(config)
     }
 
+    /**
+     * Verifies a Jellyfin URL + credentials without persisting anything. Used
+     * by the Test Connection button in Add Source.
+     */
+    suspend fun testJellyfin(url: String, username: String, password: String): Result<Unit> {
+        if (url.isBlank()) return Result.failure(IllegalArgumentException("URL is required"))
+        if (username.isBlank()) return Result.failure(IllegalArgumentException("Username is required"))
+        val transientConfig = LocalLibrarySourceConfig(
+            id = "test-jellyfin-${System.nanoTime()}",
+            displayName = "Test",
+            kind = com.nuvio.tv.domain.model.locallibrary.SourceKind.JELLYFIN,
+            urlOrPath = url.trimEnd('/')
+        )
+        val source = sourceFactory.create(transientConfig) as com.nuvio.tv.data.locallibrary.source.JellyfinSource
+        return source.verifyCredentials(username, password).map { }
+    }
+
+    /**
+     * Verifies an SMB share + credentials by connecting and listing the root
+     * directory. Credentials are stored under a transient id only for the
+     * duration of the test and cleared before returning.
+     */
+    suspend fun testSmb(
+        url: String,
+        username: String?,
+        password: String?,
+        domain: String?
+    ): Result<Unit> {
+        if (url.isBlank()) return Result.failure(IllegalArgumentException("URL is required"))
+        val transientId = "test-smb-${System.nanoTime()}"
+        return try {
+            if (!username.isNullOrBlank()) credentialStore.putSecret(transientId, LocalLibraryCredentialStore.Field.SMB_USERNAME, username)
+            if (!password.isNullOrBlank()) credentialStore.putSecret(transientId, LocalLibraryCredentialStore.Field.SMB_PASSWORD, password)
+            if (!domain.isNullOrBlank()) credentialStore.putSecret(transientId, LocalLibraryCredentialStore.Field.SMB_DOMAIN, domain)
+            val transientConfig = LocalLibrarySourceConfig(
+                id = transientId,
+                displayName = "Test",
+                kind = com.nuvio.tv.domain.model.locallibrary.SourceKind.SMB,
+                urlOrPath = url
+            )
+            val source = sourceFactory.create(transientConfig)
+            source.testConnection()
+        } finally {
+            credentialStore.clearSource(transientId)
+        }
+    }
+
     suspend fun removeSource(sourceId: String) {
         scanJobs[sourceId]?.cancel()
         scanJobs.remove(sourceId)

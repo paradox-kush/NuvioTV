@@ -112,22 +112,33 @@ class JellyfinSource(
         return Auth(storedToken, storedUserId)
     }
 
-    /** Public so the Add Source flow can prime credentials before persisting them. */
-    suspend fun authenticate(username: String, password: String): Auth? {
+    /**
+     * Authenticates against the server but does NOT persist the resulting token.
+     * Used by the Test Connection flow so a successful test doesn't leak
+     * credentials into the credential store before the user has confirmed.
+     */
+    suspend fun verifyCredentials(username: String, password: String): Result<Auth> = runCatching {
         val resp = api.authenticateByName(
             authHeader = authHeader(null),
             body = JellyfinAuthRequest(username = username, password = password)
         )
-        if (!resp.isSuccessful) {
-            Log.w(TAG, "Jellyfin auth failed: ${resp.code()}")
+        if (!resp.isSuccessful) error("HTTP ${resp.code()} ${resp.message()}")
+        val body = resp.body() ?: error("Empty response from server")
+        val token = body.accessToken ?: error("Server did not return an access token")
+        val userId = body.user?.id ?: error("Server did not return a user id")
+        Auth(token, userId)
+    }
+
+    /** Public so the Add Source flow can prime credentials before persisting them. */
+    suspend fun authenticate(username: String, password: String): Auth? {
+        val result = verifyCredentials(username, password)
+        val auth = result.getOrNull() ?: run {
+            Log.w(TAG, "Jellyfin auth failed: ${result.exceptionOrNull()?.message}")
             return null
         }
-        val body = resp.body() ?: return null
-        val token = body.accessToken ?: return null
-        val userId = body.user?.id ?: return null
-        credentialStore.putSecret(config.id, Field.JELLYFIN_TOKEN, token)
-        credentialStore.putSecret(config.id, Field.JELLYFIN_USER_ID, userId)
-        return Auth(token, userId)
+        credentialStore.putSecret(config.id, Field.JELLYFIN_TOKEN, auth.token)
+        credentialStore.putSecret(config.id, Field.JELLYFIN_USER_ID, auth.userId)
+        return auth
     }
 
     private fun authHeader(token: String?): String {

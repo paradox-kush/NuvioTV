@@ -3,6 +3,7 @@ package com.nuvio.tv.ui.screens.settings.locallibrary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.data.locallibrary.LocalLibraryManager
+import com.nuvio.tv.data.locallibrary.discovery.JellyfinDiscovery
 import com.nuvio.tv.data.locallibrary.match.MediaMatcher
 import com.nuvio.tv.data.remote.api.TmdbDiscoverResult
 import com.nuvio.tv.domain.model.ContentType
@@ -22,7 +23,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LocalLibrarySettingsViewModel @Inject constructor(
     private val manager: LocalLibraryManager,
-    private val matcher: MediaMatcher
+    private val matcher: MediaMatcher,
+    private val jellyfinDiscovery: JellyfinDiscovery
 ) : ViewModel() {
 
     data class UiState(
@@ -38,6 +40,12 @@ class LocalLibrarySettingsViewModel @Inject constructor(
 
     private val _addResult = MutableStateFlow<AddResult?>(null)
     val addResult: StateFlow<AddResult?> = _addResult.asStateFlow()
+
+    private val _testResult = MutableStateFlow<TestResult?>(null)
+    val testResult: StateFlow<TestResult?> = _testResult.asStateFlow()
+
+    private val _discoveryState = MutableStateFlow<DiscoveryState>(DiscoveryState.Idle)
+    val discoveryState: StateFlow<DiscoveryState> = _discoveryState.asStateFlow()
 
     private val _unmatched = MutableStateFlow<List<ScannedItem>>(emptyList())
     val unmatched: StateFlow<List<ScannedItem>> = _unmatched.asStateFlow()
@@ -71,6 +79,50 @@ class LocalLibrarySettingsViewModel @Inject constructor(
 
     fun clearAddResult() {
         _addResult.value = null
+    }
+
+    fun testJellyfin(url: String, username: String, password: String) {
+        viewModelScope.launch {
+            _testResult.value = TestResult.Running
+            val result = manager.testJellyfin(url, username, password)
+            _testResult.value = if (result.isSuccess) TestResult.Success
+            else TestResult.Failure(result.exceptionOrNull()?.message ?: "Connection failed")
+        }
+    }
+
+    fun testSmb(url: String, username: String?, password: String?, domain: String?) {
+        viewModelScope.launch {
+            _testResult.value = TestResult.Running
+            val result = manager.testSmb(url, username, password, domain)
+            _testResult.value = if (result.isSuccess) TestResult.Success
+            else TestResult.Failure(result.exceptionOrNull()?.message ?: "Connection failed")
+        }
+    }
+
+    fun clearTestResult() {
+        _testResult.value = null
+    }
+
+    /**
+     * Sweeps the local subnet looking for a Jellyfin server on its default
+     * ports (HTTPS 8920, then HTTP 8096). On success exposes the URL via
+     * [discoveryState] so the form can prefill its Server URL field.
+     */
+    fun discoverJellyfin() {
+        if (_discoveryState.value is DiscoveryState.Scanning) return
+        viewModelScope.launch {
+            _discoveryState.value = DiscoveryState.Scanning
+            val hit = runCatching { jellyfinDiscovery.discover() }.getOrNull()
+            _discoveryState.value = if (hit != null) {
+                DiscoveryState.Found(hit.url, hit.serverName)
+            } else {
+                DiscoveryState.NotFound
+            }
+        }
+    }
+
+    fun clearDiscoveryState() {
+        _discoveryState.value = DiscoveryState.Idle
     }
 
     fun rescan(sourceId: String) = manager.rescan(sourceId)
@@ -110,5 +162,18 @@ class LocalLibrarySettingsViewModel @Inject constructor(
     sealed class AddResult {
         object Success : AddResult()
         data class Failure(val message: String) : AddResult()
+    }
+
+    sealed class TestResult {
+        object Running : TestResult()
+        object Success : TestResult()
+        data class Failure(val message: String) : TestResult()
+    }
+
+    sealed class DiscoveryState {
+        object Idle : DiscoveryState()
+        object Scanning : DiscoveryState()
+        data class Found(val url: String, val serverName: String?) : DiscoveryState()
+        object NotFound : DiscoveryState()
     }
 }
