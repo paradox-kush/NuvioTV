@@ -27,6 +27,11 @@ import com.nuvio.tv.ui.screens.library.LibraryScreen
 import com.nuvio.tv.ui.screens.player.PlayerExitReason
 import com.nuvio.tv.ui.screens.player.PlayerScreen
 import com.nuvio.tv.ui.screens.plugin.PluginScreen
+import com.nuvio.tv.ui.screens.settings.locallibrary.AddSourceScreen
+import com.nuvio.tv.ui.screens.settings.locallibrary.LocalLibrarySettingsScreen
+import com.nuvio.tv.ui.screens.settings.locallibrary.ManualMatchListScreen
+import com.nuvio.tv.ui.screens.settings.locallibrary.ManualMatchPickerScreen
+import com.nuvio.tv.ui.screens.settings.locallibrary.SourceDetailScreen
 import com.nuvio.tv.ui.screens.search.DiscoverScreen
 import com.nuvio.tv.ui.screens.search.SearchScreen
 import com.nuvio.tv.ui.screens.settings.AboutScreen
@@ -979,7 +984,8 @@ fun NuvioNavHost(
                 },
                 onNavigateToLicensesAttributions = {
                     navController.navigate(Screen.LicensesAttributions.route)
-                }
+                },
+                onNavigateToLocalLibrary = { navController.navigate(Screen.LocalLibrarySettings.route) }
             )
         }
 
@@ -1098,6 +1104,67 @@ fun NuvioNavHost(
                     onBackPress = { navController.popBackStack() }
                 )
             }
+        }
+
+        composable(Screen.LocalLibrarySettings.route) {
+            LocalLibrarySettingsScreen(
+                onBackPress = { navController.popBackStack() },
+                onNavigateToAddSource = { navController.navigate(Screen.LocalLibraryAddSource.route) },
+                onNavigateToSourceDetail = { sourceId ->
+                    navController.navigate(Screen.LocalLibrarySourceDetail.createRoute(sourceId))
+                }
+            )
+        }
+
+        composable(Screen.LocalLibraryAddSource.route) {
+            AddSourceScreen(
+                onDone = { navController.popBackStack() },
+                onBackPress = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.LocalLibrarySourceDetail.route,
+            arguments = listOf(navArgument("sourceId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val sourceId = backStackEntry.arguments?.getString("sourceId").orEmpty()
+            SourceDetailScreen(
+                sourceId = sourceId,
+                onBackPress = { navController.popBackStack() },
+                onNavigateToManualMatch = { sid ->
+                    navController.navigate(Screen.LocalLibraryManualMatchList.createRoute(sid))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.LocalLibraryManualMatchList.route,
+            arguments = listOf(navArgument("sourceId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val sourceId = backStackEntry.arguments?.getString("sourceId").orEmpty()
+            ManualMatchListScreen(
+                sourceId = sourceId,
+                onBackPress = { navController.popBackStack() },
+                onNavigateToPicker = { sid, key ->
+                    navController.navigate(Screen.LocalLibraryManualMatchPicker.createRoute(sid, key))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.LocalLibraryManualMatchPicker.route,
+            arguments = listOf(
+                navArgument("sourceId") { type = NavType.StringType },
+                navArgument("itemKey") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val sourceId = backStackEntry.arguments?.getString("sourceId").orEmpty()
+            val itemKey = backStackEntry.arguments?.getString("itemKey").orEmpty()
+            ManualMatchPickerScreen(
+                sourceId = sourceId,
+                itemKey = itemKey,
+                onBackPress = { navController.popBackStack() }
+            )
         }
 
         composable(Screen.Account.route) {

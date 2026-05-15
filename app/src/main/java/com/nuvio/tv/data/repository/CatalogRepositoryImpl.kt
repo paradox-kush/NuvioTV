@@ -8,6 +8,7 @@ import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.repository.CatalogRepository
+import com.nuvio.tv.domain.repository.LocalLibraryGateway
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.net.URLEncoder
@@ -16,7 +17,8 @@ import javax.inject.Singleton
 
 @Singleton
 class CatalogRepositoryImpl @Inject constructor(
-    private val api: AddonApi
+    private val api: AddonApi,
+    private val localLibraryGateway: LocalLibraryGateway
 ) : CatalogRepository {
     companion object {
         private const val TAG = "CatalogRepository"
@@ -35,6 +37,11 @@ class CatalogRepositoryImpl @Inject constructor(
         supportsSkip: Boolean
     ): Flow<NetworkResult<CatalogRow>> = flow {
         emit(NetworkResult.Loading)
+
+        if (localLibraryGateway.isLocalLibrary(addonId, addonBaseUrl)) {
+            emit(localLibraryGateway.catalog(catalogId, skip, skipStep))
+            return@flow
+        }
 
         val url = buildCatalogUrl(addonBaseUrl, type, catalogId, skip, extraArgs)
         Log.d(

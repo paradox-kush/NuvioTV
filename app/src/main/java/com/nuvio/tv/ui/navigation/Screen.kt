@@ -141,6 +141,26 @@ sealed class Screen(val route: String) {
     data object AddonManager : Screen("addon_manager")
     data object CatalogOrder : Screen("catalog_order")
     data object Plugins : Screen("plugins")
+    data object LocalLibrarySettings : Screen("local_library_settings")
+    data object LocalLibraryAddSource : Screen("local_library_add_source")
+    data object LocalLibrarySourceDetail : Screen("local_library_source_detail/{sourceId}") {
+        private fun encode(value: String): String =
+            URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+        fun createRoute(sourceId: String): String =
+            "local_library_source_detail/${encode(sourceId)}"
+    }
+    data object LocalLibraryManualMatchList : Screen("local_library_match_list/{sourceId}") {
+        private fun encode(value: String): String =
+            URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+        fun createRoute(sourceId: String): String =
+            "local_library_match_list/${encode(sourceId)}"
+    }
+    data object LocalLibraryManualMatchPicker : Screen("local_library_match_picker/{sourceId}/{itemKey}") {
+        private fun encode(value: String): String =
+            URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+        fun createRoute(sourceId: String, itemKey: String): String =
+            "local_library_match_picker/${encode(sourceId)}/${encode(itemKey)}"
+    }
     data object ExperienceModeSelection : Screen("experience_mode_selection")
     data object LayoutSelection : Screen("layout_selection")
     data object LayoutSettings : Screen("layout_settings")

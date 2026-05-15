@@ -1,0 +1,215 @@
+package com.nuvio.tv.data.locallibrary
+
+import android.util.Log
+import com.nuvio.tv.data.local.LocalLibraryPreferences
+import com.nuvio.tv.data.local.MatchOverrideStore
+import com.nuvio.tv.data.locallibrary.match.MediaMatcher
+import com.nuvio.tv.data.locallibrary.source.LocalLibrarySourceFactory
+import com.nuvio.tv.domain.model.locallibrary.LocalLibrarySourceConfig
+import com.nuvio.tv.domain.model.locallibrary.ScannedItem
+import com.nuvio.tv.domain.repository.MetaRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Orchestrates the lifecycle of local library sources: add/remove, persist
+ * credentials, run scans, match items to TMDB, and notify the rest of the app
+ * via [MetaRepository.clearCache] when the index changes.
+ *
+ * Scans run on an app-scoped supervisor scope so adding a new source kicks off
+ * background work that survives the originating screen leaving the foreground.
+ */
+@Singleton
+class LocalLibraryManager @Inject constructor(
+    private val preferences: LocalLibraryPreferences,
+    private val credentialStore: LocalLibraryCredentialStore,
+    private val index: LocalLibraryIndex,
+    private val overrideStore: MatchOverrideStore,
+    private val matcher: MediaMatcher,
+    private val sourceFactory: LocalLibrarySourceFactory,
+    private val metaRepository: MetaRepository
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scanJobs = ConcurrentHashMap<String, Job>()
+    private val rescanMutex = Mutex()
+
+    private val _scanProgress = MutableStateFlow<Map<String, ScanProgress>>(emptyMap())
+    val scanProgress: StateFlow<Map<String, ScanProgress>> = _scanProgress.asStateFlow()
+
+    val sources: StateFlow<List<LocalLibrarySourceConfig>>
+        get() = sourcesFlow
+
+    // Materialize the sources Flow into a StateFlow eagerly (replay 1) so UI screens
+    // collect synchronously without waiting on DataStore IO.
+    private val sourcesFlow: MutableStateFlow<List<LocalLibrarySourceConfig>> = MutableStateFlow(emptyList())
+
+    init {
+        scope.launch {
+            preferences.sources.collect { sourcesFlow.value = it }
+        }
+    }
+
+    suspend fun addJellyfin(
+        displayName: String,
+        url: String,
+        username: String,
+        password: String
+    ): Result<LocalLibrarySourceConfig> {
+        val id = generateSourceId()
+        val config = LocalLibrarySourceConfig(
+            id = id,
+            displayName = displayName,
+            kind = com.nuvio.tv.domain.model.locallibrary.SourceKind.JELLYFIN,
+            urlOrPath = url.trimEnd('/'),
+            params = if (username.isNotBlank()) mapOf("username" to username) else emptyMap()
+        )
+        val source = sourceFactory.create(config) as com.nuvio.tv.data.locallibrary.source.JellyfinSource
+        val auth = source.authenticate(username, password)
+            ?: return Result.failure(IllegalStateException("Jellyfin authentication failed"))
+        preferences.upsert(config)
+        kickoffScan(config)
+        return Result.success(config)
+    }
+
+    suspend fun addSmb(
+        displayName: String,
+        url: String,
+        username: String?,
+        password: String?,
+        domain: String?
+    ): Result<LocalLibrarySourceConfig> {
+        val id = generateSourceId()
+        val config = LocalLibrarySourceConfig(
+            id = id,
+            displayName = displayName,
+            kind = com.nuvio.tv.domain.model.locallibrary.SourceKind.SMB,
+            urlOrPath = url
+        )
+        if (!username.isNullOrBlank()) credentialStore.putSecret(id, LocalLibraryCredentialStore.Field.SMB_USERNAME, username)
+        if (!password.isNullOrBlank()) credentialStore.putSecret(id, LocalLibraryCredentialStore.Field.SMB_PASSWORD, password)
+        if (!domain.isNullOrBlank()) credentialStore.putSecret(id, LocalLibraryCredentialStore.Field.SMB_DOMAIN, domain)
+        val source = sourceFactory.create(config)
+        val test = source.testConnection()
+        if (test.isFailure) {
+            credentialStore.clearSource(id)
+            return Result.failure(test.exceptionOrNull() ?: IllegalStateException("SMB test failed"))
+        }
+        preferences.upsert(config)
+        kickoffScan(config)
+        return Result.success(config)
+    }
+
+    suspend fun addLocalFile(
+        displayName: String,
+        treeUri: String
+    ): Result<LocalLibrarySourceConfig> {
+        val id = generateSourceId()
+        val config = LocalLibrarySourceConfig(
+            id = id,
+            displayName = displayName,
+            kind = com.nuvio.tv.domain.model.locallibrary.SourceKind.LOCAL_FILE,
+            urlOrPath = treeUri
+        )
+        val source = sourceFactory.create(config)
+        val test = source.testConnection()
+        if (test.isFailure) {
+            return Result.failure(test.exceptionOrNull() ?: IllegalStateException("Folder not accessible"))
+        }
+        preferences.upsert(config)
+        kickoffScan(config)
+        return Result.success(config)
+    }
+
+    suspend fun removeSource(sourceId: String) {
+        scanJobs[sourceId]?.cancel()
+        scanJobs.remove(sourceId)
+        preferences.remove(sourceId)
+        credentialStore.clearSource(sourceId)
+        index.deleteSource(sourceId)
+        overrideStore.removeForSource(sourceId)
+        metaRepository.clearCache()
+    }
+
+    suspend fun setEnabled(sourceId: String, enabled: Boolean) {
+        preferences.setEnabled(sourceId, enabled)
+        metaRepository.clearCache()
+    }
+
+    /** Manually trigger a rescan from the settings UI. */
+    fun rescan(sourceId: String) {
+        scope.launch {
+            val config = preferences.sources.first().firstOrNull { it.id == sourceId } ?: return@launch
+            kickoffScan(config)
+        }
+    }
+
+    /** Returns scanned items in the index that don't yet have a TMDB match. */
+    suspend fun unmatchedItems(sourceId: String): List<ScannedItem> {
+        val items = index.load(sourceId)
+        val matches = overrideStore.matches.first()
+        return items.filter { matches[it.itemKey] == null }
+    }
+
+    suspend fun resolveItem(localId: String): ScannedItem? = index.findByLocalId(localId)
+
+    private fun kickoffScan(config: LocalLibrarySourceConfig) {
+        scanJobs[config.id]?.cancel()
+        scanJobs[config.id] = scope.launch {
+            rescanMutex.withLock {
+                runScan(config)
+            }
+        }
+    }
+
+    private suspend fun runScan(config: LocalLibrarySourceConfig) {
+        _scanProgress.value = _scanProgress.value + (config.id to ScanProgress.Scanning(0))
+        val source = sourceFactory.create(config)
+        val collected = mutableListOf<ScannedItem>()
+        try {
+            source.scan().toList(collected)
+        } catch (t: Throwable) {
+            Log.e(TAG, "Scan failed for ${config.id}", t)
+            _scanProgress.value = _scanProgress.value + (config.id to ScanProgress.Failed(t.message ?: "Scan failed"))
+            return
+        }
+        index.replace(config.id, collected)
+        _scanProgress.value = _scanProgress.value + (config.id to ScanProgress.Matching(0, collected.size))
+
+        collected.forEachIndexed { i, item ->
+            runCatching { matcher.match(item) }
+                .onFailure { Log.w(TAG, "Match failed for ${item.itemKey}", it) }
+            if (i % 25 == 0 || i == collected.lastIndex) {
+                _scanProgress.value = _scanProgress.value + (config.id to ScanProgress.Matching(i + 1, collected.size))
+            }
+        }
+        preferences.setScanResult(config.id, collected.size, System.currentTimeMillis())
+        metaRepository.clearCache()
+        _scanProgress.value = _scanProgress.value + (config.id to ScanProgress.Idle(collected.size))
+    }
+
+    private fun generateSourceId(): String = java.util.UUID.randomUUID().toString()
+
+    sealed class ScanProgress {
+        data class Idle(val itemCount: Int) : ScanProgress()
+        data class Scanning(val itemsFound: Int) : ScanProgress()
+        data class Matching(val matched: Int, val total: Int) : ScanProgress()
+        data class Failed(val reason: String) : ScanProgress()
+    }
+
+    companion object {
+        private const val TAG = "LocalLibraryManager"
+    }
+}

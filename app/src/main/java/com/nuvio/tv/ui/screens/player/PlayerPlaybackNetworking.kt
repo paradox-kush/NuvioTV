@@ -5,6 +5,9 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import com.nuvio.tv.core.network.IPv4FirstDns
+import com.nuvio.tv.core.player.datasource.PlayerDataSourceEntryPoint
+import com.nuvio.tv.core.player.datasource.SchemeDispatchingDataSource
+import com.nuvio.tv.core.player.datasource.SmbDataSource
 import okhttp3.OkHttpClient
 import java.net.HttpURLConnection
 import java.net.URL
@@ -87,7 +90,16 @@ internal object PlayerPlaybackNetworking {
         context: android.content.Context,
         defaultHeaders: Map<String, String> = emptyMap()
     ): DataSource.Factory {
-        return DefaultDataSource.Factory(context, createHttpDataSourceFactory(defaultHeaders))
+        val base = DefaultDataSource.Factory(context, createHttpDataSourceFactory(defaultHeaders))
+        val entry = PlayerDataSourceEntryPoint.get(context)
+        val smbFactory = SmbDataSource.Factory(
+            entry.localLibraryPreferences(),
+            entry.localLibraryCredentialStore()
+        )
+        return SchemeDispatchingDataSource.Factory(
+            defaultFactory = base,
+            factoryByScheme = mapOf("smb" to smbFactory)
+        )
     }
 
     fun openConnection(

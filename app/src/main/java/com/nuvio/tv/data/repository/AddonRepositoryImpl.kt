@@ -11,6 +11,7 @@ import com.nuvio.tv.data.mapper.toDomain
 import com.nuvio.tv.data.remote.api.AddonApi
 import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.repository.AddonRepository
+import com.nuvio.tv.domain.repository.LocalLibraryGateway
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,6 +37,7 @@ class AddonRepositoryImpl @Inject constructor(
     private val preferences: AddonPreferences,
     private val addonSyncService: AddonSyncService,
     private val authManager: AuthManager,
+    private val localLibraryGateway: LocalLibraryGateway,
     @ApplicationContext private val context: Context
 ) : AddonRepository {
 
@@ -144,47 +146,56 @@ class AddonRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun getInstalledAddons(): Flow<List<Addon>> =
-        combine(
+    override fun getInstalledAddons(): Flow<List<Addon>> {
+        val remote: Flow<List<Addon>> = combine(
             preferences.installedAddonUrls,
             preferences.userSetNames
         ) { urls, names -> urls to names }
-        .flatMapLatest { (urls, userNames) ->
-            flow {
-                if (urls.isEmpty()) {
-                    emit(emptyList())
-                    return@flow
-                }
+            .flatMapLatest { (urls, userNames) ->
+                flow {
+                    if (urls.isEmpty()) {
+                        emit(emptyList())
+                        return@flow
+                    }
 
-                val cached = urls.mapNotNull { manifestCache[canonicalizeUrl(it)] }
-                if (cached.isNotEmpty()) {
-                    emit(applyDisplayNames(cached, userNames))
-                }
+                    val cached = urls.mapNotNull { manifestCache[canonicalizeUrl(it)] }
+                    if (cached.isNotEmpty()) {
+                        emit(applyDisplayNames(cached, userNames))
+                    }
 
-                val hasCacheMiss = cached.size < urls.size
-                if (hasCacheMiss) {
-                    val fresh = coroutineScope {
-                        urls.map { url ->
-                            async {
-                                val canonical = canonicalizeUrl(url)
-                                manifestCache[canonical] ?: when (val result = fetchAddon(url)) {
-                                    is NetworkResult.Success -> result.data
-                                    else -> null
+                    val hasCacheMiss = cached.size < urls.size
+                    if (hasCacheMiss) {
+                        val fresh = coroutineScope {
+                            urls.map { url ->
+                                async {
+                                    val canonical = canonicalizeUrl(url)
+                                    manifestCache[canonical] ?: when (val result = fetchAddon(url)) {
+                                        is NetworkResult.Success -> result.data
+                                        else -> null
+                                    }
                                 }
-                            }
-                        }.awaitAll().filterNotNull()
-                    }
+                            }.awaitAll().filterNotNull()
+                        }
 
-                    if (fresh != cached) {
-                        emit(applyDisplayNames(fresh, userNames))
+                        if (fresh != cached) {
+                            emit(applyDisplayNames(fresh, userNames))
+                        }
+                    } else if (isCacheStale() && urls.isNotEmpty()) {
+                        scheduleManifestRefresh(urls)
                     }
-                } else if (isCacheStale() && urls.isNotEmpty()) {
-                    scheduleManifestRefresh(urls)
-                }
-            }.flowOn(Dispatchers.IO)
+                }.flowOn(Dispatchers.IO)
+            }
+        return combine(remote, localLibraryGateway.synthesizeAddon()) { addons, synthetic ->
+            if (synthetic != null) listOf(synthetic) + addons else addons
         }
+    }
 
     override suspend fun fetchAddon(baseUrl: String): NetworkResult<Addon> {
+        if (localLibraryGateway.isLocalLibrary(addonId = null, baseUrl = baseUrl)) {
+            val synthetic = localLibraryGateway.synthesizeAddon().first()
+                ?: return NetworkResult.Error("Local Library has no enabled sources")
+            return NetworkResult.Success(synthetic)
+        }
         val cleanBaseUrl = canonicalizeUrl(baseUrl)
         val queryStart = cleanBaseUrl.indexOf('?')
         val basePath = if (queryStart >= 0) cleanBaseUrl.substring(0, queryStart).trimEnd('/') else cleanBaseUrl

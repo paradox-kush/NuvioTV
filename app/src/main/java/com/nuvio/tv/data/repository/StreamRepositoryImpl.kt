@@ -18,6 +18,7 @@ import com.nuvio.tv.domain.model.ScraperInfo
 import com.nuvio.tv.domain.model.Stream
 import com.nuvio.tv.domain.model.StreamBehaviorHints
 import com.nuvio.tv.domain.repository.AddonRepository
+import com.nuvio.tv.domain.repository.LocalLibraryGateway
 import com.nuvio.tv.domain.repository.StreamRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -38,7 +39,8 @@ class StreamRepositoryImpl @Inject constructor(
     private val api: AddonApi,
     private val addonRepository: AddonRepository,
     private val pluginManager: PluginManager,
-    private val tmdbService: TmdbService
+    private val tmdbService: TmdbService,
+    private val localLibraryGateway: LocalLibraryGateway
 ) : StreamRepository {
     private enum class StreamFailureKind {
         MISSING,
@@ -58,6 +60,26 @@ class StreamRepositoryImpl @Inject constructor(
         episode: Int?
     ): Flow<NetworkResult<List<AddonStreams>>> = flow {
         emit(NetworkResult.Loading)
+
+        if (localLibraryGateway.isLocalId(videoId)) {
+            val local = localLibraryGateway.streams(type, videoId, season, episode)
+            when (local) {
+                is NetworkResult.Success -> {
+                    val grouped = if (local.data.isEmpty()) emptyList()
+                    else listOf(
+                        AddonStreams(
+                            addonName = "Local Library",
+                            addonLogo = null,
+                            streams = local.data
+                        )
+                    )
+                    emit(NetworkResult.Success(grouped))
+                }
+                is NetworkResult.Error -> emit(local)
+                NetworkResult.Loading -> emit(NetworkResult.Loading)
+            }
+            return@flow
+        }
 
         try {
             val addons = addonRepository.getInstalledAddons().first()
@@ -347,6 +369,11 @@ class StreamRepositoryImpl @Inject constructor(
         type: String,
         videoId: String
     ): NetworkResult<List<Stream>> {
+        if (localLibraryGateway.isLocalLibrary(addonId = null, baseUrl = baseUrl) ||
+            localLibraryGateway.isLocalId(videoId)
+        ) {
+            return localLibraryGateway.streams(type, videoId, season = null, episode = null)
+        }
         val cleanBaseUrl = baseUrl.trimEnd('/')
         val queryStart = cleanBaseUrl.indexOf('?')
         val basePath = if (queryStart >= 0) cleanBaseUrl.substring(0, queryStart).trimEnd('/') else cleanBaseUrl
