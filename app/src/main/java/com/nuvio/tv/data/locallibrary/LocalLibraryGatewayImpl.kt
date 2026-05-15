@@ -4,6 +4,7 @@ import android.util.Log
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.core.tmdb.TmdbEnrichment
 import com.nuvio.tv.core.tmdb.TmdbMetadataService
+import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.LocalLibraryPreferences
 import com.nuvio.tv.data.local.MatchOverrideStore
 import com.nuvio.tv.data.locallibrary.source.LocalLibrarySourceFactory
@@ -38,6 +39,7 @@ class LocalLibraryGatewayImpl @Inject constructor(
     private val index: LocalLibraryIndex,
     private val overrideStore: MatchOverrideStore,
     private val tmdbMetadataService: TmdbMetadataService,
+    private val tmdbService: TmdbService,
     private val sourceFactory: LocalLibrarySourceFactory
 ) : LocalLibraryGateway {
 
@@ -102,9 +104,18 @@ class LocalLibraryGatewayImpl @Inject constructor(
         season: Int?,
         episode: Int?
     ): NetworkResult<List<Stream>> {
-        val parsedId = MetaId.parse(id)
-            ?: return NetworkResult.Error("Unknown local id: $id")
-        val items = matchedItemsFor(parsedId, season, episode)
+        val resolution = resolveExternalId(type, id)
+            ?: return if (id.startsWith(LOCAL_ID_PREFIX)) {
+                NetworkResult.Error("Unknown local id: $id")
+            } else {
+                // Foreign id we couldn't resolve to a local match — gracefully
+                // sit out so the aggregate failure path doesn't report this
+                // addon as broken.
+                NetworkResult.Success(emptyList())
+            }
+        val effectiveSeason = season ?: resolution.season
+        val effectiveEpisode = episode ?: resolution.episode
+        val items = matchedItemsFor(resolution.metaId, effectiveSeason, effectiveEpisode)
         if (items.isEmpty()) return NetworkResult.Success(emptyList())
 
         val streams = items.mapNotNull { (config, item) ->
@@ -292,6 +303,61 @@ class LocalLibraryGatewayImpl @Inject constructor(
         trailerYtIds = enrichment.trailers.mapNotNull { it.ytId },
         status = enrichment.status
     )
+
+    /**
+     * Resolves an incoming stream-request id (which may be a local `nuvio-local:`,
+     * an IMDB `tt...`, or a `tmdb:` id) into a [MetaId] plus optional season/episode
+     * extracted from the id suffix. Returns null when the id can't be resolved to a
+     * local-library lookup (e.g. IMDB id with no TMDB mapping, or a totally foreign
+     * format) — callers translate that to either a graceful empty result (for
+     * foreign ids) or an "Unknown local id" error (for malformed nuvio-local: ids).
+     */
+    private suspend fun resolveExternalId(type: String, id: String): ResolvedId? {
+        // 1) nuvio-local:... — existing path.
+        if (id.startsWith(LOCAL_ID_PREFIX)) {
+            val parsed = MetaId.parse(id) ?: return null
+            val (s, e) = when (parsed) {
+                is MetaId.Series -> parsed.season to parsed.episode
+                is MetaId.Movie -> null to null
+            }
+            return ResolvedId(parsed, s, e)
+        }
+
+        val contentType = when (type.lowercase()) {
+            "movie" -> ContentType.MOVIE
+            "series", "tv", "show" -> ContentType.SERIES
+            else -> return null
+        }
+
+        // Strip an optional :S:E (or :S/E) suffix to find the base content id.
+        val parts = id.split(':')
+        val basePart = parts.first()
+        val suffixSeason = parts.getOrNull(1)?.toIntOrNull()
+        val suffixEpisode = parts.getOrNull(2)?.toIntOrNull()
+
+        // 2) tmdb:<id> (and tmdb:<id>:S:E).
+        if (basePart.equals("tmdb", ignoreCase = true)) {
+            val tmdbId = parts.getOrNull(1)?.toIntOrNull() ?: return null
+            val tmdbSeason = parts.getOrNull(2)?.toIntOrNull()
+            val tmdbEpisode = parts.getOrNull(3)?.toIntOrNull()
+            return ResolvedId(buildMetaId(contentType, tmdbId), tmdbSeason, tmdbEpisode)
+        }
+
+        // 3) IMDB tt\d+ (and tt\d+:S:E).
+        if (basePart.startsWith("tt") && basePart.length > 2 && basePart.drop(2).all { it.isDigit() }) {
+            val tmdbId = tmdbService.imdbToTmdb(basePart, type) ?: return null
+            return ResolvedId(buildMetaId(contentType, tmdbId), suffixSeason, suffixEpisode)
+        }
+
+        return null
+    }
+
+    private fun buildMetaId(type: ContentType, tmdbId: Int): MetaId = when (type) {
+        ContentType.MOVIE -> MetaId.Movie(tmdbId)
+        else -> MetaId.Series(tmdbId)
+    }
+
+    private data class ResolvedId(val metaId: MetaId, val season: Int?, val episode: Int?)
 
     /** Returns `(sourceConfig, scannedItem)` pairs matching the requested meta id + S/E. */
     private suspend fun matchedItemsFor(
