@@ -101,6 +101,7 @@ class SmbSource(
             .replace('/', '\\')
             .trim('\\')
 
+        Log.i(TAG, "subtitle discovery start: videoBase='$videoBase' sharePath='$sharePath' urlParentPrefix='$urlParentPrefix'")
         return try {
             withShare { share, _ ->
                 val entries = try {
@@ -109,13 +110,20 @@ class SmbSource(
                     Log.w(TAG, "subtitle dir list failed '$sharePath' on ${location.host}/${location.share}", t)
                     return@withShare emptyList()
                 }
-                entries.mapNotNull { entry ->
+                val allNames = entries.map { it.fileName }
+                Log.i(TAG, "subtitle dir listing '$sharePath' returned ${allNames.size} entries: $allNames")
+                val matched = entries.mapNotNull { entry ->
                     val name = entry.fileName
                     if (name == "." || name == "..") return@mapNotNull null
                     val isDirectory =
                         (entry.fileAttributes and FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value) != 0L
                     if (isDirectory) return@mapNotNull null
-                    if (!SubtitleFilenameParser.matchesVideo(name, videoBase)) return@mapNotNull null
+                    val isSubtitle = SubtitleFilenameParser.isSubtitleFile(name)
+                    val matches = isSubtitle && SubtitleFilenameParser.matchesVideo(name, videoBase)
+                    if (isSubtitle) {
+                        Log.i(TAG, "subtitle candidate '$name' isSubtitle=$isSubtitle matchesVideo($videoBase)=$matches")
+                    }
+                    if (!matches) return@mapNotNull null
                     val ext = name.substringAfterLast('.', missingDelimiterValue = "")
                     val parsed = SubtitleFilenameParser.parse(name, videoBase)
                     ExternalSubtitleFile(
@@ -126,11 +134,9 @@ class SmbSource(
                         isForced = parsed.isForced,
                         source = ExternalSubtitleFile.Source.LOCAL_SIDECAR
                     )
-                }.also {
-                    if (it.isNotEmpty()) {
-                        Log.i(TAG, "discovered ${it.size} sidecar subtitle(s) for ${item.fileName}")
-                    }
                 }
+                Log.i(TAG, "subtitle discovery: found ${matched.size} sidecar subtitle(s) for ${item.fileName}")
+                matched
             }
         } catch (t: Throwable) {
             Log.w(TAG, "subtitle discovery failed for ${item.fileName}", t)

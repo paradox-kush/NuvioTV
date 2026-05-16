@@ -79,7 +79,7 @@ class LocalLibraryGatewayImpl @Inject constructor(
                 addonName = ADDON_NAME,
                 addonBaseUrl = SYNTHETIC_BASE_URL,
                 catalogId = catalogId,
-                catalogName = "${source.displayName} — ${parsed.type.displayName()}",
+                catalogName = source.displayName,
                 type = parsed.type,
                 items = paged,
                 hasMore = previews.size > skip + paged.size,
@@ -124,6 +124,11 @@ class LocalLibraryGatewayImpl @Inject constructor(
             val resolved = runCatching { source.resolveStream(item) }
                 .onFailure { Log.w(TAG, "resolveStream failed for ${item.itemKey}", it) }
                 .getOrNull() ?: return@mapNotNull null
+            Log.i(
+                TAG,
+                "resolved stream for ${item.fileName}: subtitles=${resolved.subtitles.size} " +
+                    resolved.subtitles.joinToString(prefix = "[", postfix = "]") { "${it.language ?: "?"}->${it.url}" }
+            )
             Stream(
                 name = config.displayName,
                 title = item.fileName,
@@ -166,14 +171,14 @@ class LocalLibraryGatewayImpl @Inject constructor(
                 CatalogDescriptor(
                     type = ContentType.MOVIE,
                     id = CatalogId.format(config.id, ContentType.MOVIE),
-                    name = "${config.displayName} — Movies",
+                    name = config.displayName,
                     showInHome = true,
                     hasExplicitShowInHome = true
                 ),
                 CatalogDescriptor(
                     type = ContentType.SERIES,
                     id = CatalogId.format(config.id, ContentType.SERIES),
-                    name = "${config.displayName} — Series",
+                    name = config.displayName,
                     showInHome = true,
                     hasExplicitShowInHome = true
                 )

@@ -898,6 +898,11 @@ internal fun PlayerRuntimeController.buildStartupSubtitleConfigurations(
 internal fun PlayerRuntimeController.buildExternalSubtitleConfigurations():
     List<androidx.media3.common.MediaItem.SubtitleConfiguration> {
     val externals = navigationArgs.externalSubtitles
+    Log.i(
+        PlayerRuntimeController.TAG,
+        "buildExternalSubtitleConfigurations: nav has ${externals.size} external sub(s); " +
+            externals.joinToString(prefix = "[", postfix = "]") { "${it.displayName}/${it.language ?: "?"} -> ${it.url}" }
+    )
     if (externals.isEmpty()) return emptyList()
 
     val style = _uiState.value.subtitleStyle

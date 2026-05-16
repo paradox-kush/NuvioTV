@@ -1,6 +1,8 @@
 package com.nuvio.tv.data.locallibrary.subtitle
 
 import androidx.media3.common.MimeTypes
+import com.nuvio.tv.data.locallibrary.match.FilenameParser
+import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.ui.screens.player.PlayerSubtitleUtils
 import java.util.Locale
 
@@ -36,6 +38,11 @@ object SubtitleFilenameParser {
     fun matchesVideo(subtitleFileName: String, videoBaseName: String): Boolean {
         if (!isSubtitleFile(subtitleFileName)) return false
         if (videoBaseName.isBlank()) return false
+        if (matchesByPrefix(subtitleFileName, videoBaseName)) return true
+        return matchesByParsedTitle(subtitleFileName, videoBaseName)
+    }
+
+    private fun matchesByPrefix(subtitleFileName: String, videoBaseName: String): Boolean {
         val subBase = subtitleFileName.substringBeforeLast('.')
         if (subBase.equals(videoBaseName, ignoreCase = true)) return true
         if (subBase.length <= videoBaseName.length) return false
@@ -44,19 +51,43 @@ object SubtitleFilenameParser {
         return sep == '.' || sep == '_' || sep == '-' || sep == ' '
     }
 
-    fun parse(subtitleFileName: String, videoBaseName: String): ParsedInfo {
-        val subBase = subtitleFileName.substringBeforeLast('.')
-        val tail = when {
-            subBase.equals(videoBaseName, ignoreCase = true) -> ""
-            subBase.length > videoBaseName.length &&
-                subBase.regionMatches(0, videoBaseName, 0, videoBaseName.length, ignoreCase = true) ->
-                subBase.substring(videoBaseName.length + 1)
-            else -> ""
+    /**
+     * Fallback that compares the parsed `(title, year, season, episode)` of both files.
+     * Catches the common case where the video uses a release-tagged name
+     * (`F1.The.Movie.2025.1080p.WEBRip.x264.AAC-[YTS.MX].mp4`) and the user-curated
+     * SRT uses the clean form (`F1 The Movie (2025).srt`).
+     */
+    private fun matchesByParsedTitle(subtitleFileName: String, videoBaseName: String): Boolean {
+        val videoParsed = FilenameParser.parse(videoBaseName)
+        val subParsed = FilenameParser.parse(subtitleFileName)
+
+        val videoTitle = normalizeTitle(videoParsed.title)
+        val subTitle = normalizeTitle(subParsed.title)
+        if (videoTitle.isBlank() || subTitle.isBlank()) return false
+        if (videoTitle != subTitle) return false
+
+        if (videoParsed.year != null && subParsed.year != null &&
+            videoParsed.year != subParsed.year
+        ) return false
+
+        if (videoParsed.contentType == ContentType.SERIES &&
+            subParsed.contentType == ContentType.SERIES
+        ) {
+            if (videoParsed.season != subParsed.season) return false
+            if (videoParsed.episode != subParsed.episode) return false
         }
 
-        val tokens = tail.split('.', '_', '-', ' ')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
+        return true
+    }
+
+    private fun normalizeTitle(title: String): String {
+        return title
+            .lowercase(Locale.ROOT)
+            .replace(Regex("[^a-z0-9]+"), "")
+    }
+
+    fun parse(subtitleFileName: String, videoBaseName: String): ParsedInfo {
+        val tokens = extractTailTokens(subtitleFileName, videoBaseName)
 
         var isForced = false
         var isSdh = false
@@ -73,6 +104,54 @@ object SubtitleFilenameParser {
         val language = detectLanguage(remaining)
         val displayName = buildDisplayName(language, remaining, subtitleFileName, isForced, isSdh)
         return ParsedInfo(language = language, isForced = isForced, isSdh = isSdh, displayName = displayName)
+    }
+
+    /**
+     * Pulls the "tail" tokens from a subtitle filename — the part that may hold
+     * language / forced / SDH flags.
+     *
+     * - Strict prefix match (`Movie.mkv` + `Movie.en.srt`): tokens come from
+     *   stripping the video basename, splitting on `. _ - space`.
+     * - Fuzzy match (`Movie.2025.1080p.mp4` + `Movie (2025).en.srt`): we don't
+     *   know the boundary, so we walk `.`-separated segments from the END and
+     *   collect short, ASCII-ish tokens until we hit something that obviously
+     *   belongs to the title (long token, contains digits, parens/brackets).
+     */
+    private fun extractTailTokens(subtitleFileName: String, videoBaseName: String): List<String> {
+        val subBase = subtitleFileName.substringBeforeLast('.')
+
+        if (subBase.equals(videoBaseName, ignoreCase = true)) return emptyList()
+        if (subBase.length > videoBaseName.length &&
+            subBase.regionMatches(0, videoBaseName, 0, videoBaseName.length, ignoreCase = true)
+        ) {
+            val sep = subBase[videoBaseName.length]
+            if (sep == '.' || sep == '_' || sep == '-' || sep == ' ') {
+                return subBase.substring(videoBaseName.length + 1)
+                    .split('.', '_', '-', ' ')
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+            }
+        }
+
+        val segments = subBase.split('.').map { it.trim() }
+        val tail = mutableListOf<String>()
+        for (i in segments.indices.reversed()) {
+            val seg = segments[i]
+            if (seg.isBlank()) continue
+            if (looksLikeTailToken(seg)) {
+                tail.add(0, seg)
+            } else {
+                break
+            }
+        }
+        return tail
+    }
+
+    private fun looksLikeTailToken(segment: String): Boolean {
+        if (segment.length > 20) return false
+        if (segment.any { !it.isLetterOrDigit() && it != '-' }) return false
+        if (segment.any { it.isDigit() }) return false
+        return segment.isNotBlank()
     }
 
     fun mimeTypeFor(extension: String): String {
