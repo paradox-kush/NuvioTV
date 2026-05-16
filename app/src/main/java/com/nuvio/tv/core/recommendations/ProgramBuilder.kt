@@ -1,9 +1,11 @@
 package com.nuvio.tv.core.recommendations
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
+import com.nuvio.tv.MainActivity
 import com.nuvio.tv.domain.model.WatchProgress
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -187,31 +189,12 @@ class ProgramBuilder @Inject constructor(
     }
 
     private fun buildPlayUri(progress: WatchProgress): Uri =
-        Uri.Builder()
-            .scheme(RecommendationConstants.DEEP_LINK_SCHEME)
-            .authority(RecommendationConstants.DEEP_LINK_HOST)
-            .appendPath(RecommendationConstants.DEEP_LINK_PATH_PLAY)
-            .appendPath(progress.contentId)
-            .appendQueryParameter(RecommendationConstants.PARAM_CONTENT_TYPE, progress.contentType)
-            .appendQueryParameter(RecommendationConstants.PARAM_VIDEO_ID, progress.videoId)
-            .appendQueryParameter(RecommendationConstants.PARAM_NAME, progress.name)
-            .apply {
-                progress.season?.let {
-                    appendQueryParameter(RecommendationConstants.PARAM_SEASON, it.toString())
-                }
-                progress.episode?.let {
-                    appendQueryParameter(RecommendationConstants.PARAM_EPISODE, it.toString())
-                }
-                appendQueryParameter(
-                    RecommendationConstants.PARAM_RESUME_POSITION,
-                    progress.position.toString()
-                )
-                progress.poster?.let {
-                    appendQueryParameter(RecommendationConstants.PARAM_POSTER, it)
-                }
-                progress.backdrop?.let {
-                    appendQueryParameter(RecommendationConstants.PARAM_BACKDROP, it)
-                }
-            }
-            .build()
+        Uri.parse(
+            Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                putExtra("contentId", progress.contentId)
+                putExtra("contentType", progress.contentType)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }.toUri(Intent.URI_INTENT_SCHEME)
+        )
 }

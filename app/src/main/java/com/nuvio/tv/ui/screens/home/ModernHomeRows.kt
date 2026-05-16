@@ -375,11 +375,15 @@ private fun ModernCatalogRowItem(
             latestOnFocused()
             item.metaPreview?.let { latestOnItemFocus(it) }
             when (payload) {
-                is ModernPayload.Catalog -> onNavigateToDetail(
-                    payload.itemId,
-                    payload.itemType,
-                    payload.addonBaseUrl
-                )
+                is ModernPayload.Catalog -> {
+                    if (!payload.itemId.startsWith("__placeholder_")) {
+                        onNavigateToDetail(
+                            payload.itemId,
+                            payload.itemType,
+                            payload.addonBaseUrl
+                        )
+                    }
+                }
                 is ModernPayload.CollectionFolder -> onNavigateToFolderDetail(
                     payload.collectionId,
                     payload.folderId
