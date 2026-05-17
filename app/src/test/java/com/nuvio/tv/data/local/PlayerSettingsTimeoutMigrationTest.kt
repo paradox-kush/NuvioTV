@@ -57,12 +57,15 @@ class PlayerSettingsTimeoutMigrationTest {
     }
 
     @Test
-    fun `Int MAX_VALUE minus one snaps to unlimited`() {
-        // distance(MAX_VALUE - 1, 30) ~ Int.MAX_VALUE; distance(MAX_VALUE - 1, MAX_VALUE) = 1.
-        // Snaps to the sentinel.
+    fun `Int MAX_VALUE minus one snaps to 30`() {
         assertEquals(
-            PlayerSettings.STREAM_AUTOPLAY_TIMEOUT_UNLIMITED,
+            30,
             PlayerSettings.applyLegacyTimeoutSentinelMigration(Int.MAX_VALUE - 1)
         )
+    }
+
+    @Test
+    fun `large unknown value snaps to 30 not unlimited`() {
+        assertEquals(30, PlayerSettings.applyLegacyTimeoutSentinelMigration(1_000_000))
     }
 }

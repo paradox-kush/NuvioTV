@@ -221,7 +221,9 @@ data class PlayerSettings(
             val raw = stored ?: 3
             if (raw == 11) return STREAM_AUTOPLAY_TIMEOUT_UNLIMITED
             if (raw in STREAM_AUTOPLAY_TIMEOUT_VALUES) return raw
-            return STREAM_AUTOPLAY_TIMEOUT_VALUES.minBy { kotlin.math.abs(it.toLong() - raw.toLong()) }
+            return STREAM_AUTOPLAY_TIMEOUT_VALUES
+                .filter { it != STREAM_AUTOPLAY_TIMEOUT_UNLIMITED }
+                .minBy { kotlin.math.abs(it.toLong() - raw.toLong()) }
         }
 
         fun isBoundedTimeout(timeoutSeconds: Int): Boolean =
