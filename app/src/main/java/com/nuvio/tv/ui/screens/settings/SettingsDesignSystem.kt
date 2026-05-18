@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -57,6 +58,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -658,6 +661,131 @@ internal fun <T> SettingsSingleChoiceDialog(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun <T> SettingsMultiChoiceDialog(
+    title: String,
+    options: List<SettingsPickerOption<T>>,
+    selectedValues: List<T>,
+    onValuesSelected: (List<T>) -> Unit,
+    onDismiss: () -> Unit,
+    subtitle: String? = null,
+    width: Dp = 520.dp,
+    maxHeight: Dp = 420.dp
+) {
+    val focusRequester = remember { FocusRequester() }
+    val selected = remember(selectedValues) { mutableStateListOf<T>().also { it.addAll(selectedValues) } }
+    val firstSelectedIndex = options.indexOfFirst { option -> selectedValues.contains(option.value) }
+        .let { if (it >= 0) it else 0 }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = firstSelectedIndex)
+
+    LaunchedEffect(firstSelectedIndex) {
+        focusRequester.requestFocusAfterFrames()
+    }
+
+    NuvioDialog(
+        onDismiss = onDismiss,
+        title = title,
+        subtitle = subtitle,
+        width = width,
+        suppressFirstKeyUp = false
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxHeight)
+        ) {
+            LazyColumn(
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
+            ) {
+                itemsIndexed(
+                    items = options,
+                    key = { index, option -> "$index-${option.value}" }
+                ) { index, option ->
+                    val isSelected = selected.contains(option.value)
+                    Card(
+                        onClick = {
+                            if (isSelected) {
+                                selected.remove(option.value)
+                            } else {
+                                selected.add(option.value)
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (index == firstSelectedIndex) Modifier.focusRequester(focusRequester) else Modifier),
+                        colors = CardDefaults.colors(
+                            containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
+                            focusedContainerColor = NuvioColors.FocusBackground
+                        ),
+                        shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
+                        scale = CardDefaults.scale(focusedScale = 1f)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = option.title,
+                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontFamily = option.titleFontFamily
+                                )
+                                if (!option.description.isNullOrBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = option.description,
+                                        color = NuvioColors.TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                            if (isSelected) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = stringResource(R.string.cd_selected),
+                                    tint = NuvioColors.Primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Button(
+                onClick = { selected.clear() },
+                colors = ButtonDefaults.colors(
+                    containerColor = NuvioColors.BackgroundElevated,
+                    contentColor = NuvioColors.TextPrimary
+                )
+            ) {
+                Text(stringResource(R.string.action_clear))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(
+                onClick = { onValuesSelected(options.map { it.value }.filter { selected.contains(it) }) },
+                colors = ButtonDefaults.colors(
+                    containerColor = NuvioColors.BackgroundCard,
+                    contentColor = NuvioColors.TextPrimary
+                )
+            ) {
+                Text(stringResource(R.string.action_save))
             }
         }
     }

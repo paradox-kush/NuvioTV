@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.nuvio.tv.core.debrid.DebridStreamFormatterDefaults
+import com.nuvio.tv.domain.model.DebridStreamPreferences
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
@@ -16,7 +17,7 @@ class DebridFormatterConfigServer(
     port: Int = 8090
 ) : NanoHTTPD(port) {
     private val gson = Gson()
-    private val settingsMapType = object : TypeToken<Map<String, String>>() {}.type
+    private val settingsMapType = object : TypeToken<Map<String, Any?>>() {}.type
 
     override fun serve(session: IHTTPSession): Response {
         return when {
@@ -55,7 +56,8 @@ class DebridFormatterConfigServer(
             settings = currentSettingsProvider(),
             defaults = DebridFormatterSettings(
                 nameTemplate = DebridStreamFormatterDefaults.NAME_TEMPLATE,
-                descriptionTemplate = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE
+                descriptionTemplate = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
+                streamPreferences = DebridStreamPreferences()
             )
         )
         return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", gson.toJson(response))
@@ -64,10 +66,13 @@ class DebridFormatterConfigServer(
     private fun handleSettingsUpdate(session: IHTTPSession): Response {
         val body = readUtf8Body(session)
         val parsed = runCatching {
-            gson.fromJson<Map<String, String>>(body, settingsMapType)
+            gson.fromJson<Map<String, Any?>>(body, settingsMapType)
         }.getOrNull()
-        val nameTemplate = parsed?.get("nameTemplate")?.takeIf { it.isNotBlank() }
-        val descriptionTemplate = parsed?.get("descriptionTemplate")?.takeIf { it.isNotBlank() }
+        val nameTemplate = (parsed?.get("nameTemplate") as? String)?.takeIf { it.isNotBlank() }
+        val descriptionTemplate = (parsed?.get("descriptionTemplate") as? String)?.takeIf { it.isNotBlank() }
+        val streamPreferences = runCatching {
+            gson.fromJson(gson.toJson(parsed?.get("streamPreferences")), DebridStreamPreferences::class.java)
+        }.getOrNull() ?: currentSettingsProvider().streamPreferences
         if (nameTemplate == null || descriptionTemplate == null) {
             return newFixedLengthResponse(
                 Response.Status.BAD_REQUEST,
@@ -79,7 +84,8 @@ class DebridFormatterConfigServer(
         onSettingsChanged(
             DebridFormatterSettings(
                 nameTemplate = nameTemplate,
-                descriptionTemplate = descriptionTemplate
+                descriptionTemplate = descriptionTemplate,
+                streamPreferences = streamPreferences
             )
         )
         return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", gson.toJson(mapOf("status" to "saved")))
@@ -128,7 +134,8 @@ class DebridFormatterConfigServer(
 
 data class DebridFormatterSettings(
     val nameTemplate: String,
-    val descriptionTemplate: String
+    val descriptionTemplate: String,
+    val streamPreferences: DebridStreamPreferences = DebridStreamPreferences()
 )
 
 private data class DebridFormatterSettingsResponse(
