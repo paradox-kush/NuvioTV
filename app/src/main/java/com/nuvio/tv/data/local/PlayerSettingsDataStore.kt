@@ -115,6 +115,12 @@ val AVAILABLE_SUBTITLE_LANGUAGES = listOf(
     SubtitleLanguage("zu", "Zulu")
 )
 
+val AVAILABLE_TMDB_LANGUAGES = AVAILABLE_SUBTITLE_LANGUAGES + listOf(
+    SubtitleLanguage("en-AU", "English (Australia)"),
+    SubtitleLanguage("en-CA", "English (Canada)"),
+    SubtitleLanguage("en-GB", "English (United Kingdom)"),
+)
+
 /**
  * Data class representing subtitle style settings
  */
