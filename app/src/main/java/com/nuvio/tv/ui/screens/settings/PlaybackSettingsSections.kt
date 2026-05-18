@@ -1027,86 +1027,21 @@ private fun PlayerPreferenceDialog(
     onPreferenceSelected: (PlayerPreference) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
     val options = listOf(
-        Triple(PlayerPreference.INTERNAL, stringResource(R.string.playback_player_internal), stringResource(R.string.playback_player_internal_desc)),
-        Triple(PlayerPreference.EXTERNAL, stringResource(R.string.playback_player_external), stringResource(R.string.playback_player_external_desc)),
-        Triple(PlayerPreference.ASK_EVERY_TIME, stringResource(R.string.playback_player_ask), stringResource(R.string.playback_player_ask_desc))
+        SettingsPickerOption(PlayerPreference.INTERNAL, stringResource(R.string.playback_player_internal), stringResource(R.string.playback_player_internal_desc)),
+        SettingsPickerOption(PlayerPreference.EXTERNAL, stringResource(R.string.playback_player_external), stringResource(R.string.playback_player_external_desc)),
+        SettingsPickerOption(PlayerPreference.ASK_EVERY_TIME, stringResource(R.string.playback_player_ask), stringResource(R.string.playback_player_ask_desc))
     )
 
-    NuvioDialog(
-        onDismiss = onDismiss,
+    SettingsSingleChoiceDialog(
         title = stringResource(R.string.playback_player),
+        options = options,
+        selectedValue = currentPreference,
+        onOptionSelected = onPreferenceSelected,
+        onDismiss = onDismiss,
         width = 420.dp,
-        suppressFirstKeyUp = false
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp)
-        ) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
-            ) {
-                items(
-                    count = options.size,
-                    key = { index -> options[index].first.name }
-                ) { index ->
-                    val (preference, title, description) = options[index]
-                    val isSelected = preference == currentPreference
-
-                    Card(
-                        onClick = { onPreferenceSelected(preference) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
-                        colors = CardDefaults.colors(
-                            containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                            focusedContainerColor = NuvioColors.FocusBackground
-                        ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(10.dp)),
-                        scale = CardDefaults.scale(focusedScale = 1f)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = description,
-                                    color = NuvioColors.TextSecondary,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (isSelected) {
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.cd_selected),
-                                    tint = NuvioColors.Primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+        maxHeight = 320.dp
+    )
 }
 
 @Composable
@@ -1115,96 +1050,31 @@ private fun InternalPlayerEngineDialog(
     onEngineSelected: (InternalPlayerEngine) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
     val options = listOf(
-        Triple(
+        SettingsPickerOption(
             InternalPlayerEngine.EXOPLAYER,
             stringResource(R.string.playback_engine_exoplayer),
             stringResource(R.string.playback_engine_exoplayer_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             InternalPlayerEngine.MVP_PLAYER,
             stringResource(R.string.playback_engine_mvplayer),
             stringResource(R.string.playback_engine_mvplayer_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             InternalPlayerEngine.AUTO,
             stringResource(R.string.playback_player_auto),
             stringResource(R.string.playback_player_auto_desc)
         )
     )
 
-    NuvioDialog(
-        onDismiss = onDismiss,
+    SettingsSingleChoiceDialog(
         title = stringResource(R.string.playback_internal_player_engine),
+        options = options,
+        selectedValue = currentEngine,
+        onOptionSelected = onEngineSelected,
+        onDismiss = onDismiss,
         width = 420.dp,
-        suppressFirstKeyUp = false
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp)
-        ) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
-            ) {
-                items(
-                    count = options.size,
-                    key = { index -> options[index].first.name }
-                ) { index ->
-                    val (engine, title, description) = options[index]
-                    val isSelected = engine == currentEngine
-
-                    Card(
-                        onClick = { onEngineSelected(engine) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
-                        colors = CardDefaults.colors(
-                            containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                            focusedContainerColor = NuvioColors.FocusBackground
-                        ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(10.dp)),
-                        scale = CardDefaults.scale(focusedScale = 1f)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = description,
-                                    color = NuvioColors.TextSecondary,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (isSelected) {
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.cd_selected),
-                                    tint = NuvioColors.Primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+        maxHeight = 320.dp
+    )
 }
