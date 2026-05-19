@@ -396,6 +396,13 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
             parentalGuideEnabled = settings.parentalGuideEnabled
             autoSkipSegmentTypes = settings.autoSkipSegmentTypes
             playerSettingsInitialized = true
+
+            // Fetch parental guide on first settings emission (after we know
+            // whether the feature is enabled). Subsequent emissions skip this.
+            if (settings.parentalGuideEnabled && _uiState.value.parentalWarnings.isEmpty()) {
+                fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
+            }
+
             if (!skipIntroEnabled) {
                 if (skipIntervals.isNotEmpty() || _uiState.value.activeSkipInterval != null) {
                     skipIntervals = emptyList()

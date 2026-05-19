@@ -213,6 +213,9 @@ class StartupSyncService @Inject constructor(
 
     private suspend fun pullRemoteData(includeProfileSettings: Boolean): Result<Unit> {
         try {
+            // Capture profile ID once at the start of the sync operation.
+            // All sub-operations must use this captured value to prevent data
+            // from leaking between profiles if the user switches mid-sync.
             val profileId = profileManager.activeProfileId.value
             Log.d(TAG, "Pulling remote data for profile $profileId")
 
@@ -347,17 +350,18 @@ class StartupSyncService @Inject constructor(
 
                 watchProgressRepository.isSyncingFromRemote = true
                 try {
-                    val remoteEntries = watchProgressSyncService.pullFromRemote().getOrElse { throw it }
+                    val remoteEntries = watchProgressSyncService.pullFromRemote(profileId).getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteEntries.size} watch progress entries from remote")
                     val hadUnsyncedProgress = watchProgressPreferences.mergeRemoteEntries(
                         remoteEntries.toMap(),
-                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs
+                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
+                        profileId = profileId
                     )
                     watchProgressRepository.hasCompletedInitialPull = true
                     Log.d(TAG, "Merged local watch progress with ${remoteEntries.size} remote entries")
                     if (hadUnsyncedProgress) {
                         Log.d(TAG, "Detected unsynced watch progress, pushing to remote")
-                        watchProgressSyncService.pushToRemote()
+                        watchProgressSyncService.pushToRemote(profileId)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to pull watch progress, continuing", e)
@@ -386,11 +390,12 @@ class StartupSyncService @Inject constructor(
 
                 watchProgressRepository.isSyncingFromRemote = true
                 try {
-                    val remoteEntries = watchProgressSyncService.pullFromRemote().getOrElse { throw it }
+                    val remoteEntries = watchProgressSyncService.pullFromRemote(profileId).getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteEntries.size} watch progress entries from remote")
                     watchProgressPreferences.mergeRemoteEntries(
                         remoteEntries.toMap(),
-                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs
+                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
+                        profileId = profileId
                     )
                     watchProgressRepository.hasCompletedInitialPull = true
                     Log.d(TAG, "Merged local watch progress with ${remoteEntries.size} remote entries")

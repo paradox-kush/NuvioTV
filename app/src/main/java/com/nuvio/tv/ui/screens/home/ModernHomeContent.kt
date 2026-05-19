@@ -566,7 +566,7 @@ fun ModernHomeContent(
                 derivedStateOf {
                     val activeKey = activeRowKey.value
                     val row = if (activeKey == null) null
-                    else rowByKey[activeKey] ?: carouselRows.list.firstOrNull()
+                    else rowByKey[activeKey]
                     
                     val index = activeItemIndex.intValue
                     val clampedIdx = row?.let {
@@ -738,9 +738,10 @@ fun ModernHomeContent(
                 derivedStateOf {
                     val (heroBackdrop, resolvedHero, enrichmentActive) = resolvedHeroState.value
                     val (heroMediaUrl, heroMediaAudioUrl, heroMediaPlaybackKey) = heroMediaDataState.value
+                    val preview = if (enrichmentActive) null else resolvedHero
                     ModernHeroSceneState(
                         heroBackdrop = heroBackdrop,
-                        preview = if (enrichmentActive) null else resolvedHero,
+                        preview = preview,
                         enrichmentActive = enrichmentActive,
                         shouldPlayTrailer = shouldPlayHeroTrailerState.value,
                         trailerFirstFrameRendered = heroTrailerFirstFrameRendered,
@@ -760,18 +761,28 @@ fun ModernHomeContent(
                     val isScrolling = verticalRowListState.isScrollInProgress
                     val isRapidNav = isRapidHorizontalNav.value
                     val stable = stableHeroSceneStateRef.value
+                    val stableHasPreview = stable?.preview?.title?.isNotBlank() == true
+                    val liveHasPreview = currentLive.preview?.title?.isNotBlank() == true
                     when {
-                        isScrolling && stable?.preview != null -> stable
+                        isScrolling && stableHasPreview -> stable
+                        isScrolling && !stableHasPreview && liveHasPreview -> currentLive
                         isRapidNav -> currentLive.copy(preview = null, enrichmentActive = false)
                         else -> currentLive
                     }
                 }.collect { currentStable ->
                     if (stableHeroSceneStateRef.value != currentStable) {
-                        // Don't update stable ref with a fallback backdrop (from heroItem)
-                        // when the active carousel item hasn't resolved yet for the new row.
-                        val currentItem = activeCarouselItemState.value
-                        if (currentItem == null && stableHeroSceneStateRef.value != null) {
+                        // Skip updates where preview is blank (transient empty state from row transitions).
+                        val incomingPreview = currentStable.preview
+                        if (incomingPreview != null && incomingPreview.title.isBlank()) {
                             return@collect
+                        }
+                        // If incoming has null preview (enrichment pending) and we're scrolling,
+                        // don't overwrite a good stable preview.
+                        val existingStable = stableHeroSceneStateRef.value
+                        if (incomingPreview == null && existingStable?.preview?.title?.isNotBlank() == true) {
+                            if (verticalRowListState.isScrollInProgress) {
+                                return@collect
+                            }
                         }
                         val displayedBackdrop = HeroBackdropState.lastDisplayedUrl
                         val corrected = if (!displayedBackdrop.isNullOrBlank() &&
@@ -794,15 +805,26 @@ fun ModernHomeContent(
                     val currentLive = currentLiveHeroSceneStateUpdated
                     val isScrolling = isScrollInProgressUpdated
                     val stable = stableHeroSceneStateRef.value
+                    val liveHasPreview = currentLive.preview?.title?.isNotBlank() == true
+                    val stableHasPreview = stable?.preview?.title?.isNotBlank() == true
 
                     when {
-                        // During vertical scroll, freeze everything
-                        isScrolling && stable?.preview != null -> stable
-                        // Normal + rapid nav: show live state
-                        // (HeroTitleBlock handles hiding during rapid nav via separate flag)
+                        // During vertical scroll: prefer live if it has real content,
+                        // otherwise freeze stable (avoids showing blank during transitions)
+                        isScrolling && liveHasPreview -> currentLive
+                        isScrolling && stableHasPreview -> stable!!
+                        // Normal: show live state
                         else -> currentLive
                     }
                 }
+            }
+
+            // Update stableRef from composition context (not inside lambda/read-only snapshot).
+            // This runs on every recomposition and captures the latest live state with real content.
+            val latestLiveForStable = liveHeroSceneState.value
+            if (latestLiveForStable.preview?.title?.isNotBlank() == true &&
+                stableHeroSceneStateRef.value?.preview != latestLiveForStable.preview) {
+                stableHeroSceneStateRef.value = latestLiveForStable
             }
 
             val isFullScreenState = remember {

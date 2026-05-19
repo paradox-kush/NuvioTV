@@ -16,7 +16,7 @@
     <string name="web_btn_add">Adicionar</string>
     <string name="web_installed_addons">Addons Instalados</string>
     <string name="web_no_addons">Nenhum addon instalado</string>
-    <string name="web_home_catalogs">Catálogos e Coleções da Tela Inicial</string
+    <string name="web_home_catalogs">Catálogos e Coleções da Tela Inicial</string>
     <string name="web_no_catalogs">Nenhum catálogo disponível na tela inicial</string>
     <string name="web_btn_save">Salvar Alterações</string>
     <string name="web_connection_lost">Conexão com a TV perdida</string>
@@ -1674,7 +1674,7 @@
     <string name="update_unknown_sources">Permita a instalação de fontes desconhecidas para continuar.</string>
     <!-- AccountScreen -->
     <string name="account_title">Conta</string>
-    <<string name="account_sign_in_description">Acesse sua conta para manter sua biblioteca, progresso e addons sempre sincronizados entre os dispositivos. O Nuvio Sync gerencia sua biblioteca quando o Trakt não está conectado, e o progresso pode usar tanto o Trakt quanto o Nuvio Sync.</string>
+    <string name="account_sign_in_description">Acesse sua conta para manter sua biblioteca, progresso e addons sempre sincronizados entre os dispositivos. O Nuvio Sync gerencia sua biblioteca quando o Trakt não está conectado, e o progresso pode usar tanto o Trakt quanto o Nuvio Sync.</string>
     <string name="account_sync_code_title">Código de Sincronia</string>
     <string name="account_sync_code_description">Sincronize entre dispositivos sem precisar criar uma conta.</string>
     <string name="account_linked_devices">Aparelhos Vinculados (%1$d)</string>

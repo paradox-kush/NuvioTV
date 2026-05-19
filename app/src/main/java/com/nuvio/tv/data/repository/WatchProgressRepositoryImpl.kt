@@ -60,6 +60,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
     private val authManager: AuthManager,
     private val metaRepository: MetaRepository,
     private val tmdbService: TmdbService,
+    private val profileManager: com.nuvio.tv.core.profile.ProfileManager,
 ) : WatchProgressRepository {
     companion object {
         private const val TAG = "WatchProgressRepo"
@@ -107,15 +108,19 @@ class WatchProgressRepositoryImpl @Inject constructor(
                 delay(NUVIO_SYNC_PERIODIC_INTERVAL_MS)
                 if (useTraktProgressFlow().first()) continue
                 if (isSyncingFromRemote || !hasCompletedInitialPull || !authManager.isAuthenticated) continue
-                watchProgressSyncService.pullFromRemote()
+                // Capture profile ID at the start of the sync cycle to prevent
+                // race conditions if the user switches profiles mid-operation.
+                val profileId = profileManager.activeProfileId.value
+                watchProgressSyncService.pullFromRemote(profileId)
                     .onSuccess { entries ->
                         val hadUnsynced = watchProgressPreferences.mergeRemoteEntries(
                             entries.toMap(),
-                            lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs
+                            lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
+                            profileId = profileId
                         )
-                        Log.d(TAG, "Periodic Nuvio Sync pull: merged ${entries.size} entries")
+                        Log.d(TAG, "Periodic Nuvio Sync pull: merged ${entries.size} entries for profile $profileId")
                         if (hadUnsynced) {
-                            watchProgressSyncService.pushToRemote()
+                            watchProgressSyncService.pushToRemote(profileId)
                         }
                     }
                     .onFailure { Log.w(TAG, "Periodic Nuvio Sync pull failed", it) }
@@ -127,11 +132,14 @@ class WatchProgressRepositoryImpl @Inject constructor(
         if (isSyncingFromRemote) return
         if (!hasCompletedInitialPull) return
         if (!authManager.isAuthenticated) return
+        // Capture profile ID now so the delayed push targets the correct profile
+        // even if the user switches profiles during the debounce window.
+        val profileId = profileManager.activeProfileId.value
         syncJob?.cancel()
         syncJob = syncScope.launch {
             delay(2000)
             withContext(NonCancellable) {
-                watchProgressSyncService.pushToRemote()
+                watchProgressSyncService.pushToRemote(profileId)
             }
         }
     }
@@ -675,6 +683,8 @@ class WatchProgressRepositoryImpl @Inject constructor(
             progress.contentType.equals("tv", ignoreCase = true)) {
             traktSettingsDataStore.removeDismissedNextUpKeysForContent(progress.contentId)
         }
+        // Capture profile ID now so async operations target the correct profile.
+        val profileId = profileManager.activeProfileId.value
         if (shouldUseTraktProgress()) {
             traktProgressService.applyOptimisticProgress(progress)
             watchProgressPreferences.saveProgress(progress)
@@ -693,7 +703,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
             // Mirror to Nuvio Sync so data is ready if user switches source later.
             if (syncRemote && authManager.isAuthenticated) {
                 syncScope.launch(NonCancellable) {
-                    watchProgressSyncService.pushSingleToRemote(progressKey(progress), progress)
+                    watchProgressSyncService.pushSingleToRemote(progressKey(progress), progress, profileId)
                         .onFailure { error ->
                             Log.w(TAG, "Failed single progress push (Trakt mirror); falling back to full sync next cycle", error)
                         }
@@ -708,7 +718,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
 
         if (syncRemote && authManager.isAuthenticated) {
             syncScope.launch(NonCancellable) {
-                watchProgressSyncService.pushSingleToRemote(progressKey(progress), progress)
+                watchProgressSyncService.pushSingleToRemote(progressKey(progress), progress, profileId)
                     .onFailure { error ->
                         Log.w(TAG, "Failed single progress push; falling back to full sync next cycle", error)
                     }
