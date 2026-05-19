@@ -47,7 +47,7 @@ import javax.inject.Inject
 private const val TAG = "StreamScreenViewModel"
 private const val EMBEDDED_STREAM_GROUP_NAME = "Embedded Streams"
 private const val EMBEDDED_STREAM_FALLBACK_NAME = "Embed Stream"
-private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 45_000L
+private const val DIRECT_AUTOPLAY_HARD_TIMEOUT_MS = 60_000L
 
 @HiltViewModel
 class StreamScreenViewModel @Inject constructor(
@@ -396,6 +396,7 @@ class StreamScreenViewModel @Inject constructor(
             var autoSelectTriggered = false
             var timeoutElapsed = false
             var debridPreparationLaunched = false
+            val isUnlimitedTimeout = playerSettings.streamAutoPlayTimeoutSeconds == PlayerSettings.STREAM_AUTOPLAY_TIMEOUT_UNLIMITED
 
             fun launchDirectDebridPreparationIfNeeded(streamGroups: List<AddonStreams>) {
                 if (debridPreparationLaunched || streamGroups.none { group -> group.streams.any { it.isDirectDebrid() && it.getStreamUrl() == null } }) {
@@ -451,10 +452,58 @@ class StreamScreenViewModel @Inject constructor(
                             lastSuccessData = result.data
                             applySuccess(result.data, isAllLoaded = false)
                             launchDirectDebridPreparationIfNeeded(result.data)
-                            if (timeoutElapsed && !autoSelectTriggered) {
+
+                            if (autoSelectTriggered || resolvedAutoPlayTarget || autoPlayHandledForSession) {
+                                // Already resolved — nothing more to do.
+                            } else if (timeoutElapsed) {
+                                // Timeout elapsed: run full auto-select (binge
+                                // group preferred, then fallback to mode).
                                 applySuccess(result.data, isAllLoaded = true)
                                 if (resolvedAutoPlayTarget) {
                                     autoSelectTriggered = true
+                                } else if (directAutoPlayFlowEnabledForSession && !isUnlimitedTimeout) {
+                                    // Bounded/instant timeout: no match found
+                                    // after full select → show stream picker.
+                                    autoPlayHandledForSession = true
+                                    directAutoPlayFlowEnabledForSession = false
+                                    updateUiStateIfChanged {
+                                        it.copy(
+                                            isDirectAutoPlayFlow = false,
+                                            showDirectAutoPlayOverlay = false,
+                                            directAutoPlayMessage = null
+                                        )
+                                    }
+                                }
+                            } else if (directFlowActive && persistedBingeGroup != null) {
+                                // Before timeout: eagerly check binge group only
+                                // (no fallback to FIRST_STREAM/REGEX yet). If a
+                                // match is found we can start playback immediately
+                                // without waiting for the full timeout.
+                                val orderedStreams = StreamAutoPlaySelector.orderAddonStreams(
+                                    result.data, installedAddonOrder
+                                )
+                                val allStreams = orderedStreams.flatMap { it.streams.sortedByDescending { s -> s.qualityValue } }
+                                val earlyMatch = StreamAutoPlaySelector.selectAutoPlayStream(
+                                    streams = allStreams,
+                                    mode = playerSettings.streamAutoPlayMode,
+                                    regexPattern = playerSettings.streamAutoPlayRegex,
+                                    source = playerSettings.streamAutoPlaySource,
+                                    installedAddonNames = installedAddonOrder.toSet(),
+                                    selectedAddons = playerSettings.streamAutoPlaySelectedAddons,
+                                    selectedPlugins = playerSettings.streamAutoPlaySelectedPlugins,
+                                    preferredBingeGroup = persistedBingeGroup,
+                                    preferBingeGroupInSelection = true,
+                                    bingeGroupOnly = true
+                                )
+                                if (earlyMatch != null) {
+                                    resolvedAutoPlayTarget = true
+                                    autoSelectTriggered = true
+                                    updateUiStateIfChanged {
+                                        it.copy(
+                                            autoPlayStream = earlyMatch,
+                                            showDirectAutoPlayOverlay = true
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -504,7 +553,14 @@ class StreamScreenViewModel @Inject constructor(
                 }
             }
 
-            // After timeout: if streams arrived, auto-select now; if not, wait for first result from inner job
+            // Timeout semantics:
+            // - 0 (instant): timeoutElapsed immediately, first addon response
+            //   triggers auto-select; if no match -> dismiss overlay at once.
+            // - 1-30s (bounded): wait the configured delay, then auto-select
+            //   from whatever streams arrived; if no match -> dismiss overlay.
+            // - unlimited: check each addon response as it arrives; if a match
+            //   is found use it immediately; otherwise keep waiting until all
+            //   addons finish or the hard timeout (60s) forces a fallback.
             val timeoutMs = playerSettings.streamAutoPlayTimeoutSeconds * 1_000L
             if (PlayerSettings.isBoundedTimeout(playerSettings.streamAutoPlayTimeoutSeconds)) {
                 delay(timeoutMs)
@@ -516,6 +572,23 @@ class StreamScreenViewModel @Inject constructor(
                 applySuccess(lastSuccessData, isAllLoaded = true)
                 if (resolvedAutoPlayTarget) {
                     autoSelectTriggered = true
+                }
+            }
+
+            // For instant/bounded timeout: if streams arrived but no auto-play
+            // target was resolved, tear down the overlay immediately so the
+            // user sees the stream picker.
+            // For unlimited: keep the overlay — we continue checking as more
+            // addons respond until the hard timeout below.
+            if (directFlowActive && !resolvedAutoPlayTarget && lastSuccessData != null && !isUnlimitedTimeout) {
+                autoPlayHandledForSession = true
+                directAutoPlayFlowEnabledForSession = false
+                updateUiStateIfChanged {
+                    it.copy(
+                        isDirectAutoPlayFlow = false,
+                        showDirectAutoPlayOverlay = false,
+                        directAutoPlayMessage = null
+                    )
                 }
             }
 

@@ -1158,7 +1158,26 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                 )
             }
 
+            fun tryBingeGroupOnly(data: List<AddonStreams>): Stream? {
+                if (currentStreamBingeGroup == null || !playerSettings.streamAutoPlayPreferBingeGroupForNextEpisode) return null
+                val orderedStreams = StreamAutoPlaySelector.orderAddonStreams(data, installedAddonOrder)
+                val allStreams = orderedStreams.flatMap { it.streams }
+                return StreamAutoPlaySelector.selectAutoPlayStream(
+                    streams = allStreams,
+                    mode = effectiveMode,
+                    regexPattern = effectiveRegex,
+                    source = effectiveSource,
+                    installedAddonNames = installedAddonOrder.toSet(),
+                    selectedAddons = effectiveSelectedAddons,
+                    selectedPlugins = effectiveSelectedPlugins,
+                    preferredBingeGroup = currentStreamBingeGroup,
+                    preferBingeGroupInSelection = true,
+                    bingeGroupOnly = true
+                )
+            }
+
             val timeoutSeconds = playerSettings.streamAutoPlayTimeoutSeconds
+            val isUnlimitedTimeout = timeoutSeconds == PlayerSettings.STREAM_AUTOPLAY_TIMEOUT_UNLIMITED
 
             val innerJob = launch {
                 streamRepository.getStreamsFromAllAddons(
@@ -1170,11 +1189,22 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     when (result) {
                         is NetworkResult.Success -> {
                             lastSuccessData = result.data
-                            if (timeoutElapsed && !autoSelectTriggered) {
+                            if (autoSelectTriggered) {
+                                // Already resolved.
+                            } else if (timeoutElapsed) {
+                                // Timeout elapsed: full select (binge group +
+                                // fallback to mode).
                                 val candidate = trySelectStream(result.data)
                                 if (candidate != null) {
                                     autoSelectTriggered = true
                                     selectedStream = candidate
+                                }
+                            } else {
+                                // Before timeout: eagerly check binge group only.
+                                val earlyMatch = tryBingeGroupOnly(result.data)
+                                if (earlyMatch != null) {
+                                    autoSelectTriggered = true
+                                    selectedStream = earlyMatch
                                 }
                             }
                         }
@@ -1200,10 +1230,10 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     }
                 }
                 if (selectedStream != null) {
-                    // Found a match within timeout - use it.
+                    // Found a match (early binge group or post-timeout full select).
                     innerJob.cancel()
                 } else if (lastSuccessData != null) {
-                    // Streams arrived but no match (e.g. binge group not found).
+                    // Streams arrived but no match after full select.
                     // Respect the original timeout - don't wait further.
                     innerJob.cancel()
                     autoSelectTriggered = true
@@ -1220,9 +1250,13 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     }
                 }
             } else {
-                // "Unlimited" mode - still apply a hard ceiling to prevent
-                // hanging forever if a scraper/addon never responds.
-                val completed = withTimeoutOrNull(NEXT_EPISODE_HARD_TIMEOUT_MS) { innerJob.join() }
+                // Instant (0) or unlimited: timeoutElapsed immediately so each
+                // addon response triggers a full select attempt in the collect.
+                // For unlimited we wait up to the hard ceiling; for instant (0)
+                // we also wait but the first Success will resolve via collect.
+                timeoutElapsed = true
+                val hardTimeout = if (isUnlimitedTimeout) NEXT_EPISODE_HARD_TIMEOUT_MS else NEXT_EPISODE_HARD_TIMEOUT_MS
+                val completed = withTimeoutOrNull(hardTimeout) { innerJob.join() }
                 if (completed == null) {
                     innerJob.cancel()
                     if (!autoSelectTriggered && lastSuccessData != null) {
