@@ -151,6 +151,13 @@
     <string name="cw_min_left">%1$dmin restantes</string>
     <string name="cw_almost_done">Quase acabando</string>
     <string name="cw_airs_date">Disponível em %1$s</string>
+    <string name="cw_airs_today">Disponível hoje</string>
+    <string name="cw_airs_tomorrow">Disponível amanhã</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Disponível em %d dia</item>
+        <item quantity="many">Disponível em %d dias</item>
+        <item quantity="other">Disponível em %d dias</item>
+    </plurals>
     <string name="cw_action_go_to_details">Ver detalhes</string>
     <string name="cw_action_start_from_beginning">Assistir do início</string>
     <string name="cw_action_remove">Remover</string>

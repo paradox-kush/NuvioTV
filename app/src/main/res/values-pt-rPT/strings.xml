@@ -115,6 +115,13 @@
     <string name="cw_min_left">faltam %1$dm</string>
     <string name="cw_almost_done">Quase a terminar</string>
     <string name="cw_airs_date">Sairá a %1$s</string>
+    <string name="cw_airs_today">Sairá hoje</string>
+    <string name="cw_airs_tomorrow">Sairá amanhã</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Sairá dentro de %d dia</item>
+        <item quantity="many">Sairá dentro de %d dias</item>
+        <item quantity="other">Sairá dentro de %d dias</item>
+    </plurals>
     <string name="cw_action_go_to_details">Ir para detalhes</string>
     <string name="cw_action_start_from_beginning">Ver do início</string>
     <string name="cw_action_remove">Remover</string>

@@ -58,6 +58,11 @@
     <string name="cw_min_left">残り%1$d分</string>
     <string name="cw_almost_done">もうすぐ終了</string>
     <string name="cw_airs_date">%1$s 放送予定</string>
+    <string name="cw_airs_today">本日放送</string>
+    <string name="cw_airs_tomorrow">明日放送</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="other">%d日後に放送</item>
+    </plurals>
     <string name="cw_action_go_to_details">詳細へ</string>
     <string name="cw_action_start_from_beginning">最初から再生</string>
     <string name="cw_action_remove">削除</string>

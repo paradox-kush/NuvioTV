@@ -115,6 +115,16 @@
     <string name="cw_min_left">متبقي %1$d د</string>
     <string name="cw_almost_done">على وشك الانتهاء</string>
     <string name="cw_airs_date">يُعرض في %1$s</string>
+    <string name="cw_airs_today">يُعرض اليوم</string>
+    <string name="cw_airs_tomorrow">يُعرض غداً</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="zero">يُعرض بعد %d يوم</item>
+        <item quantity="one">يُعرض بعد يوم</item>
+        <item quantity="two">يُعرض بعد يومين</item>
+        <item quantity="few">يُعرض بعد %d أيام</item>
+        <item quantity="many">يُعرض بعد %d يوماً</item>
+        <item quantity="other">يُعرض بعد %d يوم</item>
+    </plurals>
     <string name="cw_action_go_to_details">التفاصيل</string>
     <string name="cw_action_start_from_beginning">البدء من البداية</string>
     <string name="cw_action_remove">إزالة</string>

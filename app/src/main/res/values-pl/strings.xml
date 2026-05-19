@@ -20,6 +20,14 @@
     <string name="cw_min_left">Zostało %1$dm</string>
     <string name="cw_almost_done">Prawie koniec</string>
     <string name="cw_airs_date">Emisja %1$s</string>
+    <string name="cw_airs_today">Emisja dzisiaj</string>
+    <string name="cw_airs_tomorrow">Emisja jutro</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Emisja za %d dzień</item>
+        <item quantity="few">Emisja za %d dni</item>
+        <item quantity="many">Emisja za %d dni</item>
+        <item quantity="other">Emisja za %d dni</item>
+    </plurals>
     <string name="cw_action_go_to_details">Przejdź do szczegółów</string>
     <string name="cw_action_remove">Usuń</string>
     <string name="cw_dialog_subtitle">Wybierz co chcesz zrobić z tym elementem.</string>

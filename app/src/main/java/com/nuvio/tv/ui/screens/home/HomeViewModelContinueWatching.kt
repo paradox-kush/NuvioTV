@@ -13,6 +13,7 @@ import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.domain.model.normalizeLanguageCode
 import com.nuvio.tv.domain.model.countryToLanguageCode
+import com.nuvio.tv.ui.util.parseEpisodeReleaseDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -2534,26 +2535,6 @@ private fun HomeViewModel.publishBadgeUpdate(
         }
     }
     fullyWatchedSeriesIds.updateWithValidation(merged, allValidatedIds, revalidateAt)
-}
-
-private fun parseEpisodeReleaseDate(raw: String?): LocalDate? {
-    if (raw.isNullOrBlank()) return null
-    val value = raw.trim()
-    val zone = ZoneId.systemDefault()
-
-    return runCatching {
-        Instant.parse(value).atZone(zone).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        OffsetDateTime.parse(value).atZoneSameInstant(zone).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        LocalDateTime.parse(value).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        LocalDate.parse(value)
-    }.getOrNull() ?: runCatching {
-        val datePortion = Regex("\\b\\d{4}-\\d{2}-\\d{2}\\b").find(value)?.value
-            ?: return@runCatching null
-        LocalDate.parse(datePortion)
-    }.getOrNull()
 }
 
 private fun parseEpisodeReleaseInstant(raw: String?): Instant? {

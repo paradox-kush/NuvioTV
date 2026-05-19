@@ -115,6 +115,13 @@
 <string name="cw_min_left">%1$dm rimanenti</string>
 <string name="cw_almost_done">Quasi fatto</string>
 <string name="cw_airs_date">In onda il %1$s</string>
+<string name="cw_airs_today">In onda oggi</string>
+<string name="cw_airs_tomorrow">In onda domani</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">In onda tra %d giorno</item>
+        <item quantity="many">In onda tra %d giorni</item>
+        <item quantity="other">In onda tra %d giorni</item>
+    </plurals>
 <string name="cw_action_go_to_details">Vai ai dettagli</string>
 <string name="cw_action_start_from_beginning">Comincia dall\'inizio</string>
 <string name="cw_action_remove">Rimuovi</string>

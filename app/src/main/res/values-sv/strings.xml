@@ -53,6 +53,12 @@
     <string name="cw_min_left">%1$dm kvar</string>
     <string name="cw_almost_done">Nästan färdig</string>
     <string name="cw_airs_date">Sänds %1$s</string>
+    <string name="cw_airs_today">Sänds idag</string>
+    <string name="cw_airs_tomorrow">Sänds imorgon</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Sänds om %d dag</item>
+        <item quantity="other">Sänds om %d dagar</item>
+    </plurals>
     <string name="cw_action_go_to_details">Gå till detaljer</string>
     <string name="cw_action_start_from_beginning">Börja om från början</string>
     <string name="cw_action_remove">Ta bort</string>

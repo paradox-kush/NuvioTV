@@ -11,6 +11,7 @@ import com.nuvio.tv.domain.model.CollectionFolder
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
+import com.nuvio.tv.ui.util.computeAirDateBadgeText
 import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.R
 import com.nuvio.tv.ui.components.formatContinueWatchingProgressLabel
@@ -292,7 +293,7 @@ internal fun buildContinueWatchingItem(
                     context.getString(R.string.cw_new_episode)
                 }
             } else if (!item.info.hasAired) {
-                item.info.airDateLabel?.let { context.getString(R.string.cw_airs_date, it) }
+                computeAirDateBadgeText(context, item.info.released, item.info.airDateLabel)
                     ?: context.getString(R.string.cw_upcoming)
             } else {
                 context.getString(R.string.cw_next_up)

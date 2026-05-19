@@ -76,6 +76,7 @@ import java.util.concurrent.TimeUnit
 import com.nuvio.tv.ui.util.recompositionHighlighter
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import com.nuvio.tv.ui.util.rememberLongPressKeyTracker
+import com.nuvio.tv.ui.util.computeAirDateBadgeText
 
 private val CwCardShape = RoundedCornerShape(12.dp)
 private val CwClipShape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
@@ -296,7 +297,6 @@ fun ContinueWatchingCard(
             null
         }
     }
-    val strAirsDate = stringResource(R.string.cw_airs_date, nextUp?.airDateLabel ?: "")
     val strUpcoming = stringResource(R.string.cw_upcoming)
     val strNextUp = stringResource(R.string.cw_next_up)
     val strNewEpisode = stringResource(R.string.cw_new_episode)
@@ -309,7 +309,7 @@ fun ContinueWatchingCard(
         if (info.isReleaseAlert) {
             if (info.isNewSeasonRelease) strNewSeason else strNewEpisode
         } else if (!info.hasAired) {
-            info.airDateLabel?.let { strAirsDate } ?: strUpcoming
+            computeAirDateBadgeText(cardContext, info.released, info.airDateLabel) ?: strUpcoming
         } else {
             strNextUp
         }
@@ -380,7 +380,7 @@ fun ContinueWatchingCard(
     val effectiveImageModel = if (usesFallbackImage) fallbackImageModel else imageModel
     val titleText = remember(progress, nextUp) { progress?.name ?: nextUp?.name.orEmpty() }
     val context = LocalContext.current
-    val strAirsDateForEpisode = nextUp?.airDateLabel?.let { stringResource(R.string.cw_airs_date, it) }
+    val strAirsDateForEpisode = computeAirDateBadgeText(context, nextUp?.released, nextUp?.airDateLabel)
     val episodeTitle = remember(progress, nextUp, context, strAirsDateForEpisode) {
         when {
             progress != null -> progress.episodeTitle?.localizeEpisodeTitle(context)

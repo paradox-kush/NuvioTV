@@ -115,6 +115,14 @@
     <string name="cw_min_left">Zostáva %1$dm</string>
     <string name="cw_almost_done">Takmer hotovo</string>
     <string name="cw_airs_date">Vysiela sa %1$s</string>
+    <string name="cw_airs_today">Vysiela sa dnes</string>
+    <string name="cw_airs_tomorrow">Vysiela sa zajtra</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Vysiela sa za %d deň</item>
+        <item quantity="few">Vysiela sa za %d dni</item>
+        <item quantity="many">Vysiela sa za %d dní</item>
+        <item quantity="other">Vysiela sa za %d dní</item>
+    </plurals>
     <string name="cw_action_go_to_details">Prejsť na detaily</string>
     <string name="cw_action_start_from_beginning">Začať od začiatku</string>
     <string name="cw_action_remove">Odobrať</string>
