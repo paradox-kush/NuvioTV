@@ -54,11 +54,9 @@ internal fun PlayerRuntimeController.skipInterval(interval: SkipInterval): Boole
 
 internal fun PlayerRuntimeController.applyAudioAmplification(db: Int) {
     val clampedDb = db.coerceIn(AUDIO_AMPLIFICATION_MIN_DB, AUDIO_AMPLIFICATION_MAX_DB)
-    val isAudioPathActive = ffmpegAudioRenderer?.isAudioPathActive() == true
+    val isAudioAmplificationAvailable = isUsingMpvEngine() || _exoPlayer != null
     val wasActive = gainAudioProcessor.isGainEnabled()
-    gainAudioProcessor.setGainDb(
-        if (isAudioPathActive) clampedDb else AUDIO_AMPLIFICATION_MIN_DB
-    )
+    gainAudioProcessor.setGainDb(if (isAudioAmplificationAvailable) clampedDb else AUDIO_AMPLIFICATION_MIN_DB)
     val isActiveNow = gainAudioProcessor.isGainEnabled()
 
     if (wasActive != isActiveNow && !isUsingMpvEngine()) {
@@ -74,7 +72,7 @@ internal fun PlayerRuntimeController.applyAudioAmplification(db: Int) {
     _uiState.update {
         it.copy(
             audioAmplificationDb = clampedDb,
-            isAudioAmplificationAvailable = isAudioPathActive || isUsingMpvEngine()
+            isAudioAmplificationAvailable = isAudioAmplificationAvailable
         )
     }
 }
@@ -92,15 +90,13 @@ internal fun PlayerRuntimeController.updateAudioControlAvailability(
     selectedAudioIndex: Int = _uiState.value.selectedAudioTrackIndex
 ) {
     val selectedTrack = audioTracks.getOrNull(selectedAudioIndex)
-    val isAudioAmplificationAvailable =
-        isUsingMpvEngine() || ffmpegAudioRenderer?.isAudioPathActive() == true
-    val shouldApplyExoGain = ffmpegAudioRenderer?.isAudioPathActive() == true
+    val isAudioAmplificationAvailable = isUsingMpvEngine() || _exoPlayer != null
     val isCenterMixAvailable =
         ffmpegAudioRenderer?.isCenterMixActive() == true && (selectedTrack?.channelCount ?: 0) > 2
     val clampedDb = _uiState.value.audioAmplificationDb
         .coerceIn(AUDIO_AMPLIFICATION_MIN_DB, AUDIO_AMPLIFICATION_MAX_DB)
     gainAudioProcessor.setGainDb(
-        if (shouldApplyExoGain) clampedDb else AUDIO_AMPLIFICATION_MIN_DB
+        if (isAudioAmplificationAvailable) clampedDb else AUDIO_AMPLIFICATION_MIN_DB
     )
     _uiState.update { state ->
         state.copy(
