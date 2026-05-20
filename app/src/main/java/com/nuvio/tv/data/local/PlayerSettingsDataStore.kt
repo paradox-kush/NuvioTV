@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -461,86 +462,92 @@ class PlayerSettingsDataStore @Inject constructor(
 
     init {
         ioScope.launch {
-            store().edit { prefs ->
-                val loadControlMigrated = prefs[migrationLoadControlDefaultsAlignedDoneKey] ?: false
-                if (!loadControlMigrated) {
-                    val currentMin = prefs[minBufferMsKey]
-                    val currentMax = prefs[maxBufferMsKey]
+            profileManager.activeProfileId.collect { pid ->
+                migrateProfile(pid)
+            }
+        }
+    }
 
-                    val legacyDefaultsDetected = (currentMin == null && currentMax == null) ||
-                        (currentMin == 15_000 && currentMax == 25_000)
+    private suspend fun migrateProfile(profileId: Int) {
+        factory.get(profileId, FEATURE).edit { prefs ->
+            val loadControlMigrated = prefs[migrationLoadControlDefaultsAlignedDoneKey] ?: false
+            if (!loadControlMigrated) {
+                val currentMin = prefs[minBufferMsKey]
+                val currentMax = prefs[maxBufferMsKey]
 
-                    if (legacyDefaultsDetected) {
-                        prefs[minBufferMsKey] = 50_000
-                        prefs[maxBufferMsKey] = 50_000
-                    }
+                val legacyDefaultsDetected = (currentMin == null && currentMax == null) ||
+                    (currentMin == 15_000 && currentMax == 25_000)
 
-                    prefs[migrationLoadControlDefaultsAlignedDoneKey] = true
+                if (legacyDefaultsDetected) {
+                    prefs[minBufferMsKey] = 50_000
+                    prefs[maxBufferMsKey] = 50_000
                 }
 
-                val min = prefs[minBufferMsKey]
-                val max = prefs[maxBufferMsKey]
-                if (min != null && max != null && max < min) {
-                    prefs[maxBufferMsKey] = min
-                }
+                prefs[migrationLoadControlDefaultsAlignedDoneKey] = true
+            }
 
-                val preferredAudioLanguage = prefs[preferredAudioLanguageKey]
-                if (preferredAudioLanguage != null) {
-                    val normalizedPreferredAudioLanguage =
-                        normalizeSelectableLanguageCode(preferredAudioLanguage)
-                    if (normalizedPreferredAudioLanguage != preferredAudioLanguage) {
-                        prefs[preferredAudioLanguageKey] = normalizedPreferredAudioLanguage
-                    }
-                }
+            val min = prefs[minBufferMsKey]
+            val max = prefs[maxBufferMsKey]
+            if (min != null && max != null && max < min) {
+                prefs[maxBufferMsKey] = min
+            }
 
-                val secondaryPreferredAudioLanguage = prefs[secondaryPreferredAudioLanguageKey]
-                if (secondaryPreferredAudioLanguage != null) {
-                    val normalizedSecondaryPreferredAudioLanguage =
-                        normalizeSecondaryAudioLanguageCode(secondaryPreferredAudioLanguage)
-                    if (normalizedSecondaryPreferredAudioLanguage != secondaryPreferredAudioLanguage) {
-                        if (normalizedSecondaryPreferredAudioLanguage != null) {
-                            prefs[secondaryPreferredAudioLanguageKey] = normalizedSecondaryPreferredAudioLanguage
-                        } else {
-                            prefs.remove(secondaryPreferredAudioLanguageKey)
-                        }
-                    }
+            val preferredAudioLanguage = prefs[preferredAudioLanguageKey]
+            if (preferredAudioLanguage != null) {
+                val normalizedPreferredAudioLanguage =
+                    normalizeSelectableLanguageCode(preferredAudioLanguage)
+                if (normalizedPreferredAudioLanguage != preferredAudioLanguage) {
+                    prefs[preferredAudioLanguageKey] = normalizedPreferredAudioLanguage
                 }
+            }
 
-                val preferredSubtitleLanguage = prefs[subtitlePreferredLanguageKey]
-                if (preferredSubtitleLanguage != null) {
-                    val normalizedPreferredSubtitleLanguage =
-                        normalizeSelectableLanguageCode(preferredSubtitleLanguage)
-                    if (normalizedPreferredSubtitleLanguage != preferredSubtitleLanguage) {
-                        prefs[subtitlePreferredLanguageKey] = normalizedPreferredSubtitleLanguage
+            val secondaryPreferredAudioLanguage = prefs[secondaryPreferredAudioLanguageKey]
+            if (secondaryPreferredAudioLanguage != null) {
+                val normalizedSecondaryPreferredAudioLanguage =
+                    normalizeSecondaryAudioLanguageCode(secondaryPreferredAudioLanguage)
+                if (normalizedSecondaryPreferredAudioLanguage != secondaryPreferredAudioLanguage) {
+                    if (normalizedSecondaryPreferredAudioLanguage != null) {
+                        prefs[secondaryPreferredAudioLanguageKey] = normalizedSecondaryPreferredAudioLanguage
+                    } else {
+                        prefs.remove(secondaryPreferredAudioLanguageKey)
                     }
                 }
+            }
 
-                val secondarySubtitleLanguage = prefs[subtitleSecondaryLanguageKey]
-                if (secondarySubtitleLanguage != null) {
-                    val normalizedSecondarySubtitleLanguage =
-                        normalizeSelectableLanguageCode(secondarySubtitleLanguage)
-                    if (normalizedSecondarySubtitleLanguage != secondarySubtitleLanguage) {
-                        prefs[subtitleSecondaryLanguageKey] = normalizedSecondarySubtitleLanguage
-                    }
-                }
-
+            val preferredSubtitleLanguage = prefs[subtitlePreferredLanguageKey]
+            if (preferredSubtitleLanguage != null) {
                 val normalizedPreferredSubtitleLanguage =
-                    preferredSubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+                    normalizeSelectableLanguageCode(preferredSubtitleLanguage)
+                if (normalizedPreferredSubtitleLanguage != preferredSubtitleLanguage) {
+                    prefs[subtitlePreferredLanguageKey] = normalizedPreferredSubtitleLanguage
+                }
+            }
+
+            val secondarySubtitleLanguage = prefs[subtitleSecondaryLanguageKey]
+            if (secondarySubtitleLanguage != null) {
                 val normalizedSecondarySubtitleLanguage =
-                    secondarySubtitleLanguage?.let(::normalizeSelectableLanguageCode)
-                when {
-                    normalizedPreferredSubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
-                        prefs[subtitleUseForcedSubtitlesKey] = true
-                        val migratedPreferred = normalizedSecondarySubtitleLanguage
-                            ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
-                            ?: "en"
-                        prefs[subtitlePreferredLanguageKey] = migratedPreferred
-                        prefs.remove(subtitleSecondaryLanguageKey)
-                    }
-                    normalizedSecondarySubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
-                        prefs[subtitleUseForcedSubtitlesKey] = true
-                        prefs.remove(subtitleSecondaryLanguageKey)
-                    }
+                    normalizeSelectableLanguageCode(secondarySubtitleLanguage)
+                if (normalizedSecondarySubtitleLanguage != secondarySubtitleLanguage) {
+                    prefs[subtitleSecondaryLanguageKey] = normalizedSecondarySubtitleLanguage
+                }
+            }
+
+            val normalizedPreferredSubtitleLanguage =
+                preferredSubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+            val normalizedSecondarySubtitleLanguage =
+                secondarySubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+            when {
+                normalizedPreferredSubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
+                    prefs[subtitleUseForcedSubtitlesKey] = true
+                    val migratedPreferred = normalizedSecondarySubtitleLanguage
+                        ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
+                        ?: "en"
+                    prefs[subtitlePreferredLanguageKey] = migratedPreferred
+                    prefs.remove(subtitleSecondaryLanguageKey)
+                }
+                normalizedSecondarySubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
+                    prefs[subtitleUseForcedSubtitlesKey] = true
+                    prefs.remove(subtitleSecondaryLanguageKey)
                 }
             }
         }
