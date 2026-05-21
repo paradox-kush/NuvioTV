@@ -1978,8 +1978,6 @@ private fun resolveNextUpVideoFromMeta(
     meta: CwMetaSummary
 ): CwVideoSummary? = resolveNextUpVideoFromMeta(progress, meta, showUnairedNextUp = true)
 
-private const val CW_NEXT_UP_NEW_SEASON_UNAIRED_WINDOW_DAYS = 7
-
 private fun resolveNextUpVideoFromMeta(
     progress: WatchProgress,
     meta: CwMetaSummary,
@@ -2045,13 +2043,6 @@ private fun resolveNextUpVideoFromMeta(
             }
             if (!releaseDate.isAfter(todayLocal)) {
                 return@firstOrNull true
-            }
-            // Match mobile: show unaired next-season episodes within 7-day window
-            if (showUnairedNextUp) {
-                val daysUntil = java.time.temporal.ChronoUnit.DAYS.between(todayLocal, releaseDate)
-                if (daysUntil <= CW_NEXT_UP_NEW_SEASON_UNAIRED_WINDOW_DAYS) {
-                    return@firstOrNull true
-                }
             }
             return@firstOrNull false
         }
