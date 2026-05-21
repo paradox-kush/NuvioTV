@@ -19,7 +19,8 @@ import javax.inject.Singleton
 class DirectDebridResolver @Inject constructor(
     private val dataStore: DebridSettingsDataStore,
     private val torboxResolver: TorboxDirectDebridResolver,
-    private val realDebridResolver: RealDebridDirectDebridResolver
+    private val realDebridResolver: RealDebridDirectDebridResolver,
+    private val premiumizeResolver: PremiumizeDirectDebridResolver
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutex = Mutex()
@@ -102,6 +103,7 @@ class DirectDebridResolver @Inject constructor(
         return when (val result = resolve(stream, season, episode)) {
             is DirectDebridResolveResult.Success -> DirectDebridPlayableResult.Success(stream.withResolvedDebridUrl(result))
             DirectDebridResolveResult.MissingApiKey -> DirectDebridPlayableResult.MissingApiKey
+            DirectDebridResolveResult.NotCached -> DirectDebridPlayableResult.NotCached
             DirectDebridResolveResult.Stale -> DirectDebridPlayableResult.Stale
             DirectDebridResolveResult.Error -> DirectDebridPlayableResult.Error
         }
@@ -128,6 +130,7 @@ class DirectDebridResolver @Inject constructor(
     ): DirectDebridResolveResult {
         return when (DebridProviders.byId(stream.clientResolve?.service)?.id) {
             DebridProviders.TORBOX_ID -> torboxResolver.resolve(stream, season, episode)
+            DebridProviders.PREMIUMIZE_ID -> premiumizeResolver.resolve(stream, season, episode)
             DebridProviders.REAL_DEBRID_ID -> realDebridResolver.resolve(stream, season, episode)
             else -> DirectDebridResolveResult.Error
         }
@@ -139,6 +142,7 @@ class DirectDebridResolver @Inject constructor(
         val settings = dataStore.settings.first()
         val apiKey = when (providerId) {
             DebridProviders.TORBOX_ID -> settings.torboxApiKey
+            DebridProviders.PREMIUMIZE_ID -> settings.premiumizeApiKey
             DebridProviders.REAL_DEBRID_ID -> settings.realDebridApiKey
             else -> ""
         }.trim().takeIf { it.isNotBlank() } ?: return null
@@ -170,6 +174,7 @@ private data class CachedDirectDebridResolve(
 sealed class DirectDebridPlayableResult {
     data class Success(val stream: Stream) : DirectDebridPlayableResult()
     data object MissingApiKey : DirectDebridPlayableResult()
+    data object NotCached : DirectDebridPlayableResult()
     data object Stale : DirectDebridPlayableResult()
     data object Error : DirectDebridPlayableResult()
 }

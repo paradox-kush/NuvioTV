@@ -1187,6 +1187,7 @@ internal suspend fun PlayerRuntimeController.resolveDirectDebridStreamIfNeeded(
     return when (val result = directDebridResolver.resolveToPlayableStream(stream, season, episode)) {
         is DirectDebridPlayableResult.Success -> result.stream
         DirectDebridPlayableResult.MissingApiKey,
+        DirectDebridPlayableResult.NotCached,
         DirectDebridPlayableResult.Stale,
         DirectDebridPlayableResult.Error -> null
     }

@@ -5,11 +5,15 @@ import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.R
+import com.nuvio.tv.core.debrid.DebridProviderCapability
+import com.nuvio.tv.core.debrid.DebridProviders
+import com.nuvio.tv.core.debrid.supports
 import com.nuvio.tv.core.qr.QrCodeGenerator
 import com.nuvio.tv.core.server.DebridFormatterConfigServer
 import com.nuvio.tv.core.server.DebridFormatterSettings
 import com.nuvio.tv.core.server.DeviceIpAddress
 import com.nuvio.tv.data.local.DebridSettingsDataStore
+import com.nuvio.tv.data.remote.api.PremiumizeApi
 import com.nuvio.tv.data.remote.api.TorboxApi
 import com.nuvio.tv.domain.model.DEBRID_PREPARE_INSTANT_PLAYBACK_DEFAULT_LIMIT
 import com.nuvio.tv.domain.model.DebridSettings
@@ -35,7 +39,8 @@ import javax.inject.Inject
 class DebridSettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val dataStore: DebridSettingsDataStore,
-    private val torboxApi: TorboxApi
+    private val torboxApi: TorboxApi,
+    private val premiumizeApi: PremiumizeApi
 ) : ViewModel() {
     private var formatterServer: DebridFormatterConfigServer? = null
     private var logoBytes: ByteArray? = null
@@ -68,10 +73,18 @@ class DebridSettingsViewModel @Inject constructor(
     fun onEvent(event: DebridSettingsEvent) {
         when (event) {
             is DebridSettingsEvent.ToggleEnabled -> {
-                if (event.enabled && !_uiState.value.hasAnyApiKey) return
+                if (event.enabled && !_uiState.value.hasResolverProvider) return
                 update { dataStore.setEnabled(event.enabled) }
             }
         }
+    }
+
+    fun setCloudLibraryEnabled(enabled: Boolean) {
+        update { dataStore.setCloudLibraryEnabled(enabled) }
+    }
+
+    fun setPreferredResolverProviderId(providerId: String) {
+        update { dataStore.setPreferredResolverProviderId(providerId) }
     }
 
     fun startFormatterQrMode() {
@@ -175,29 +188,47 @@ class DebridSettingsViewModel @Inject constructor(
     }
 
     fun validateAndSaveTorboxApiKey(value: String, onSuccess: () -> Unit) {
+        validateAndSaveProviderApiKey(DebridProviders.TORBOX_ID, value, onSuccess)
+    }
+
+    fun validateAndSaveProviderApiKey(providerId: String, value: String, onSuccess: () -> Unit) {
         val trimmed = value.trim()
         if (trimmed.isBlank()) {
-            viewModelScope.launch { dataStore.setTorboxApiKey("") }
+            viewModelScope.launch { dataStore.setProviderApiKey(providerId, "") }
             onSuccess()
             return
         }
         viewModelScope.launch {
             _validating.value = true
-            val valid = try {
-                val response = torboxApi.getUser("Bearer $trimmed")
-                response.body()?.close()
-                response.errorBody()?.close()
-                response.isSuccessful
-            } catch (e: Exception) {
-                false
-            }
+            val valid = validateProviderApiKey(providerId, trimmed)
             _validating.value = false
             if (valid) {
-                dataStore.setTorboxApiKey(trimmed)
+                dataStore.setProviderApiKey(providerId, trimmed)
                 onSuccess()
             } else {
-                _validationError.tryEmit(context.getString(R.string.debrid_invalid_torbox_api_key))
+                _validationError.tryEmit(context.getString(R.string.debrid_key_invalid))
             }
+        }
+    }
+
+    private suspend fun validateProviderApiKey(providerId: String, apiKey: String): Boolean {
+        return try {
+            when (DebridProviders.byId(providerId)?.id) {
+                DebridProviders.TORBOX_ID -> {
+                    val response = torboxApi.getUser("Bearer $apiKey")
+                    response.body()?.close()
+                    response.errorBody()?.close()
+                    response.isSuccessful
+                }
+                DebridProviders.PREMIUMIZE_ID -> {
+                    val response = premiumizeApi.accountInfo("Bearer $apiKey")
+                    response.errorBody()?.close()
+                    response.isSuccessful && !response.body()?.status.equals("error", ignoreCase = true)
+                }
+                else -> false
+            }
+        } catch (error: Exception) {
+            false
         }
     }
 
@@ -218,8 +249,11 @@ class DebridSettingsViewModel @Inject constructor(
 
 data class DebridSettingsUiState(
     val enabled: Boolean = false,
+    val cloudLibraryEnabled: Boolean = true,
     val torboxApiKey: String = "",
+    val premiumizeApiKey: String = "",
     val realDebridApiKey: String = "",
+    val preferredResolverProviderId: String = "",
     val instantPlaybackPreparationLimit: Int = 0,
     val streamMaxResults: Int = 0,
     val streamSortMode: DebridStreamSortMode = DebridStreamSortMode.DEFAULT,
@@ -235,13 +269,51 @@ data class DebridSettingsUiState(
     val formatterServerUrl: String? = null,
     val serverError: String? = null
 ) {
+    val providerApiKeys: Map<String, String>
+        get() = mapOf(
+            DebridProviders.TORBOX_ID to torboxApiKey,
+            DebridProviders.PREMIUMIZE_ID to premiumizeApiKey,
+            DebridProviders.REAL_DEBRID_ID to realDebridApiKey
+        )
+
     val hasAnyApiKey: Boolean
-        get() = torboxApiKey.isNotBlank()
+        get() = DebridProviders.visible().any { provider -> apiKeyFor(provider.id).isNotBlank() }
+
+    val resolverProviders: List<com.nuvio.tv.core.debrid.DebridProvider>
+        get() = DebridProviders.visible()
+            .filter { provider ->
+                apiKeyFor(provider.id).isNotBlank() &&
+                    (provider.supports(DebridProviderCapability.ClientResolve) ||
+                        provider.supports(DebridProviderCapability.LocalTorrentResolve))
+            }
+
+    val activeResolverProvider: com.nuvio.tv.core.debrid.DebridProvider?
+        get() = resolverProviders.firstOrNull { it.id == preferredResolverProviderId }
+            ?: resolverProviders.firstOrNull()
+
+    val hasResolverProvider: Boolean
+        get() = activeResolverProvider != null
+
+    val cloudLibraryProviders: List<com.nuvio.tv.core.debrid.DebridProvider>
+        get() = DebridProviders.visible()
+            .filter { provider ->
+                apiKeyFor(provider.id).isNotBlank() &&
+                    provider.supports(DebridProviderCapability.CloudLibrary)
+            }
+
+    val hasCloudLibraryProvider: Boolean
+        get() = cloudLibraryProviders.isNotEmpty()
+
+    fun apiKeyFor(providerId: String): String =
+        providerApiKeys[providerId].orEmpty()
 
     fun fromSettings(settings: DebridSettings): DebridSettingsUiState = copy(
         enabled = settings.enabled,
+        cloudLibraryEnabled = settings.cloudLibraryEnabled,
         torboxApiKey = settings.torboxApiKey,
+        premiumizeApiKey = settings.premiumizeApiKey,
         realDebridApiKey = settings.realDebridApiKey,
+        preferredResolverProviderId = settings.preferredResolverProviderId,
         instantPlaybackPreparationLimit = settings.instantPlaybackPreparationLimit,
         streamMaxResults = settings.streamMaxResults,
         streamSortMode = settings.streamSortMode,

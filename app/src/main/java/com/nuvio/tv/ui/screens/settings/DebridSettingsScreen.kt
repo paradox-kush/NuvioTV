@@ -49,6 +49,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.R
+import com.nuvio.tv.core.debrid.DebridProvider
+import com.nuvio.tv.core.debrid.DebridProviders
 import com.nuvio.tv.domain.model.DebridStreamAudioChannel
 import com.nuvio.tv.domain.model.DebridStreamAudioTag
 import com.nuvio.tv.domain.model.DebridStreamEncode
@@ -70,8 +72,9 @@ fun DebridSettingsContent(
     initialFocusRequester: FocusRequester? = null
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var activeApiKeyDialog by remember { mutableStateOf<DebridApiKeyDialogProvider?>(null) }
+    var activeApiKeyDialog by remember { mutableStateOf<String?>(null) }
     var activeStreamPicker by remember { mutableStateOf<DebridStreamPicker?>(null) }
+    var showResolverPicker by remember { mutableStateOf(false) }
     var showPrepareCountDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -109,7 +112,7 @@ fun DebridSettingsContent(
                         SettingsToggleRow(
                             title = stringResource(R.string.debrid_enable_title),
                             subtitle = stringResource(R.string.debrid_enable_subtitle),
-                            checked = uiState.enabled && uiState.hasAnyApiKey,
+                            checked = uiState.enabled && uiState.hasResolverProvider,
                             onToggle = { viewModel.onEvent(DebridSettingsEvent.ToggleEnabled(!uiState.enabled)) },
                             modifier = Modifier
                                 .padding(top = 2.dp)
@@ -120,8 +123,30 @@ fun DebridSettingsContent(
                                         Modifier
                                     }
                                 ),
-                            enabled = uiState.hasAnyApiKey
+                            enabled = uiState.hasResolverProvider
                         )
+                    }
+
+                    item(key = "debrid_cloud_library") {
+                        SettingsToggleRow(
+                            title = stringResource(R.string.debrid_cloud_library),
+                            subtitle = stringResource(R.string.debrid_cloud_library_description),
+                            checked = uiState.cloudLibraryEnabled && uiState.hasCloudLibraryProvider,
+                            onToggle = { viewModel.setCloudLibraryEnabled(!uiState.cloudLibraryEnabled) },
+                            enabled = uiState.hasCloudLibraryProvider
+                        )
+                    }
+
+                    if (uiState.resolverProviders.size > 1) {
+                        item(key = "debrid_resolve_with") {
+                            SettingsActionRow(
+                                title = stringResource(R.string.debrid_resolve_with),
+                                subtitle = stringResource(R.string.debrid_resolve_with_description),
+                                value = uiState.activeResolverProvider?.displayName ?: stringResource(R.string.debrid_add_key_first),
+                                onClick = { showResolverPicker = true },
+                                enabled = true
+                            )
+                        }
                     }
 
                     if (!uiState.hasAnyApiKey) {
@@ -134,14 +159,16 @@ fun DebridSettingsContent(
                         DebridSectionLabel(text = stringResource(R.string.debrid_section_account))
                     }
 
-                    item(key = "debrid_torbox_api_key") {
-                        SettingsActionRow(
-                            title = stringResource(R.string.debrid_api_key_title),
-                            subtitle = stringResource(R.string.debrid_api_key_subtitle),
-                            value = maskDebridApiKey(uiState.torboxApiKey, stringResource(R.string.debrid_not_set)),
-                            onClick = { activeApiKeyDialog = DebridApiKeyDialogProvider.TORBOX },
-                            enabled = true
-                        )
+                    DebridProviders.visible().forEach { provider ->
+                        item(key = "debrid_${provider.id}_api_key") {
+                            SettingsActionRow(
+                                title = provider.displayName,
+                                subtitle = stringResource(R.string.debrid_provider_description, provider.displayName),
+                                value = maskDebridApiKey(uiState.apiKeyFor(provider.id), stringResource(R.string.debrid_not_set)),
+                                onClick = { activeApiKeyDialog = provider.id },
+                                enabled = true
+                            )
+                        }
                     }
 
                     item(key = "debrid_instant_section") {
@@ -266,23 +293,35 @@ fun DebridSettingsContent(
         }
     }
 
-    activeApiKeyDialog?.let { provider ->
-        when (provider) {
-            DebridApiKeyDialogProvider.TORBOX -> DebridApiKeyDialog(
-                title = stringResource(R.string.debrid_dialog_title),
-                subtitle = stringResource(R.string.debrid_dialog_subtitle),
-                placeholder = stringResource(R.string.debrid_dialog_placeholder),
-                currentValue = uiState.torboxApiKey,
+    activeApiKeyDialog?.let { providerId ->
+        DebridProviders.byId(providerId)?.let { provider ->
+            DebridApiKeyDialog(
+                title = stringResource(R.string.debrid_api_key_dialog_title, provider.displayName),
+                subtitle = stringResource(R.string.debrid_api_key_dialog_subtitle, provider.displayName),
+                placeholder = stringResource(R.string.debrid_api_key_dialog_placeholder, provider.displayName),
+                currentValue = uiState.apiKeyFor(provider.id),
                 viewModel = viewModel,
-                onSave = { value, onSaved -> viewModel.validateAndSaveTorboxApiKey(value, onSaved) },
+                onSave = { value, onSaved -> viewModel.validateAndSaveProviderApiKey(provider.id, value, onSaved) },
                 onSaved = { activeApiKeyDialog = null },
                 onClear = {
-                    viewModel.validateAndSaveTorboxApiKey("") {}
+                    viewModel.validateAndSaveProviderApiKey(provider.id, "") {}
                     activeApiKeyDialog = null
                 },
                 onDismiss = { activeApiKeyDialog = null }
             )
         }
+    }
+
+    if (showResolverPicker) {
+        DebridResolverProviderDialog(
+            providers = uiState.resolverProviders,
+            selectedProviderId = uiState.activeResolverProvider?.id,
+            onSelected = { providerId ->
+                viewModel.setPreferredResolverProviderId(providerId)
+                showResolverPicker = false
+            },
+            onDismiss = { showResolverPicker = false }
+        )
     }
 
     when (activeStreamPicker) {
@@ -646,6 +685,29 @@ private fun DebridPrepareCountDialog(
         },
         selectedValue = selectedLimit,
         onOptionSelected = onLimitSelected,
+        onDismiss = onDismiss,
+        width = 420.dp,
+        maxHeight = 280.dp
+    )
+}
+
+@Composable
+private fun DebridResolverProviderDialog(
+    providers: List<DebridProvider>,
+    selectedProviderId: String?,
+    onSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val selected = selectedProviderId ?: providers.firstOrNull()?.id.orEmpty()
+
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.debrid_resolve_with),
+        subtitle = stringResource(R.string.debrid_resolve_with_description),
+        options = providers.map { provider ->
+            SettingsPickerOption(provider.id, provider.displayName)
+        },
+        selectedValue = selected,
+        onOptionSelected = onSelected,
         onDismiss = onDismiss,
         width = 420.dp,
         maxHeight = 280.dp
@@ -1068,10 +1130,6 @@ private fun maskDebridApiKey(key: String, notSetLabel: String): String {
     val trimmed = key.trim()
     if (trimmed.isBlank()) return notSetLabel
     return if (trimmed.length <= 4) "****" else "******${trimmed.takeLast(4)}"
-}
-
-private enum class DebridApiKeyDialogProvider {
-    TORBOX
 }
 
 private enum class DebridStreamPicker {

@@ -2,6 +2,7 @@ package com.nuvio.tv.core.debrid
 
 import com.nuvio.tv.data.local.DebridSettingsDataStore
 import com.nuvio.tv.data.remote.api.TorboxApi
+import com.nuvio.tv.data.remote.dto.TorboxCloudItemDto
 import com.nuvio.tv.data.remote.dto.TorboxCreateTorrentDataDto
 import com.nuvio.tv.data.remote.dto.TorboxEnvelopeDto
 import com.nuvio.tv.data.remote.dto.TorboxTorrentDataDto
@@ -193,6 +194,60 @@ class TorboxDirectDebridResolverTest {
             requestCalls++
             lastFileId = fileId
             return linkResponse
+        }
+
+        override suspend fun listCloudTorrents(
+            authorization: String
+        ): Response<TorboxEnvelopeDto<List<TorboxCloudItemDto>>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = emptyList()))
+        }
+
+        override suspend fun listCloudUsenet(
+            authorization: String
+        ): Response<TorboxEnvelopeDto<List<TorboxCloudItemDto>>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = emptyList()))
+        }
+
+        override suspend fun listCloudWebDownloads(
+            authorization: String
+        ): Response<TorboxEnvelopeDto<List<TorboxCloudItemDto>>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = emptyList()))
+        }
+
+        override suspend fun requestCloudTorrentDownloadLink(
+            authorization: String,
+            token: String,
+            torrentId: String,
+            fileId: String?,
+            zipLink: Boolean,
+            redirect: Boolean,
+            appendName: Boolean
+        ): Response<TorboxEnvelopeDto<String>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = ""))
+        }
+
+        override suspend fun requestCloudUsenetDownloadLink(
+            authorization: String,
+            token: String,
+            usenetId: String,
+            fileId: String?,
+            zipLink: Boolean,
+            redirect: Boolean,
+            appendName: Boolean
+        ): Response<TorboxEnvelopeDto<String>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = ""))
+        }
+
+        override suspend fun requestCloudWebDownloadLink(
+            authorization: String,
+            token: String,
+            webId: String,
+            fileId: String?,
+            zipLink: Boolean,
+            redirect: Boolean,
+            appendName: Boolean
+        ): Response<TorboxEnvelopeDto<String>> {
+            return Response.success(TorboxEnvelopeDto(success = true, data = ""))
         }
 
         private fun RequestBody.readUtf8(): String {

@@ -898,6 +898,10 @@ class StreamScreenViewModel @Inject constructor(
                 showDirectDebridPlaybackError(context.getString(R.string.debrid_missing_api_key), refreshStreams = false)
                 null
             }
+            DirectDebridResolveResult.NotCached -> {
+                showDirectDebridPlaybackError(context.getString(R.string.debrid_not_cached), refreshStreams = false)
+                null
+            }
             DirectDebridResolveResult.Stale -> {
                 showDirectDebridPlaybackError(context.getString(R.string.debrid_stale_stream), refreshStreams = true)
                 null
