@@ -12,9 +12,12 @@ import com.nuvio.tv.core.profile.ProfileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import javax.inject.Inject
@@ -115,6 +118,12 @@ val AVAILABLE_SUBTITLE_LANGUAGES = listOf(
     SubtitleLanguage("zu", "Zulu")
 )
 
+val AVAILABLE_TMDB_LANGUAGES = AVAILABLE_SUBTITLE_LANGUAGES + listOf(
+    SubtitleLanguage("en-AU", "English (Australia)"),
+    SubtitleLanguage("en-CA", "English (Canada)"),
+    SubtitleLanguage("en-GB", "English (United Kingdom)"),
+)
+
 /**
  * Data class representing subtitle style settings
  */
@@ -155,6 +164,32 @@ object AudioLanguageOption {
     const val ORIGINAL = "original"  // Use content's original language (from TMDB)
 }
 
+enum class AudioOutputChannels(
+    val settingValue: String,
+    val displayLabel: String,
+    val channelCount: Int,
+    val ffmpegLayoutName: String
+) {
+    CHANNELS_2_0("2.0", "2.0", 2, "stereo"),
+    CHANNELS_2_1("2.1", "2.1", 3, "2.1"),
+    CHANNELS_3_0("3.0", "3.0", 3, "3.0"),
+    CHANNELS_3_1("3.1", "3.1", 4, "3.1"),
+    CHANNELS_4_0("4.0", "4.0", 4, "4.0"),
+    CHANNELS_4_1("4.1", "4.1", 5, "4.1"),
+    CHANNELS_5_0("5.0", "5.0", 5, "5.0"),
+    CHANNELS_5_1("5.1", "5.1", 6, "5.1"),
+    CHANNELS_7_0("7.0", "7.0", 7, "7.0"),
+    CHANNELS_7_1("7.1", "7.1", 8, "7.1");
+
+    companion object {
+        val default = CHANNELS_7_1
+
+        fun fromSettingValue(value: String?): AudioOutputChannels {
+            return entries.firstOrNull { it.settingValue == value } ?: default
+        }
+    }
+}
+
 /**
  * Data class representing player settings
  */
@@ -168,9 +203,13 @@ data class PlayerSettings(
     val bufferSettings: BufferSettings = BufferSettings(),
     // Audio settings
     val decoderPriority: Int = 1, // EXTENSION_RENDERER_MODE_ON (0=off, 1=on, 2=prefer)
+    val downmixEnabled: Boolean = false,
+    val audioOutputChannels: AudioOutputChannels = AudioOutputChannels.default,
+    val maintainOriginalAudioOnDownmix: Boolean = true,
     val tunnelingEnabled: Boolean = false,
     val skipSilence: Boolean = false,
     val audioAmplificationDb: Int = 0,
+    val centerMixLevelDb: Int = 0,
     val persistAudioAmplification: Boolean = false,
     val rememberAudioDelayPerDevice: Boolean = true,
     val preferredAudioLanguage: String = AudioLanguageOption.DEVICE,
@@ -180,6 +219,7 @@ data class PlayerSettings(
     val pauseOverlayEnabled: Boolean = true,
     val osdClockEnabled: Boolean = true,
     val skipIntroEnabled: Boolean = true,
+    val parentalGuideEnabled: Boolean = true,
     val autoSkipSegmentTypes: Set<AutoSkipSegmentType> = emptySet(),
     // Dolby Vision Profile 7 → HEVC fallback (requires forked ExoPlayer)
     val mapDV7ToHevc: Boolean = false,
@@ -195,6 +235,7 @@ data class PlayerSettings(
     val streamAutoPlayRegex: String = "",
     val streamAutoPlayNextEpisodeEnabled: Boolean = false,
     val streamAutoPlayPreferBingeGroupForNextEpisode: Boolean = true,
+    val streamAutoPlayReuseBingeGroup: Boolean = true,
     val streamAutoPlayTimeoutSeconds: Int = 3,
     val stillWatchingEnabled: Boolean = false,
     val stillWatchingEpisodeThreshold: Int = DEFAULT_STILL_WATCHING_EPISODE_THRESHOLD,
@@ -211,6 +252,23 @@ data class PlayerSettings(
         const val DEFAULT_STILL_WATCHING_EPISODE_THRESHOLD = 3
         const val MIN_STILL_WATCHING_EPISODE_THRESHOLD = 2
         const val MAX_STILL_WATCHING_EPISODE_THRESHOLD = 6
+
+        const val STREAM_AUTOPLAY_TIMEOUT_UNLIMITED = Int.MAX_VALUE
+
+        val STREAM_AUTOPLAY_TIMEOUT_VALUES: List<Int> =
+            listOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, STREAM_AUTOPLAY_TIMEOUT_UNLIMITED)
+
+        fun applyLegacyTimeoutSentinelMigration(stored: Int?): Int {
+            val raw = stored ?: 3
+            if (raw == 11) return STREAM_AUTOPLAY_TIMEOUT_UNLIMITED
+            if (raw in STREAM_AUTOPLAY_TIMEOUT_VALUES) return raw
+            return STREAM_AUTOPLAY_TIMEOUT_VALUES
+                .filter { it != STREAM_AUTOPLAY_TIMEOUT_UNLIMITED }
+                .minBy { kotlin.math.abs(it.toLong() - raw.toLong()) }
+        }
+
+        fun isBoundedTimeout(timeoutSeconds: Int): Boolean =
+            timeoutSeconds > 0 && timeoutSeconds != STREAM_AUTOPLAY_TIMEOUT_UNLIMITED
     }
 }
 
@@ -299,6 +357,7 @@ enum class LibassRenderType {
     OVERLAY_OPEN_GL    // Overlay OpenGL rendering (supports HDR, recommended)
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @Singleton
 class PlayerSettingsDataStore @Inject constructor(
     private val factory: ProfileDataStoreFactory,
@@ -308,6 +367,8 @@ class PlayerSettingsDataStore @Inject constructor(
         private const val FEATURE = "player_settings"
         private const val AUDIO_AMPLIFICATION_DB_MIN = 0
         private const val AUDIO_AMPLIFICATION_DB_MAX = 10
+        private const val CENTER_MIX_LEVEL_DB_MIN = -10
+        private const val CENTER_MIX_LEVEL_DB_MAX = 30
     }
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) =
@@ -327,9 +388,16 @@ class PlayerSettingsDataStore @Inject constructor(
 
     // Audio settings keys
     private val decoderPriorityKey = intPreferencesKey("decoder_priority")
+    private val downmixEnabledKey = booleanPreferencesKey("downmix_enabled")
+    private val audioOutputChannelsKey = stringPreferencesKey("audio_output_channels")
+    private val maintainOriginalAudioOnDownmixKey =
+        booleanPreferencesKey("maintain_original_audio_on_downmix")
+    private val downmixNormalizationEnabledLegacyKey =
+        booleanPreferencesKey("downmix_normalization_enabled")
     private val tunnelingEnabledKey = booleanPreferencesKey("tunneling_enabled")
     private val skipSilenceKey = booleanPreferencesKey("skip_silence")
     private val audioAmplificationDbKey = intPreferencesKey("audio_amplification_db")
+    private val centerMixLevelDbKey = intPreferencesKey("center_mix_level_db")
     private val persistAudioAmplificationKey = booleanPreferencesKey("persist_audio_amplification")
     private val rememberAudioDelayPerDeviceKey = booleanPreferencesKey("remember_audio_delay_per_device")
     private val preferredAudioLanguageKey = stringPreferencesKey("preferred_audio_language")
@@ -339,6 +407,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val pauseOverlayEnabledKey = booleanPreferencesKey("pause_overlay_enabled")
     private val osdClockEnabledKey = booleanPreferencesKey("osd_clock_enabled")
     private val skipIntroEnabledKey = booleanPreferencesKey("skip_intro_enabled")
+    private val parentalGuideEnabledKey = booleanPreferencesKey("parental_guide_enabled")
     private val autoSkipSegmentTypesKey = stringSetPreferencesKey("auto_skip_segment_types")
     private val mapDV7ToHevcKey = booleanPreferencesKey("map_dv7_to_hevc")
     private val mpvHardwareDecodeModeKey = stringPreferencesKey("mpv_hardware_decode_mode")
@@ -352,6 +421,7 @@ class PlayerSettingsDataStore @Inject constructor(
     private val streamAutoPlayRegexKey = stringPreferencesKey("stream_auto_play_regex")
     private val streamAutoPlayNextEpisodeEnabledKey = booleanPreferencesKey("stream_auto_play_next_episode_enabled")
     private val streamAutoPlayPreferBingeGroupForNextEpisodeKey = booleanPreferencesKey("stream_auto_play_prefer_bingegroup_next_episode")
+    private val streamAutoPlayReuseBingeGroupKey = booleanPreferencesKey("stream_auto_play_reuse_binge_group")
     private val streamAutoPlayTimeoutSecondsKey = intPreferencesKey("stream_auto_play_timeout_seconds")
     private val stillWatchingEnabledKey = booleanPreferencesKey("still_watching_enabled")
     private val stillWatchingEpisodeThresholdKey = intPreferencesKey("still_watching_episode_threshold")
@@ -395,86 +465,92 @@ class PlayerSettingsDataStore @Inject constructor(
 
     init {
         ioScope.launch {
-            store().edit { prefs ->
-                val loadControlMigrated = prefs[migrationLoadControlDefaultsAlignedDoneKey] ?: false
-                if (!loadControlMigrated) {
-                    val currentMin = prefs[minBufferMsKey]
-                    val currentMax = prefs[maxBufferMsKey]
+            profileManager.activeProfileId.collect { pid ->
+                migrateProfile(pid)
+            }
+        }
+    }
 
-                    val legacyDefaultsDetected = (currentMin == null && currentMax == null) ||
-                        (currentMin == 15_000 && currentMax == 25_000)
+    private suspend fun migrateProfile(profileId: Int) {
+        factory.get(profileId, FEATURE).edit { prefs ->
+            val loadControlMigrated = prefs[migrationLoadControlDefaultsAlignedDoneKey] ?: false
+            if (!loadControlMigrated) {
+                val currentMin = prefs[minBufferMsKey]
+                val currentMax = prefs[maxBufferMsKey]
 
-                    if (legacyDefaultsDetected) {
-                        prefs[minBufferMsKey] = 50_000
-                        prefs[maxBufferMsKey] = 50_000
-                    }
+                val legacyDefaultsDetected = (currentMin == null && currentMax == null) ||
+                    (currentMin == 15_000 && currentMax == 25_000)
 
-                    prefs[migrationLoadControlDefaultsAlignedDoneKey] = true
+                if (legacyDefaultsDetected) {
+                    prefs[minBufferMsKey] = 50_000
+                    prefs[maxBufferMsKey] = 50_000
                 }
 
-                val min = prefs[minBufferMsKey]
-                val max = prefs[maxBufferMsKey]
-                if (min != null && max != null && max < min) {
-                    prefs[maxBufferMsKey] = min
-                }
+                prefs[migrationLoadControlDefaultsAlignedDoneKey] = true
+            }
 
-                val preferredAudioLanguage = prefs[preferredAudioLanguageKey]
-                if (preferredAudioLanguage != null) {
-                    val normalizedPreferredAudioLanguage =
-                        normalizeSelectableLanguageCode(preferredAudioLanguage)
-                    if (normalizedPreferredAudioLanguage != preferredAudioLanguage) {
-                        prefs[preferredAudioLanguageKey] = normalizedPreferredAudioLanguage
-                    }
-                }
+            val min = prefs[minBufferMsKey]
+            val max = prefs[maxBufferMsKey]
+            if (min != null && max != null && max < min) {
+                prefs[maxBufferMsKey] = min
+            }
 
-                val secondaryPreferredAudioLanguage = prefs[secondaryPreferredAudioLanguageKey]
-                if (secondaryPreferredAudioLanguage != null) {
-                    val normalizedSecondaryPreferredAudioLanguage =
-                        normalizeSecondaryAudioLanguageCode(secondaryPreferredAudioLanguage)
-                    if (normalizedSecondaryPreferredAudioLanguage != secondaryPreferredAudioLanguage) {
-                        if (normalizedSecondaryPreferredAudioLanguage != null) {
-                            prefs[secondaryPreferredAudioLanguageKey] = normalizedSecondaryPreferredAudioLanguage
-                        } else {
-                            prefs.remove(secondaryPreferredAudioLanguageKey)
-                        }
-                    }
+            val preferredAudioLanguage = prefs[preferredAudioLanguageKey]
+            if (preferredAudioLanguage != null) {
+                val normalizedPreferredAudioLanguage =
+                    normalizeSelectableLanguageCode(preferredAudioLanguage)
+                if (normalizedPreferredAudioLanguage != preferredAudioLanguage) {
+                    prefs[preferredAudioLanguageKey] = normalizedPreferredAudioLanguage
                 }
+            }
 
-                val preferredSubtitleLanguage = prefs[subtitlePreferredLanguageKey]
-                if (preferredSubtitleLanguage != null) {
-                    val normalizedPreferredSubtitleLanguage =
-                        normalizeSelectableLanguageCode(preferredSubtitleLanguage)
-                    if (normalizedPreferredSubtitleLanguage != preferredSubtitleLanguage) {
-                        prefs[subtitlePreferredLanguageKey] = normalizedPreferredSubtitleLanguage
+            val secondaryPreferredAudioLanguage = prefs[secondaryPreferredAudioLanguageKey]
+            if (secondaryPreferredAudioLanguage != null) {
+                val normalizedSecondaryPreferredAudioLanguage =
+                    normalizeSecondaryAudioLanguageCode(secondaryPreferredAudioLanguage)
+                if (normalizedSecondaryPreferredAudioLanguage != secondaryPreferredAudioLanguage) {
+                    if (normalizedSecondaryPreferredAudioLanguage != null) {
+                        prefs[secondaryPreferredAudioLanguageKey] = normalizedSecondaryPreferredAudioLanguage
+                    } else {
+                        prefs.remove(secondaryPreferredAudioLanguageKey)
                     }
                 }
+            }
 
-                val secondarySubtitleLanguage = prefs[subtitleSecondaryLanguageKey]
-                if (secondarySubtitleLanguage != null) {
-                    val normalizedSecondarySubtitleLanguage =
-                        normalizeSelectableLanguageCode(secondarySubtitleLanguage)
-                    if (normalizedSecondarySubtitleLanguage != secondarySubtitleLanguage) {
-                        prefs[subtitleSecondaryLanguageKey] = normalizedSecondarySubtitleLanguage
-                    }
-                }
-
+            val preferredSubtitleLanguage = prefs[subtitlePreferredLanguageKey]
+            if (preferredSubtitleLanguage != null) {
                 val normalizedPreferredSubtitleLanguage =
-                    preferredSubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+                    normalizeSelectableLanguageCode(preferredSubtitleLanguage)
+                if (normalizedPreferredSubtitleLanguage != preferredSubtitleLanguage) {
+                    prefs[subtitlePreferredLanguageKey] = normalizedPreferredSubtitleLanguage
+                }
+            }
+
+            val secondarySubtitleLanguage = prefs[subtitleSecondaryLanguageKey]
+            if (secondarySubtitleLanguage != null) {
                 val normalizedSecondarySubtitleLanguage =
-                    secondarySubtitleLanguage?.let(::normalizeSelectableLanguageCode)
-                when {
-                    normalizedPreferredSubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
-                        prefs[subtitleUseForcedSubtitlesKey] = true
-                        val migratedPreferred = normalizedSecondarySubtitleLanguage
-                            ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
-                            ?: "en"
-                        prefs[subtitlePreferredLanguageKey] = migratedPreferred
-                        prefs.remove(subtitleSecondaryLanguageKey)
-                    }
-                    normalizedSecondarySubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
-                        prefs[subtitleUseForcedSubtitlesKey] = true
-                        prefs.remove(subtitleSecondaryLanguageKey)
-                    }
+                    normalizeSelectableLanguageCode(secondarySubtitleLanguage)
+                if (normalizedSecondarySubtitleLanguage != secondarySubtitleLanguage) {
+                    prefs[subtitleSecondaryLanguageKey] = normalizedSecondarySubtitleLanguage
+                }
+            }
+
+            val normalizedPreferredSubtitleLanguage =
+                preferredSubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+            val normalizedSecondarySubtitleLanguage =
+                secondarySubtitleLanguage?.let(::normalizeSelectableLanguageCode)
+            when {
+                normalizedPreferredSubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
+                    prefs[subtitleUseForcedSubtitlesKey] = true
+                    val migratedPreferred = normalizedSecondarySubtitleLanguage
+                        ?.takeUnless { it == SUBTITLE_LANGUAGE_FORCED || it == "none" }
+                        ?: "en"
+                    prefs[subtitlePreferredLanguageKey] = migratedPreferred
+                    prefs.remove(subtitleSecondaryLanguageKey)
+                }
+                normalizedSecondarySubtitleLanguage == SUBTITLE_LANGUAGE_FORCED -> {
+                    prefs[subtitleUseForcedSubtitlesKey] = true
+                    prefs.remove(subtitleSecondaryLanguageKey)
                 }
             }
         }
@@ -484,7 +560,8 @@ class PlayerSettingsDataStore @Inject constructor(
      * Flow of current player settings
      */
     val playerSettings: Flow<PlayerSettings> = profileManager.activeProfileId.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { prefs ->
+        factory.get(pid, FEATURE).data.onStart { migrateProfile(pid) }
+    }.map { prefs ->
             PlayerSettings(
                 playerPreference = prefs[playerPreferenceKey]?.let {
                     runCatching { PlayerPreference.valueOf(it) }.getOrDefault(PlayerPreference.INTERNAL)
@@ -498,11 +575,28 @@ class PlayerSettingsDataStore @Inject constructor(
                     try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
                 } ?: LibassRenderType.OVERLAY_OPEN_GL,
                 decoderPriority = prefs[decoderPriorityKey] ?: 1,
+                downmixEnabled =
+                    prefs[downmixEnabledKey]
+                        ?: (
+                            prefs[audioOutputChannelsKey] != null ||
+                                prefs[maintainOriginalAudioOnDownmixKey] != null ||
+                                prefs[downmixNormalizationEnabledLegacyKey] != null
+                            ),
+                audioOutputChannels = AudioOutputChannels.fromSettingValue(
+                    prefs[audioOutputChannelsKey]
+                ),
+                maintainOriginalAudioOnDownmix =
+                    prefs[maintainOriginalAudioOnDownmixKey]
+                        ?: !(prefs[downmixNormalizationEnabledLegacyKey] ?: false),
                 tunnelingEnabled = prefs[tunnelingEnabledKey] ?: false,
                 skipSilence = prefs[skipSilenceKey] ?: false,
                 audioAmplificationDb = (prefs[audioAmplificationDbKey] ?: 0).coerceIn(
                     AUDIO_AMPLIFICATION_DB_MIN,
                     AUDIO_AMPLIFICATION_DB_MAX
+                ),
+                centerMixLevelDb = (prefs[centerMixLevelDbKey] ?: 0).coerceIn(
+                    CENTER_MIX_LEVEL_DB_MIN,
+                    CENTER_MIX_LEVEL_DB_MAX
                 ),
                 persistAudioAmplification = prefs[persistAudioAmplificationKey] ?: false,
                 rememberAudioDelayPerDevice = prefs[rememberAudioDelayPerDeviceKey] ?: true,
@@ -516,6 +610,7 @@ class PlayerSettingsDataStore @Inject constructor(
                 pauseOverlayEnabled = prefs[pauseOverlayEnabledKey] ?: true,
                 osdClockEnabled = prefs[osdClockEnabledKey] ?: true,
                 skipIntroEnabled = prefs[skipIntroEnabledKey] ?: true,
+                parentalGuideEnabled = prefs[parentalGuideEnabledKey] ?: true,
                 autoSkipSegmentTypes = prefs[autoSkipSegmentTypesKey]
                     ?.mapNotNull(AutoSkipSegmentType::fromStoredValue)
                     ?.toSet()
@@ -542,7 +637,11 @@ class PlayerSettingsDataStore @Inject constructor(
                 streamAutoPlayNextEpisodeEnabled = prefs[streamAutoPlayNextEpisodeEnabledKey] ?: false,
                 streamAutoPlayPreferBingeGroupForNextEpisode =
                     prefs[streamAutoPlayPreferBingeGroupForNextEpisodeKey] ?: true,
-                streamAutoPlayTimeoutSeconds = (prefs[streamAutoPlayTimeoutSecondsKey] ?: 3).coerceIn(0, 11),
+                streamAutoPlayReuseBingeGroup =
+                    prefs[streamAutoPlayReuseBingeGroupKey] ?: true,
+                streamAutoPlayTimeoutSeconds = PlayerSettings.applyLegacyTimeoutSentinelMigration(
+                    prefs[streamAutoPlayTimeoutSecondsKey]
+                ),
                 stillWatchingEnabled = prefs[stillWatchingEnabledKey] ?: false,
                 stillWatchingEpisodeThreshold = prefs[stillWatchingEpisodeThresholdKey]
                     ?.coerceIn(
@@ -604,26 +703,25 @@ class PlayerSettingsDataStore @Inject constructor(
                 )
             )
         }
-    }
 
     /**
      * Flow for just the libass toggle
      */
     val useLibass: Flow<Boolean> = profileManager.activeProfileId.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { prefs ->
-            prefs[useLibassKey] ?: false
-        }
+        factory.get(pid, FEATURE).data.onStart { migrateProfile(pid) }
+    }.map { prefs ->
+        prefs[useLibassKey] ?: false
     }
 
     /**
      * Flow for the libass render type
      */
     val libassRenderType: Flow<LibassRenderType> = profileManager.activeProfileId.flatMapLatest { pid ->
-        factory.get(pid, FEATURE).data.map { prefs ->
-            prefs[libassRenderTypeKey]?.let {
-                try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
-            } ?: LibassRenderType.OVERLAY_OPEN_GL
-        }
+        factory.get(pid, FEATURE).data.onStart { migrateProfile(pid) }
+    }.map { prefs ->
+        prefs[libassRenderTypeKey]?.let {
+            try { LibassRenderType.valueOf(it) } catch (e: Exception) { LibassRenderType.OVERLAY_OPEN_GL }
+        } ?: LibassRenderType.OVERLAY_OPEN_GL
     }
 
     // Player preference setter
@@ -654,6 +752,26 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setDownmixEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[downmixEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setAudioOutputChannels(channels: AudioOutputChannels) {
+        store().edit { prefs ->
+            prefs[downmixEnabledKey] = true
+            prefs[audioOutputChannelsKey] = channels.settingValue
+        }
+    }
+
+    suspend fun setMaintainOriginalAudioOnDownmix(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[downmixEnabledKey] = true
+            prefs[maintainOriginalAudioOnDownmixKey] = enabled
+        }
+    }
+
     suspend fun setTunnelingEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[tunnelingEnabledKey] = enabled
@@ -675,13 +793,32 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
-    suspend fun setPersistAudioAmplification(enabled: Boolean, dbToPersist: Int? = null) {
+    suspend fun setCenterMixLevelDb(db: Int) {
+        store().edit { prefs ->
+            prefs[centerMixLevelDbKey] = db.coerceIn(
+                CENTER_MIX_LEVEL_DB_MIN,
+                CENTER_MIX_LEVEL_DB_MAX
+            )
+        }
+    }
+
+    suspend fun setPersistAudioAmplification(
+        enabled: Boolean,
+        dbToPersist: Int? = null,
+        centerMixDbToPersist: Int? = null
+    ) {
         store().edit { prefs ->
             prefs[persistAudioAmplificationKey] = enabled
             if (enabled && dbToPersist != null) {
                 prefs[audioAmplificationDbKey] = dbToPersist.coerceIn(
                     AUDIO_AMPLIFICATION_DB_MIN,
                     AUDIO_AMPLIFICATION_DB_MAX
+                )
+            }
+            if (enabled && centerMixDbToPersist != null) {
+                prefs[centerMixLevelDbKey] = centerMixDbToPersist.coerceIn(
+                    CENTER_MIX_LEVEL_DB_MIN,
+                    CENTER_MIX_LEVEL_DB_MAX
                 )
             }
         }
@@ -729,6 +866,12 @@ class PlayerSettingsDataStore @Inject constructor(
     suspend fun setSkipIntroEnabled(enabled: Boolean) {
         store().edit { prefs ->
             prefs[skipIntroEnabledKey] = enabled
+        }
+    }
+
+    suspend fun setParentalGuideEnabled(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[parentalGuideEnabledKey] = enabled
         }
     }
 
@@ -816,9 +959,15 @@ class PlayerSettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setStreamAutoPlayReuseBingeGroup(enabled: Boolean) {
+        store().edit { prefs ->
+            prefs[streamAutoPlayReuseBingeGroupKey] = enabled
+        }
+    }
+
     suspend fun setStreamAutoPlayTimeoutSeconds(seconds: Int) {
         store().edit { prefs ->
-            prefs[streamAutoPlayTimeoutSecondsKey] = seconds.coerceIn(0, 11)
+            prefs[streamAutoPlayTimeoutSecondsKey] = PlayerSettings.applyLegacyTimeoutSentinelMigration(seconds)
         }
     }
 

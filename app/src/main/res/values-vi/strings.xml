@@ -21,6 +21,11 @@
     <string name="cw_min_left">Còn %1$dp</string>
     <string name="cw_almost_done">Sắp xong rồi</string>
     <string name="cw_airs_date">Phát sóng %1$s</string>
+    <string name="cw_airs_today">Phát sóng hôm nay</string>
+    <string name="cw_airs_tomorrow">Phát sóng ngày mai</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="other">Phát sóng trong %d ngày nữa</item>
+    </plurals>
     <string name="cw_action_go_to_details">Xem chi tiết</string>
     <string name="cw_action_start_from_beginning">Xem từ đầu</string>
     <string name="cw_action_remove">Xoá</string>

@@ -12,6 +12,7 @@ import com.nuvio.tv.data.local.NextEpisodeThresholdMode
 import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
 import com.nuvio.tv.data.local.AddonSubtitleStartupMode
+import com.nuvio.tv.data.local.AudioOutputChannels
 import com.nuvio.tv.data.local.AutoSkipSegmentType
 import com.nuvio.tv.data.local.MpvHardwareDecodeMode
 import com.nuvio.tv.data.local.SubtitleOrganizationMode
@@ -89,6 +90,18 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setDecoderPriority(priority)
     }
 
+    suspend fun setDownmixEnabled(enabled: Boolean) {
+        playerSettingsDataStore.setDownmixEnabled(enabled)
+    }
+
+    suspend fun setAudioOutputChannels(channels: AudioOutputChannels) {
+        playerSettingsDataStore.setAudioOutputChannels(channels)
+    }
+
+    suspend fun setMaintainOriginalAudioOnDownmix(enabled: Boolean) {
+        playerSettingsDataStore.setMaintainOriginalAudioOnDownmix(enabled)
+    }
+
     suspend fun setTunnelingEnabled(enabled: Boolean) {
         playerSettingsDataStore.setTunnelingEnabled(enabled)
     }
@@ -127,6 +140,10 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setSkipIntroEnabled(enabled: Boolean) {
         playerSettingsDataStore.setSkipIntroEnabled(enabled)
+    }
+
+    suspend fun setParentalGuideEnabled(enabled: Boolean) {
+        playerSettingsDataStore.setParentalGuideEnabled(enabled)
     }
 
     suspend fun setAutoSkipSegmentTypeEnabled(segmentType: AutoSkipSegmentType, enabled: Boolean) {
@@ -282,6 +299,10 @@ class PlaybackSettingsViewModel @Inject constructor(
 
     suspend fun setStreamAutoPlayPreferBingeGroupForNextEpisode(enabled: Boolean) {
         playerSettingsDataStore.setStreamAutoPlayPreferBingeGroupForNextEpisode(enabled)
+    }
+
+    suspend fun setStreamAutoPlayReuseBingeGroup(enabled: Boolean) {
+        playerSettingsDataStore.setStreamAutoPlayReuseBingeGroup(enabled)
     }
 
     suspend fun setStreamAutoPlayTimeoutSeconds(seconds: Int) {

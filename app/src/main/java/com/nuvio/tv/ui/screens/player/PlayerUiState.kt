@@ -81,8 +81,10 @@ data class PlayerUiState(
     val selectedSubtitleTrackIndex: Int = -1,
     val audioDelayMs: Int = 0,
     val audioAmplificationDb: Int = 0,
-    val isAudioAmplificationAvailable: Boolean = true,
+    val isAudioAmplificationAvailable: Boolean = false,
     val persistAudioAmplification: Boolean = false,
+    val centerMixLevelDb: Int = 0,
+    val isCenterMixAvailable: Boolean = false,
     val showAudioOverlay: Boolean = false,
     val showSubtitleOverlay: Boolean = false,
     val showSubtitleStylePanel: Boolean = false,
@@ -154,6 +156,7 @@ data class PlayerUiState(
     val postPlayMode: PostPlayMode? = null,
     val postPlayDismissedForCurrentEpisode: Boolean = false,
     val streamAutoPlayMode: StreamAutoPlayMode = StreamAutoPlayMode.MANUAL,
+    val streamAutoPlayNextEpisodeEnabled: Boolean = false,
     // Stream source badge
     val showStreamSourceIndicator: Boolean = false,
     val streamSourceIndicatorText: String = "",
@@ -243,6 +246,7 @@ sealed class PlayerEvent {
     data class OnSetAudioDelayMs(val delayMs: Int) : PlayerEvent()
     data class OnSetAudioAmplificationDb(val db: Int) : PlayerEvent()
     data class OnSetPersistAudioAmplification(val enabled: Boolean) : PlayerEvent()
+    data class OnSetCenterMixLevelDb(val db: Int) : PlayerEvent()
     data class OnSelectSubtitleTrack(val index: Int) : PlayerEvent()
     data object OnDisableSubtitles : PlayerEvent()
     data class OnSelectAddonSubtitle(val subtitle: Subtitle) : PlayerEvent()

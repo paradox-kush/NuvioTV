@@ -146,11 +146,17 @@
     <string name="cw_new_episode">New Episode</string>
     <string name="cw_new_season">New Season</string>
     <string name="cw_resume">Resume</string>
-    <string name="cw_percent_watched">%1$d%% watched</string>
+    <string name="cw_percent_watched">%1$d%% Watched</string>
     <string name="cw_hours_min_left">%1$dh %2$dm left</string>
-    <string name="cw_min_left">%1$dm left</string>
-    <string name="cw_almost_done">Almost done</string>
+    <string name="cw_min_left">%1$dm Left</string>
+    <string name="cw_almost_done">Almost Done</string>
     <string name="cw_airs_date">Airs %1$s</string>
+    <string name="cw_airs_today">Airs Today</string>
+    <string name="cw_airs_tomorrow">Airs Tomorrow</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">Airs in %d Day</item>
+        <item quantity="other">Airs in %d Days</item>
+    </plurals>
     <string name="cw_action_go_to_details">Go to details</string>
     <string name="cw_action_start_from_beginning">Start from beginning</string>
     <string name="cw_action_remove">Remove</string>
@@ -251,6 +257,14 @@
     <string name="tmdb_entity_rail_popular">Popular</string>
     <string name="tmdb_entity_rail_top_rated">Top Rated</string>
     <string name="tmdb_entity_rail_recent">Recent</string>
+    <string name="tmdb_entity_rail_most_voted">Most Voted</string>
+    <string name="collections_editor_tmdb_watch_region">Watch region</string>
+    <string name="collections_editor_tmdb_watch_region_helper">ISO 3166-1 country code where the title is available. Example: US, GB.</string>
+    <string name="collections_editor_tmdb_quick_watch_regions">Quick watch regions</string>
+    <string name="collections_editor_tmdb_watch_providers">Watch provider IDs</string>
+    <string name="collections_editor_tmdb_watch_providers_helper">Use TMDB watch provider IDs. Separate multiple with commas for AND, or pipes for OR.</string>
+    <string name="collections_editor_tmdb_watch_providers_placeholder">8|337|350</string>
+    <string name="collections_editor_tmdb_quick_watch_providers">Quick watch providers</string>
     <string name="tmdb_error_load_source">Could not load TMDB source</string>
     <string name="tmdb_error_list_not_found">TMDB list not found</string>
     <string name="tmdb_error_collection_not_found">TMDB collection not found</string>
@@ -484,6 +498,7 @@
     <string name="settings_tmdb_subtitle">Metadata enrichment controls</string>
     <string name="settings_mdblist_subtitle">External ratings providers</string>
     <string name="settings_animeskip_subtitle">Anime intro/outro skip timestamps</string>
+    <string name="settings_debrid_subtitle">Experimental cloud account sources</string>
 
     <!-- PlaybackSettingsScreen -->
     <string name="playback_title">Playback Settings</string>
@@ -540,6 +555,8 @@
     <string name="playback_osd_clock">OSD Clock</string>
     <string name="playback_skip_intro">Skip Intro</string>
     <string name="playback_skip_intro_sub">Use introdb.app to detect intros and recaps.</string>
+    <string name="playback_parental_guide">Content Warnings</string>
+    <string name="playback_parental_guide_sub">Show parental guidance overlay when playback starts.</string>
     <string name="playback_auto_skip_segments">Automatic Skipping</string>
     <string name="playback_auto_skip_segments_sub">Choose which segments skip automatically.</string>
     <string name="auto_skip_intro">Intro / Opening</string>
@@ -606,10 +623,14 @@
     <string name="audio_remember_delay_per_device_sub">Save and restore the in-player audio delay for the current audio output route</string>
     <string name="audio_advanced_section">Advanced Audio</string>
     <string name="audio_advanced_warning">These settings may cause issues on some devices. Change only if you know what you\'re doing.</string>
+    <string name="audio_number_of_channels">Number of channels</string>
+    <string name="audio_number_of_channels_desc">Sets the speaker layout used for FFmpeg downmix.</string>
     <string name="audio_decoder_device_only">Device decoders only</string>
     <string name="audio_decoder_prefer_device">Prefer device decoders</string>
     <string name="audio_decoder_prefer_app">Prefer app decoders (FFmpeg)</string>
     <string name="audio_decoder_priority">Decoder Priority</string>
+    <string name="audio_enable_downmix_title">Enable downmix</string>
+    <string name="audio_enable_downmix_subtitle">Uses the FFmpeg downmix path. When disabled, audio follows the previous Android/device path.</string>
     <string name="audio_tunneled">Tunneled Playback</string>
     <string name="audio_tunneled_sub">Hardware-level audio/video sync. May improve playback on some Android TV devices</string>
     <string name="audio_dv_sub">Map Dolby Vision Profile 7 to standard HEVC for devices without DV hardware support</string>
@@ -694,6 +715,8 @@
     <string name="autoplay_next_episode_sub">Start next episode automatically when prompt appears.</string>
     <string name="autoplay_prefer_binge_group">Prefer Binge Group (Next Episode)</string>
     <string name="autoplay_prefer_binge_group_sub">Try the same source profile first (same addon/quality group) before normal auto-play rules.</string>
+    <string name="autoplay_reuse_binge_group">Reuse Binge Group</string>
+    <string name="autoplay_reuse_binge_group_sub">Remember and reuse the last binge group across sessions (Continue Watching, Details, etc.).</string>
     <string name="autoplay_threshold_pct">Percentage</string>
     <string name="autoplay_threshold_min">Minutes before end</string>
     <string name="autoplay_threshold_mode">Next Episode Threshold Mode</string>
@@ -867,6 +890,75 @@
     <string name="mdblist_dialog_placeholder">Enter MDBList API key</string>
     <string name="mdblist_not_set">Not set</string>
     <string name="mdblist_invalid_api_key">Invalid MDBList API key</string>
+
+    <string name="debrid_title">Debrid</string>
+    <string name="debrid_subtitle">Experimental cloud account sources</string>
+    <string name="debrid_experimental_notice">Debrid support is experimental and may be kept, changed, or removed later.</string>
+    <string name="debrid_enable_title">Enable sources</string>
+    <string name="debrid_enable_subtitle">Show playable results from connected accounts.</string>
+    <string name="debrid_add_key_first">Add an API key first.</string>
+    <string name="debrid_section_account">Account</string>
+    <string name="debrid_section_instant_playback">Instant Playback</string>
+    <string name="debrid_section_filters">Filters &amp; Sorting</string>
+    <string name="debrid_section_formatting">Web Settings</string>
+    <string name="debrid_provider_title">Provider</string>
+    <string name="debrid_provider_subtitle">Additional providers will be added later</string>
+    <string name="debrid_provider_torbox">Torbox</string>
+    <string name="debrid_provider_available">Torbox</string>
+    <string name="debrid_api_key_title">Torbox</string>
+    <string name="debrid_api_key_subtitle">Connect your Torbox account.</string>
+    <string name="debrid_dialog_title">Torbox API Key</string>
+    <string name="debrid_dialog_subtitle">Enter your Torbox API key.</string>
+    <string name="debrid_dialog_placeholder">Enter Torbox API key</string>
+    <string name="debrid_real_debrid_api_key_title">Real-Debrid API Token</string>
+    <string name="debrid_real_debrid_api_key_subtitle">Required for local Real-Debrid link resolution</string>
+    <string name="debrid_real_debrid_dialog_title">Real-Debrid API Token</string>
+    <string name="debrid_real_debrid_dialog_subtitle">Enter your Real-Debrid API token for Direct Debrid</string>
+    <string name="debrid_real_debrid_dialog_placeholder">Enter Real-Debrid API token</string>
+    <string name="debrid_not_set">Not set</string>
+    <string name="debrid_invalid_torbox_api_key">Could not validate this API key.</string>
+    <string name="debrid_invalid_real_debrid_api_key">Could not validate this API key.</string>
+    <string name="debrid_prepare_instant_playback">Prepare links</string>
+    <string name="debrid_prepare_instant_playback_description">Resolve the first sources before playback starts.</string>
+    <string name="debrid_prepare_stream_count">Sources to prepare</string>
+    <string name="debrid_prepare_stream_count_warning">Use a lower count when possible. Debrid services may rate-limit how many links can be resolved in a time period. Opening a movie or episode can count toward those limits even if you do not press Watch, because the links are prepared ahead of time.</string>
+    <string name="debrid_prepare_count_one">1 source</string>
+    <string name="debrid_prepare_count_many">%1$d sources</string>
+    <string name="debrid_stream_max_results_title">Max results</string>
+    <string name="debrid_stream_max_results_subtitle">Limit how many Direct Debrid sources appear.</string>
+    <string name="debrid_stream_max_results_all">All streams</string>
+    <string name="debrid_stream_max_results_count">%1$d streams</string>
+    <string name="debrid_stream_sort_title">Sort streams</string>
+    <string name="debrid_stream_sort_subtitle">Choose how Direct Debrid sources are ordered.</string>
+    <string name="debrid_stream_sort_default">Default</string>
+    <string name="debrid_stream_sort_quality">Quality, highest first</string>
+    <string name="debrid_stream_sort_size_desc">Size, largest first</string>
+    <string name="debrid_stream_sort_size_asc">Size, smallest first</string>
+    <string name="debrid_stream_min_quality_title">Minimum quality</string>
+    <string name="debrid_stream_min_quality_subtitle">Hide sources below the selected resolution.</string>
+    <string name="debrid_stream_min_quality_any">Any quality</string>
+    <string name="debrid_stream_min_quality_720">720p and above</string>
+    <string name="debrid_stream_min_quality_1080">1080p and above</string>
+    <string name="debrid_stream_min_quality_2160">4K only</string>
+    <string name="debrid_stream_dolby_vision_title">Dolby Vision</string>
+    <string name="debrid_stream_dolby_vision_subtitle">Show, hide, or require Dolby Vision sources.</string>
+    <string name="debrid_stream_hdr_title">HDR</string>
+    <string name="debrid_stream_hdr_subtitle">Show, hide, or require HDR sources.</string>
+    <string name="debrid_stream_feature_any">Any</string>
+    <string name="debrid_stream_feature_exclude">Hide</string>
+    <string name="debrid_stream_feature_only">Only</string>
+    <string name="debrid_stream_codec_title">Codec</string>
+    <string name="debrid_stream_codec_subtitle">Filter sources by video codec.</string>
+    <string name="debrid_stream_codec_any">Any codec</string>
+    <string name="debrid_stream_codec_h264">H.264 / AVC</string>
+    <string name="debrid_stream_codec_hevc">HEVC / H.265</string>
+    <string name="debrid_stream_codec_av1">AV1</string>
+    <string name="debrid_formatter_title">Web editor</string>
+    <string name="debrid_formatter_subtitle">Configure source display, filters, and sorting from another device.</string>
+    <string name="debrid_formatter_configure">Open web editor</string>
+    <string name="debrid_formatter_reset_title">Reset formatting</string>
+    <string name="debrid_formatter_reset_subtitle">Restore default source formatting.</string>
+    <string name="debrid_formatter_qr_instruction">Scan this QR code on your phone to configure Debrid source settings.</string>
 
     <!-- Anime-Skip -->
     <string name="animeskip_title">Anime Skip</string>
@@ -1158,6 +1250,10 @@
     <string name="stream_no_streams">No streams found</string>
     <string name="stream_no_streams_hint">Try installing more addons to find streams</string>
     <string name="stream_finding_source">Finding stream source</string>
+    <string name="debrid_resolving_stream">Resolving debrid stream</string>
+    <string name="debrid_stale_stream">This Debrid result expired. Refreshing streams.</string>
+    <string name="debrid_missing_api_key">Add a Debrid API key in Settings.</string>
+    <string name="debrid_resolution_failed">Could not resolve this Debrid stream.</string>
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">P2P Streaming</string>
@@ -1287,6 +1383,12 @@
     <string name="audio_mix_range">Range: %1$d dB to %2$d dB</string>
     <string name="audio_mix_range_saved">Range: %1$d dB to %2$d dB (saved)</string>
     <string name="audio_mix_unavailable">Amplification is not available on this device</string>
+    <string name="audio_center_mix_label">Downmix: Center Mix Level</string>
+    <string name="audio_center_mix_value_db">%1$d dB</string>
+    <string name="audio_center_mix_help">Center Mix Level in dB relative to metadata or default (-3 dB)</string>
+    <string name="audio_center_mix_unavailable">Center mix is only available when FFmpeg downmix is active.</string>
+    <string name="audio_maintain_original_audio_on_downmix_title">Maintain original audio on downmix</string>
+    <string name="audio_maintain_original_audio_on_downmix_subtitle">When disabled, downmix normalization can reduce overall volume.</string>
 
     <!-- SubtitleDialog / SubtitleStyleSidePanel -->
     <string name="subtitle_dialog_title">Subtitles</string>
@@ -1339,6 +1441,10 @@
     <string name="next_episode_finding_source">Finding source…</string>
     <string name="next_episode_playing_via">Playing via %1$s in %2$ds</string>
     <string name="next_episode_play">Play</string>
+    <string name="player_next_episode_prompt_title">Continue watching?</string>
+    <string name="player_next_episode_prompt_message">Do you want to play the next episode?</string>
+    <string name="player_next_episode_prompt_yes">Yes</string>
+    <string name="player_next_episode_prompt_no">No, return to details</string>
     <string name="next_episode_unaired">Unaired</string>
     <string name="next_episode_not_aired_yet">Next episode hasn\'t aired yet</string>
     <string name="still_watching_title">Are you still watching?</string>

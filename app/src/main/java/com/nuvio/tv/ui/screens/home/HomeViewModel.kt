@@ -49,7 +49,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import java.util.Collections
@@ -272,7 +271,6 @@ class HomeViewModel @Inject constructor(
             observeTmdbSettings()
             observeMdbListSettings()
             observeBlurUnwatchedEpisodes()
-            observeMemoryOnlyVerticalScroll()
             observeProgressSourceChanges()
             observeCollections()
             observeInstalledAddons()
@@ -311,6 +309,8 @@ class HomeViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(layoutPreferencesReady = false)
                     }
+                    clearFocusState()
+                    _gridFocusState.value = HomeScreenFocusState()
                     // Reset so the new profile's pipeline signals first completion correctly.
                     _initialCwResolved.value = false
                     loadContinueWatching()
@@ -417,16 +417,6 @@ class HomeViewModel @Inject constructor(
                         return@collect
                     }
                     clearAllCwInMemoryCaches()
-                }
-        }
-    }
-
-    private fun observeMemoryOnlyVerticalScroll() {
-        viewModelScope.launch {
-            layoutPreferenceDataStore.memoryOnlyVerticalScroll
-                .distinctUntilChanged()
-                .collect { enabled ->
-                    _uiState.update { it.copy(memoryOnlyVerticalScroll = enabled) }
                 }
         }
     }
@@ -653,16 +643,18 @@ class HomeViewModel @Inject constructor(
         catalogUpdateJob?.cancel()
         catalogUpdateJob = viewModelScope.launch {
             val debounceMs = when {
-                // First render: use minimal debounce to show content ASAP while still
-                // batching near-simultaneous arrivals.
+                // First render: use a moderate debounce so near-simultaneous
+                // catalog arrivals are batched into a single heavy update pass.
                 !hasRenderedFirstCatalog && hasAnyCatalogRows() -> {
                     hasRenderedFirstCatalog = true
-                    50L
+                    150L
                 }
-                pendingCatalogLoads > 8 -> 200L
-                pendingCatalogLoads > 3 -> 150L
-                pendingCatalogLoads > 0 -> 100L
-                else -> 50L
+                // During bulk loading, batch aggressively — placeholders are
+                // already visible so the user won't notice the delay.
+                pendingCatalogLoads > 8 -> 300L
+                pendingCatalogLoads > 3 -> 250L
+                pendingCatalogLoads > 0 -> 200L
+                else -> 80L
             }
             delay(debounceMs)
             updateCatalogRows()

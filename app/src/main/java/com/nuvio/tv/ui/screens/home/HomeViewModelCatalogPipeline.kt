@@ -326,6 +326,19 @@ internal suspend fun HomeViewModel.loadAllCatalogsPipeline(
         // Immediately schedule an update so placeholder rows appear in the UI
         // while catalogs are still loading.
         scheduleUpdateCatalogRows()
+
+        // Safety flush: if catalogs trickle in slowly (e.g., slow addons),
+        // ensure the user sees whatever content is available within a
+        // reasonable window, even if not all catalogs have completed yet.
+        if (eagerCatalogs.size > 1) {
+            viewModelScope.launch {
+                delay(800L)
+                if (pendingCatalogLoads > 0 && hasAnyCatalogRows()) {
+                    Log.d(HomeViewModel.TAG, "Safety flush: pending=$pendingCatalogLoads — forcing UI update")
+                    scheduleUpdateCatalogRows()
+                }
+            }
+        }
     } catch (e: Exception) {
         catalogsLoadInProgress = false
         _uiState.update { it.copy(isLoading = false, error = e.message) }
@@ -424,7 +437,19 @@ internal fun HomeViewModel.loadCatalogPipeline(
                         if (pendingCatalogLoads == 0) {
                             catalogsLoadInProgress = false
                         }
-                        scheduleUpdateCatalogRows()
+                        // Batch updates: only trigger a UI rebuild when all
+                        // eager catalogs have completed, or let the debounce
+                        // in scheduleUpdateCatalogRows coalesce intermediate
+                        // arrivals.  When pending == 0 we always flush.
+                        if (pendingCatalogLoads == 0) {
+                            scheduleUpdateCatalogRows()
+                        } else if (!hasRenderedFirstCatalog) {
+                            // First content arriving — show it quickly so the
+                            // user sees something beyond placeholders.
+                            scheduleUpdateCatalogRows()
+                        }
+                        // Otherwise, let the next completion or the final
+                        // pendingCatalogLoads==0 trigger the update.
                     }
                     is NetworkResult.Error -> {
                         val errorKey = catalogKey(
@@ -447,7 +472,10 @@ internal fun HomeViewModel.loadCatalogPipeline(
                         if (pendingCatalogLoads == 0) {
                             catalogsLoadInProgress = false
                         }
-                        scheduleUpdateCatalogRows()
+                        // Same batching logic as success path.
+                        if (pendingCatalogLoads == 0 || !hasRenderedFirstCatalog) {
+                            scheduleUpdateCatalogRows()
+                        }
                     }
                     NetworkResult.Loading -> {
                         /* Handled by individual row */
@@ -652,14 +680,15 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
 
     heroItemOrder = baseHeroItems.map { it.id }
 
-    val computedHomeRows = buildList {
-        val displayRowsByKey = displayRows.associateBy { "${it.addonId}_${it.apiType}_${it.catalogId}" }
-        // Build a lookup of placeholder descriptors by key for lazy catalogs
-        val placeholdersByKey = synchronized(catalogStateLock) {
-            placeholderDescriptors.associateBy { it.catalogKey }
-        }
-        collectionsCache.forEach { collection ->
-            val key = "collection_${collection.id}"
+    val (computedHomeRows, nextGridItems) = withContext(Dispatchers.Default) {
+        val computedHomeRows = buildList {
+            val displayRowsByKey = displayRows.associateBy { "${it.addonId}_${it.apiType}_${it.catalogId}" }
+            // Build a lookup of placeholder descriptors by key for lazy catalogs
+            val placeholdersByKey = synchronized(catalogStateLock) {
+                placeholderDescriptors.associateBy { it.catalogKey }
+            }
+            collectionsCache.forEach { collection ->
+                val key = "collection_${collection.id}"
             if (collection.pinToTop && key !in disabledHomeCatalogKeys) {
                 add(HomeRow.CollectionRow(collection))
             }
@@ -794,6 +823,9 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
         }.let { replaceGridHeroItemsPipeline(it, baseHeroItems) }
     } else {
         currentGridItems
+    }
+
+        computedHomeRows to nextGridItems
     }
 
     // Clear any stale error when content is now available (e.g., hero

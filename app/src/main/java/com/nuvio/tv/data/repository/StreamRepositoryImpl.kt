@@ -3,6 +3,8 @@ package com.nuvio.tv.data.repository
 import android.content.Context
 import android.util.Log
 import com.nuvio.tv.R
+import com.nuvio.tv.core.debrid.DirectDebridStreamFetchResult
+import com.nuvio.tv.core.debrid.DirectDebridStreamSource
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.core.network.safeApiCall
 import com.nuvio.tv.core.plugin.PluginManager
@@ -41,6 +43,7 @@ class StreamRepositoryImpl @Inject constructor(
     private val pluginManager: PluginManager,
     private val tmdbService: TmdbService,
     private val localLibraryGateway: LocalLibraryGateway
+    private val directDebridStreamSource: DirectDebridStreamSource
 ) : StreamRepository {
     private enum class StreamFailureKind {
         MISSING,
@@ -84,15 +87,18 @@ class StreamRepositoryImpl @Inject constructor(
         try {
             val addons = addonRepository.getInstalledAddons().first()
             
-            // Filter addons that support streams for this type
+            // Filter addons that support streams for this type and id
             val streamAddons = addons.filter { addon ->
-                addon.supportsStreamResource(type)
+                addon.supportsStreamResource(type, videoId)
             }
 
             // Convert IMDB ID to TMDB ID if needed for plugins
             val tmdbId = tmdbService.ensureTmdbId(videoId, type)
             Log.d(TAG, "Video ID: $videoId -> TMDB ID: $tmdbId (type: $type)")
-            val attemptedAddonNames = streamAddons.map { it.displayName }
+            val directDebridSourceNames = directDebridStreamSource.sourceNames()
+            val directDebridEnabled = directDebridSourceNames.isNotEmpty()
+            val attemptedAddonNames = streamAddons.map { it.displayName } +
+                directDebridSourceNames
             val attemptedFailures = java.util.Collections.synchronizedList(
                 mutableListOf<StreamAttemptFailure>()
             )
@@ -105,7 +111,9 @@ class StreamRepositoryImpl @Inject constructor(
                 val resultChannel = Channel<AddonStreams>(Channel.UNLIMITED)
                 
                 // Track number of pending jobs
-                val totalJobs = streamAddons.size + (if (tmdbId != null) 1 else 0)
+                val totalJobs = streamAddons.size +
+                    (if (tmdbId != null) 1 else 0) +
+                    (if (directDebridEnabled) 1 else 0)
                 var completedJobs = 0
 
                 // Launch addon jobs
@@ -189,6 +197,45 @@ class StreamRepositoryImpl @Inject constructor(
                     }
                 }
 
+                if (directDebridEnabled) {
+                    launch {
+                        try {
+                            when (val result = directDebridStreamSource.fetchStreams(type, videoId)) {
+                                is DirectDebridStreamFetchResult.Success -> result.streams.forEach {
+                                    resultChannel.send(it)
+                                }
+                                is DirectDebridStreamFetchResult.Error -> addDirectDebridFailures(
+                                    attemptedFailures = attemptedFailures,
+                                    sourceNames = directDebridSourceNames,
+                                    kind = StreamFailureKind.REQUEST_FAILED,
+                                    detail = result.message
+                                )
+                                DirectDebridStreamFetchResult.Empty -> addDirectDebridFailures(
+                                    attemptedFailures = attemptedFailures,
+                                    sourceNames = directDebridSourceNames,
+                                    kind = StreamFailureKind.MISSING,
+                                    detail = context.getString(com.nuvio.tv.R.string.stream_error_detail_no_streams_for_id)
+                                )
+                                DirectDebridStreamFetchResult.Disabled -> Unit
+                            }
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            Log.e(TAG, "Direct debrid stream fetch failed: ${e.message}")
+                            addDirectDebridFailures(
+                                attemptedFailures = attemptedFailures,
+                                sourceNames = directDebridSourceNames,
+                                kind = StreamFailureKind.REQUEST_FAILED,
+                                detail = e.message ?: context.getString(com.nuvio.tv.R.string.stream_error_detail_addon_request_failed)
+                            )
+                        } finally {
+                            completedJobs++
+                            if (completedJobs >= totalJobs) {
+                                resultChannel.close()
+                            }
+                        }
+                    }
+                }
+
                 // Handle case where there are no jobs
                 if (totalJobs == 0) {
                     resultChannel.close()
@@ -228,6 +275,21 @@ class StreamRepositoryImpl @Inject constructor(
             if (e is CancellationException) throw e
             Log.e(TAG, "Failed to fetch streams: ${e.message}", e)
             emit(NetworkResult.Error(e.message ?: context.getString(com.nuvio.tv.R.string.stream_error_fetch_failed)))
+        }
+    }
+
+    private fun addDirectDebridFailures(
+        attemptedFailures: MutableList<StreamAttemptFailure>,
+        sourceNames: List<String>,
+        kind: StreamFailureKind,
+        detail: String
+    ) {
+        sourceNames.forEach { sourceName ->
+            attemptedFailures += StreamAttemptFailure(
+                addonName = sourceName,
+                kind = kind,
+                detail = detail
+            )
         }
     }
 
@@ -337,7 +399,12 @@ class StreamRepositoryImpl @Inject constructor(
     }
 
     private fun Stream.dedupKey(): String =
-        infoHash?.lowercase() ?: url ?: externalUrl ?: ytId ?: "${addonName}:${name}:${title}"
+        infoHash?.lowercase()
+            ?: clientResolve?.infoHash?.lowercase()?.let { hash -> "$hash:${clientResolve.fileIdx}" }
+            ?: url
+            ?: externalUrl
+            ?: ytId
+            ?: "${addonName}:${name}:${title}"
 
     /**
      * Build a description string from scraper result
@@ -414,12 +481,20 @@ class StreamRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Check if addon supports stream resource for the given type
+     * Check if addon supports stream resource for the given type and video id.
+     * Respects the resource-level idPrefixes declared in the addon manifest,
+     * falling back to the top-level addon idPrefixes if the resource doesn't
+     * declare its own.
      */
-    private fun Addon.supportsStreamResource(type: String): Boolean {
+    private fun Addon.supportsStreamResource(type: String, videoId: String): Boolean {
         return resources.any { resource ->
-            resource.name == "stream" && 
-            (resource.types.isEmpty() || resource.types.contains(type))
+            resource.name == "stream" &&
+            (resource.types.isEmpty() || resource.types.contains(type)) &&
+            run {
+                val prefixes = resource.idPrefixes?.takeIf { it.isNotEmpty() }
+                    ?: idPrefixes.takeIf { it.isNotEmpty() }
+                prefixes == null || prefixes.any { prefix -> videoId.startsWith(prefix) }
+            }
         }
     }
 

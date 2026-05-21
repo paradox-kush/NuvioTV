@@ -2,6 +2,7 @@
 
 package com.nuvio.tv.ui.screens.settings
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,11 +52,12 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.core.build.AppFeaturePolicy
 import com.nuvio.tv.data.local.AVAILABLE_SUBTITLE_LANGUAGES
-import com.nuvio.tv.data.local.displayName
 import com.nuvio.tv.data.local.AudioLanguageOption
+import com.nuvio.tv.data.local.AudioOutputChannels
 import com.nuvio.tv.data.local.MpvHardwareDecodeMode
 import com.nuvio.tv.data.local.PlayerSettings
 import com.nuvio.tv.data.local.TrailerSettings
+import com.nuvio.tv.data.local.displayName
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.theme.NuvioColors
 
@@ -64,10 +66,13 @@ internal fun LazyListScope.trailerAndAudioSettingsItems(
     trailerSettings: TrailerSettings,
     onShowAudioLanguageDialog: () -> Unit,
     onShowSecondaryAudioLanguageDialog: () -> Unit,
+    onShowAudioOutputChannelsDialog: () -> Unit,
     onShowDecoderPriorityDialog: () -> Unit,
     onShowMpvHardwareDecodeModeDialog: () -> Unit,
     onSetTrailerEnabled: (Boolean) -> Unit,
     onSetTrailerDelaySeconds: (Int) -> Unit,
+    onSetDownmixEnabled: (Boolean) -> Unit,
+    onSetMaintainOriginalAudioOnDownmix: (Boolean) -> Unit,
     onSetSkipSilence: (Boolean) -> Unit,
     onSetRememberAudioDelayPerDevice: (Boolean) -> Unit,
     onSetTunnelingEnabled: (Boolean) -> Unit,
@@ -230,6 +235,43 @@ internal fun LazyListScope.trailerAndAudioSettingsItems(
         )
     }
 
+    item(key = "audio_enable_downmix") {
+        ToggleSettingsItem(
+            icon = Icons.Default.Tune,
+            title = stringResource(R.string.audio_enable_downmix_title),
+            subtitle = stringResource(R.string.audio_enable_downmix_subtitle),
+            isChecked = playerSettings.downmixEnabled,
+            onCheckedChange = onSetDownmixEnabled,
+            onFocused = onItemFocused,
+            enabled = enabled
+        )
+    }
+
+    if (playerSettings.downmixEnabled) {
+        item(key = "audio_number_of_channels") {
+            NavigationSettingsItem(
+                icon = Icons.Default.VolumeUp,
+                title = stringResource(R.string.audio_number_of_channels),
+                subtitle = playerSettings.audioOutputChannels.displayLabel,
+                onClick = onShowAudioOutputChannelsDialog,
+                onFocused = onItemFocused,
+                enabled = enabled
+            )
+        }
+
+        item(key = "audio_downmix_normalization") {
+            ToggleSettingsItem(
+                icon = Icons.Default.Tune,
+                title = stringResource(R.string.audio_maintain_original_audio_on_downmix_title),
+                subtitle = stringResource(R.string.audio_maintain_original_audio_on_downmix_subtitle),
+                isChecked = playerSettings.maintainOriginalAudioOnDownmix,
+                onCheckedChange = onSetMaintainOriginalAudioOnDownmix,
+                onFocused = onItemFocused,
+                enabled = enabled
+            )
+        }
+    }
+
     item(key = "audio_tunneled_playback") {
         ToggleSettingsItem(
             icon = Icons.Default.VolumeUp,
@@ -278,18 +320,22 @@ internal fun LazyListScope.trailerAndAudioSettingsItems(
 internal fun AudioSettingsDialogs(
     showAudioLanguageDialog: Boolean,
     showSecondaryAudioLanguageDialog: Boolean,
+    showAudioOutputChannelsDialog: Boolean,
     showDecoderPriorityDialog: Boolean,
     showMpvHardwareDecodeModeDialog: Boolean,
     selectedLanguage: String,
     selectedSecondaryLanguage: String?,
+    selectedAudioOutputChannels: AudioOutputChannels,
     selectedPriority: Int,
     selectedMpvHardwareDecodeMode: MpvHardwareDecodeMode,
     onSetPreferredAudioLanguage: (String) -> Unit,
     onSetSecondaryPreferredAudioLanguage: (String?) -> Unit,
+    onSetAudioOutputChannels: (AudioOutputChannels) -> Unit,
     onSetDecoderPriority: (Int) -> Unit,
     onSetMpvHardwareDecodeMode: (MpvHardwareDecodeMode) -> Unit,
     onDismissAudioLanguageDialog: () -> Unit,
     onDismissSecondaryAudioLanguageDialog: () -> Unit,
+    onDismissAudioOutputChannelsDialog: () -> Unit,
     onDismissDecoderPriorityDialog: () -> Unit,
     onDismissMpvHardwareDecodeModeDialog: () -> Unit
 ) {
@@ -317,6 +363,17 @@ internal fun AudioSettingsDialogs(
         )
     }
 
+    if (showAudioOutputChannelsDialog) {
+        AudioOutputChannelsDialog(
+            selectedChannels = selectedAudioOutputChannels,
+            onChannelsSelected = {
+                onSetAudioOutputChannels(it)
+                onDismissAudioOutputChannelsDialog()
+            },
+            onDismiss = onDismissAudioOutputChannelsDialog
+        )
+    }
+
     if (showDecoderPriorityDialog) {
         DecoderPriorityDialog(
             selectedPriority = selectedPriority,
@@ -341,19 +398,13 @@ internal fun AudioSettingsDialogs(
 }
 
 @Composable
-private fun AudioLanguageSelectionDialog(
-    selectedLanguage: String,
-    onLanguageSelected: (String) -> Unit,
+private fun AudioOutputChannelsDialog(
+    selectedChannels: AudioOutputChannels,
+    onChannelsSelected: (AudioOutputChannels) -> Unit,
     onDismiss: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
-    val specialOptions = listOf(
-        AudioLanguageOption.DEFAULT to stringResource(R.string.audio_lang_default),
-        AudioLanguageOption.DEVICE to stringResource(R.string.audio_lang_device),
-        AudioLanguageOption.ORIGINAL to stringResource(R.string.audio_lang_original)
-    )
-    val originalHint = stringResource(R.string.audio_lang_original_hint)
-    val allOptions = specialOptions + AVAILABLE_SUBTITLE_LANGUAGES.sortedBy { it.displayName.lowercase() }.map { it.code to it.displayName }
+    val options = AudioOutputChannels.entries
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -361,35 +412,32 @@ private fun AudioLanguageSelectionDialog(
 
     NuvioDialog(
         onDismiss = onDismiss,
-        title = stringResource(R.string.audio_preferred_lang),
-        width = 400.dp,
+        title = stringResource(R.string.audio_number_of_channels),
+        subtitle = stringResource(R.string.audio_number_of_channels_desc),
+        width = 420.dp,
         suppressFirstKeyUp = false
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(320.dp)
+                .heightIn(max = 420.dp)
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)
             ) {
                 items(
-                    count = allOptions.size,
-                    key = { index -> allOptions[index].first }
+                    count = options.size,
+                    key = { index -> options[index].settingValue }
                 ) { index ->
-                    val (code, name) = allOptions[index]
-                    val isSelected = code == selectedLanguage
-                    val isOriginal = code == AudioLanguageOption.ORIGINAL
-                    var isFocused by remember { mutableStateOf(false) }
+                    val option = options[index]
+                    val isSelected = option == selectedChannels
 
                     Card(
-                        onClick = { onLanguageSelected(code) },
+                        onClick = { onChannelsSelected(option) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier)
-                            .onFocusChanged { isFocused = it.isFocused },
+                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
                         colors = CardDefaults.colors(
                             containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
                             focusedContainerColor = NuvioColors.FocusBackground
@@ -403,21 +451,12 @@ private fun AudioLanguageSelectionDialog(
                                 .padding(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = name,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary
-                                )
-                                if (isOriginal) {
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = originalHint,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = NuvioColors.TextSecondary
-                                    )
-                                }
-                            }
+                            Text(
+                                text = option.displayLabel,
+                                color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f)
+                            )
                             if (isSelected) {
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Icon(
@@ -433,6 +472,43 @@ private fun AudioLanguageSelectionDialog(
             }
         }
     }
+}
+
+@Composable
+private fun AudioLanguageSelectionDialog(
+    selectedLanguage: String,
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val specialOptions = listOf(
+        AudioLanguageOption.DEFAULT to stringResource(R.string.audio_lang_default),
+        AudioLanguageOption.DEVICE to stringResource(R.string.audio_lang_device),
+        AudioLanguageOption.ORIGINAL to stringResource(R.string.audio_lang_original)
+    )
+    val originalHint = stringResource(R.string.audio_lang_original_hint)
+    val allOptions = specialOptions.map { (code, name) ->
+        SettingsPickerOption(
+            value = code,
+            title = name,
+            description = if (code == AudioLanguageOption.ORIGINAL) originalHint else null
+        )
+    } + AVAILABLE_SUBTITLE_LANGUAGES.sortedBy { it.displayName.lowercase() }.map {
+        SettingsPickerOption(
+            value = it.code,
+            title = it.displayName,
+            trailing = it.code.uppercase()
+        )
+    }
+
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.audio_preferred_lang),
+        options = allOptions,
+        selectedValue = selectedLanguage,
+        onOptionSelected = onLanguageSelected,
+        onDismiss = onDismiss,
+        width = 400.dp,
+        maxHeight = 320.dp
+    )
 }
 
 @Composable
@@ -441,108 +517,44 @@ private fun MpvHardwareDecodeModeDialog(
     onModeSelected: (MpvHardwareDecodeMode) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val focusRequester = remember { FocusRequester() }
     val options = listOf(
-        Triple(
+        SettingsPickerOption(
             MpvHardwareDecodeMode.AUTO_SAFE,
             stringResource(R.string.audio_mpv_hwdec_auto_safe),
             stringResource(R.string.audio_mpv_hwdec_auto_safe_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             MpvHardwareDecodeMode.HARDWARE_COPY,
             stringResource(R.string.audio_mpv_hwdec_hardware_copy),
             stringResource(R.string.audio_mpv_hwdec_hardware_copy_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             MpvHardwareDecodeMode.HARDWARE_DIRECT,
             stringResource(R.string.audio_mpv_hwdec_hardware_direct),
             stringResource(R.string.audio_mpv_hwdec_hardware_direct_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             MpvHardwareDecodeMode.DISABLED,
             stringResource(R.string.audio_mpv_hwdec_disabled),
             stringResource(R.string.audio_mpv_hwdec_disabled_desc)
         ),
-        Triple(
+        SettingsPickerOption(
             MpvHardwareDecodeMode.LEGACY_DIRECT_COPY,
             stringResource(R.string.audio_mpv_hwdec_legacy_direct_copy),
             stringResource(R.string.audio_mpv_hwdec_legacy_direct_copy_desc)
         )
     )
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    NuvioDialog(
-        onDismiss = onDismiss,
+    SettingsSingleChoiceDialog(
         title = stringResource(R.string.audio_mpv_hwdec_title),
         subtitle = stringResource(R.string.audio_mpv_hwdec_dialog_subtitle),
+        options = options,
+        selectedValue = selectedMode,
+        onOptionSelected = onModeSelected,
+        onDismiss = onDismiss,
         width = 460.dp,
-        suppressFirstKeyUp = false
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 360.dp)
-        ) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)
-            ) {
-                items(
-                    count = options.size,
-                    key = { index -> options[index].first.name }
-                ) { index ->
-                    val (mode, title, description) = options[index]
-                    val isSelected = mode == selectedMode
-
-                    Card(
-                        onClick = { onModeSelected(mode) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
-                        colors = CardDefaults.colors(
-                            containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                            focusedContainerColor = NuvioColors.FocusBackground
-                        ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(10.dp)),
-                        scale = CardDefaults.scale(focusedScale = 1f)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = description,
-                                    color = NuvioColors.TextSecondary,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (isSelected) {
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.cd_selected),
-                                    tint = NuvioColors.Primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+        maxHeight = 360.dp
+    )
 }
 
 @Composable
@@ -551,84 +563,20 @@ internal fun DecoderPriorityDialog(
     onPrioritySelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val focusRequester = remember { FocusRequester() }
     val options = listOf(
-        Triple(0, stringResource(R.string.audio_decoder_device_only), stringResource(R.string.audio_decoder_device_only_desc)),
-        Triple(1, stringResource(R.string.audio_decoder_prefer_device), stringResource(R.string.audio_decoder_prefer_device_desc)),
-        Triple(2, stringResource(R.string.audio_decoder_prefer_app), stringResource(R.string.audio_decoder_prefer_app_desc))
+        SettingsPickerOption(0, stringResource(R.string.audio_decoder_device_only), stringResource(R.string.audio_decoder_device_only_desc)),
+        SettingsPickerOption(1, stringResource(R.string.audio_decoder_prefer_device), stringResource(R.string.audio_decoder_prefer_device_desc)),
+        SettingsPickerOption(2, stringResource(R.string.audio_decoder_prefer_app), stringResource(R.string.audio_decoder_prefer_app_desc))
     )
 
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    NuvioDialog(
-        onDismiss = onDismiss,
+    SettingsSingleChoiceDialog(
         title = stringResource(R.string.audio_decoder_priority),
         subtitle = stringResource(R.string.audio_decoder_controls),
+        options = options,
+        selectedValue = selectedPriority,
+        onOptionSelected = onPrioritySelected,
+        onDismiss = onDismiss,
         width = 420.dp,
-        suppressFirstKeyUp = false
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 320.dp)
-        ) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 4.dp)
-            ) {
-                items(
-                    count = options.size,
-                    key = { index -> options[index].first.toString() }
-                ) { index ->
-                    val (priority, title, description) = options[index]
-                    val isSelected = priority == selectedPriority
-
-                    Card(
-                        onClick = { onPrioritySelected(priority) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier),
-                        colors = CardDefaults.colors(
-                            containerColor = if (isSelected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                            focusedContainerColor = NuvioColors.FocusBackground
-                        ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(10.dp)),
-                        scale = CardDefaults.scale(focusedScale = 1f)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = title,
-                                    color = if (isSelected) NuvioColors.Primary else NuvioColors.TextPrimary,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = description,
-                                    color = NuvioColors.TextSecondary,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                            if (isSelected) {
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.cd_selected),
-                                    tint = NuvioColors.Primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+        maxHeight = 320.dp
+    )
 }

@@ -189,7 +189,7 @@ internal fun HomeViewModel.observeLayoutPreferencesPipeline() {
                 // layout's onDispose doesn't poison the incoming layout
                 // (e.g., Modern dispose saves hasSavedFocus=true right
                 // before Classic composes, preventing hero initial focus).
-                if (previousState.homeLayout != prefs.layout) {
+                if (previousState.layoutPreferencesReady && previousState.homeLayout != prefs.layout) {
                     // Suppress the outgoing layout's onDispose from saving
                     // stale focus state before the incoming layout composes.
                     suppressFocusSave = true
@@ -265,7 +265,12 @@ internal fun HomeViewModel.observeModernHomePresentationPipeline() {
                     && old.localeTag == new.localeTag
                     && old.catalogRows.size == new.catalogRows.size
             }
-            .debounce(80)
+            .debounce {
+                // Use a longer debounce while catalogs are still loading to
+                // avoid repeated expensive presentation builds during the
+                // initial burst of catalog arrivals.
+                if (catalogsLoadInProgress) 300L else 80L
+            }
             .collectLatest { input ->
                 val shouldWarmStart = uiState.value.modernHomePresentation.rows.list.isEmpty()
                 val visibleCatalogRowCount = input.catalogRows.count { it.items.isNotEmpty() }

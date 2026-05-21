@@ -50,6 +50,12 @@
     <string name="cw_min_left">%1$dm बाकी</string>
     <string name="cw_almost_done">लगभग पूरा</string>
     <string name="cw_airs_date">%1$s को प्रसारित होगा</string>
+    <string name="cw_airs_today">आज प्रसारित होगा</string>
+    <string name="cw_airs_tomorrow">कल प्रसारित होगा</string>
+    <plurals name="cw_airs_in_days">
+        <item quantity="one">%d दिन में प्रसारित होगा</item>
+        <item quantity="other">%d दिनों में प्रसारित होगा</item>
+    </plurals>
     <string name="cw_action_go_to_details">विवरण देखें</string>
     <string name="cw_action_start_from_beginning">शुरुआत से चलाएँ</string>
     <string name="cw_action_remove">हटाएँ</string>

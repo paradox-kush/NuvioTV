@@ -20,6 +20,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -93,6 +94,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.tv.material3.Border
+import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -150,8 +154,8 @@ fun PlayerScreen(
     var subtitleDelayAutoSyncFocused by remember { mutableStateOf(false) }
     var subtitleTimingConsumeNextConfirmKeyUp by remember { mutableStateOf(false) }
     val exitPlayer: () -> Unit = {
-        viewModel.stopAndRelease()
         val timeline = viewModel.playbackTimeline.value
+        viewModel.stopAndRelease()
         val completed = timeline.duration > 0L &&
             (timeline.currentPosition.toFloat() / timeline.duration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
         onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
@@ -166,9 +170,46 @@ fun PlayerScreen(
 
     val currentOnPlaybackEnded by rememberUpdatedState(onPlaybackEnded)
     val currentOnBackPress by rememberUpdatedState(onBackPress)
+    val nextEpisodeForEndPrompt = uiState.nextEpisode?.takeIf { it.hasAired }
+    val shouldConfirmNextEpisodeOnEnd =
+        uiState.playbackEnded &&
+            uiState.error == null &&
+            uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL &&
+            !uiState.streamAutoPlayNextEpisodeEnabled &&
+            nextEpisodeForEndPrompt != null
+    val returnToDetailsFromEndPrompt = {
+        viewModel.stopAndRelease()
+        currentOnBackPress(
+            uiState.currentVideoId,
+            uiState.currentSeason,
+            uiState.currentEpisode,
+            true,
+            true
+        )
+    }
+    val continueToNextEpisodeFromEndPrompt = {
+        val next = nextEpisodeForEndPrompt
+        if (next != null) {
+            viewModel.stopAndRelease()
+            val cb = currentOnPlaybackEnded
+            if (cb != null) {
+                cb(next.videoId, next.season, next.episode, null)
+            } else {
+                currentOnBackPress(
+                    uiState.currentVideoId,
+                    uiState.currentSeason,
+                    uiState.currentEpisode,
+                    false,
+                    true
+                )
+            }
+        }
+    }
 
     val handleBackPress = {
-        if (uiState.error != null) {
+        if (shouldConfirmNextEpisodeOnEnd) {
+            returnToDetailsFromEndPrompt()
+        } else if (uiState.error != null) {
             exitPlayerFromError()
         } else if (uiState.showAudioOverlay || uiState.showSubtitleOverlay) {
             viewModel.onEvent(PlayerEvent.OnDismissTransientOverlay)
@@ -192,10 +233,14 @@ fun PlayerScreen(
             } else {
                 viewModel.onEvent(PlayerEvent.OnDismissEpisodesPanel)
             }
-        } else if (uiState.activeSkipInterval != null && !uiState.skipIntervalDismissed && !uiState.showControls) {
-            viewModel.onEvent(PlayerEvent.OnDismissSkipIntro)
         } else if (uiState.postPlayMode is PostPlayMode.AutoPlay) {
             viewModel.onEvent(PlayerEvent.OnDismissNextEpisodeCard)
+            // Transfer focus to skip button if it's still visible
+            if (skipButtonActuallyVisible) {
+                runCatching { skipIntroFocusRequester.requestFocus() }
+            }
+        } else if (uiState.activeSkipInterval != null && !uiState.skipIntervalDismissed && !uiState.showControls) {
+            viewModel.onEvent(PlayerEvent.OnDismissSkipIntro)
         } else if (uiState.postPlayMode is PostPlayMode.StillWatching) {
             viewModel.onEvent(PlayerEvent.OnDismissStillWatchingPrompt)
         } else if (uiState.showControls) {
@@ -209,11 +254,12 @@ fun PlayerScreen(
         handleBackPress()
     }
 
-    LaunchedEffect(uiState.playbackEnded, uiState.error, uiState.pendingExitReason) {
+    LaunchedEffect(uiState.playbackEnded, uiState.error, uiState.pendingExitReason, shouldConfirmNextEpisodeOnEnd) {
         val explicitReason = uiState.pendingExitReason
         val shouldDispatchNatural = uiState.playbackEnded &&
             uiState.error == null &&
             uiState.postPlayMode?.blocksNaturalCompletion() != true &&
+            !shouldConfirmNextEpisodeOnEnd &&
             explicitReason == null
         when {
             explicitReason == PlayerExitReason.StillWatchingPrompt -> {
@@ -315,7 +361,9 @@ fun PlayerScreen(
         uiState.showAudioOverlay,
         uiState.showSubtitleOverlay,
         uiState.showSpeedDialog,
+        shouldConfirmNextEpisodeOnEnd,
     ) {
+        if (shouldConfirmNextEpisodeOnEnd) return@LaunchedEffect
         if (uiState.showControls && !uiState.showEpisodesPanel && !uiState.showSourcesPanel &&
             !uiState.showAudioOverlay && !uiState.showSubtitleOverlay &&
             !uiState.showSubtitleStylePanel && !uiState.showSubtitleDelayOverlay &&
@@ -478,6 +526,7 @@ fun PlayerScreen(
                         uiState.showSubtitleStylePanel || uiState.showSpeedDialog ||
                         uiState.showSubtitleDelayOverlay || uiState.showSubtitleTimingDialog ||
                         uiState.showMoreDialog ||
+                        shouldConfirmNextEpisodeOnEnd ||
                         uiState.postPlayMode is PostPlayMode.StillWatching
                 if (panelOrDialogOpen) return@onKeyEvent false
 
@@ -692,6 +741,15 @@ fun PlayerScreen(
             )
         }
 
+        val endPromptEpisode = nextEpisodeForEndPrompt.takeIf { shouldConfirmNextEpisodeOnEnd }
+        if (endPromptEpisode != null) {
+            NextEpisodeEndPromptOverlay(
+                nextEpisode = endPromptEpisode,
+                onContinue = continueToNextEpisodeFromEndPrompt,
+                onReturnToDetails = returnToDetailsFromEndPrompt
+            )
+        }
+
         val skipButtonBottomPadding by animateDpAsState(
             targetValue = if (uiState.showControls) 122.dp else 30.dp,
             animationSpec = tween(durationMillis = 180),
@@ -703,6 +761,7 @@ fun PlayerScreen(
             interval = if (uiState.showPauseOverlay || uiState.showLoadingOverlay) null else uiState.activeSkipInterval,
             dismissed = uiState.skipIntervalDismissed,
             controlsVisible = uiState.showControls,
+            suppressFocus = uiState.postPlayMode is PostPlayMode.AutoPlay,
             onSkip = { viewModel.onEvent(PlayerEvent.OnSkipIntro) },
             onDismiss = { viewModel.onEvent(PlayerEvent.OnDismissSkipIntro) },
             onVisibilityChanged = { skipButtonActuallyVisible = it },
@@ -722,6 +781,7 @@ fun PlayerScreen(
         PostPlayOverlay(
             mode = uiState.postPlayMode.takeIf {
                 uiState.error == null &&
+                    !shouldConfirmNextEpisodeOnEnd &&
                     !uiState.showLoadingOverlay &&
                     !uiState.showPauseOverlay &&
                     !uiState.showStreamInfoOverlay &&
@@ -851,8 +911,8 @@ fun PlayerScreen(
                     val url = viewModel.getCurrentStreamUrl()
                     val title = uiState.title
                     val headers = viewModel.getCurrentHeaders()
-                    viewModel.stopAndRelease()
                     val timeline = viewModel.playbackTimeline.value
+                    viewModel.stopAndRelease()
                     val completed = timeline.duration > 0L &&
                         (timeline.currentPosition.toFloat() / timeline.duration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
                     onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
@@ -1086,11 +1146,16 @@ fun PlayerScreen(
             audioAmplificationDb = uiState.audioAmplificationDb,
             isAmplificationAvailable = uiState.isAudioAmplificationAvailable,
             persistAmplification = uiState.persistAudioAmplification,
+            centerMixLevelDb = uiState.centerMixLevelDb,
+            isCenterMixAvailable = uiState.isCenterMixAvailable,
             onTrackSelected = { viewModel.onEvent(PlayerEvent.OnSelectAudioTrack(it)) },
             onAudioDelayChange = { viewModel.onEvent(PlayerEvent.OnSetAudioDelayMs(it)) },
             onAmplificationChange = { viewModel.onEvent(PlayerEvent.OnSetAudioAmplificationDb(it)) },
             onPersistAmplificationChange = {
                 viewModel.onEvent(PlayerEvent.OnSetPersistAudioAmplification(it))
+            },
+            onCenterMixLevelChange = {
+                viewModel.onEvent(PlayerEvent.OnSetCenterMixLevelDb(it))
             },
             onDismiss = { viewModel.onEvent(PlayerEvent.OnDismissTransientOverlay) },
             modifier = Modifier
@@ -2428,9 +2493,7 @@ private fun ErrorOverlay(
                     text = stringResource(R.string.player_go_back),
                     onClick = onBack,
                     isPrimary = true,
-                    modifier = Modifier
-                        .focusRequester(exitFocusRequester)
-                        .focusable()
+                    modifier = Modifier.focusRequester(exitFocusRequester)
                 )
             }
         }
@@ -2614,22 +2677,29 @@ internal fun DialogButton(
     isPrimary: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Card(
+    Button(
         onClick = onClick,
-        modifier = modifier.onFocusChanged { isFocused = it.isFocused },
-        colors = CardDefaults.colors(
+        modifier = modifier,
+        colors = ButtonDefaults.colors(
             containerColor = if (isPrimary) NuvioColors.Secondary else NuvioColors.BackgroundCard,
-            focusedContainerColor = if (isPrimary) NuvioColors.Secondary else NuvioColors.FocusBackground
+            contentColor = if (isPrimary) NuvioColors.OnSecondary else NuvioColors.TextSecondary,
+            focusedContainerColor = if (isPrimary) NuvioColors.SecondaryVariant else NuvioColors.FocusBackground,
+            focusedContentColor = if (isPrimary) NuvioColors.OnSecondaryVariant else NuvioColors.Primary
         ),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp))
+        border = ButtonDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, if (isPrimary) NuvioColors.SecondaryVariant else NuvioColors.FocusRing),
+                shape = RoundedCornerShape(12.dp)
+            )
+        ),
+        shape = ButtonDefaults.shape(RoundedCornerShape(12.dp)),
+        scale = ButtonDefaults.scale(focusedScale = 1f)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (isPrimary) NuvioColors.OnSecondary else NuvioColors.TextPrimary,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

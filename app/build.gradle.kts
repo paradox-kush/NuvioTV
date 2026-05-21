@@ -26,8 +26,19 @@ val devProperties = Properties().apply {
 
 fun env(name: String): String? = providers.environmentVariable(name).orNull
 
+fun truthy(value: String?): Boolean {
+    return value.equals("true", ignoreCase = true) ||
+        value.equals("1", ignoreCase = true) ||
+        value.equals("yes", ignoreCase = true)
+}
+
 val buildingAppBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
 val useDebugReleaseSigning = env("CI_USE_DEBUG_SIGNING").equals("true", ignoreCase = true)
+val useLocalFfmpegDecoder = truthy(
+    providers.gradleProperty("useLocalFfmpegDecoder").orNull
+        ?: env("USE_LOCAL_FFMPEG_DECODER")
+        ?: localProperties.getProperty("USE_LOCAL_FFMPEG_DECODER")
+)
 val releaseStoreFilePath = env("NUVIO_RELEASE_STORE_FILE")
     ?: localProperties.getProperty("NUVIO_RELEASE_STORE_FILE")
 val releaseKeyAliasValue = env("NUVIO_RELEASE_KEY_ALIAS")
@@ -45,8 +56,8 @@ android {
         applicationId = "com.nuvio.tv"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1011
-        versionName = "0.6.17-beta"
+        versionCode = 1012
+        versionName = "0.6.18-beta"
 
         buildConfigField("String", "PARENTAL_GUIDE_API_URL", "\"${localProperties.getProperty("PARENTAL_GUIDE_API_URL", "")}\"")
         buildConfigField("String", "INTRODB_API_URL", "\"${localProperties.getProperty("INTRODB_API_URL", "")}\"")
@@ -63,6 +74,7 @@ android {
         buildConfigField("String", "DONATIONS_DONATE_URL", "\"${localProperties.getProperty("DONATIONS_DONATE_URL", "")}\"")
         buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", "")}\"")
         buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", "")}\"")
+        buildConfigField("String", "DIRECT_DEBRID_API_BASE_URL", "\"${localProperties.getProperty("DIRECT_DEBRID_API_BASE_URL", "")}\"")
 
         // In-app updater (GitHub Releases)
         buildConfigField("String", "GITHUB_OWNER", "\"tapframe\"")
@@ -118,6 +130,7 @@ android {
             buildConfigField("String", "DONATIONS_DONATE_URL", "\"${devProperties.getProperty("DONATIONS_DONATE_URL", localProperties.getProperty("DONATIONS_DONATE_URL", ""))}\"")
             buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${devProperties.getProperty("AVATAR_PUBLIC_BASE_URL", localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", ""))}\"")
             buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${devProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", ""))}\"")
+            buildConfigField("String", "DIRECT_DEBRID_API_BASE_URL", "\"${devProperties.getProperty("DIRECT_DEBRID_API_BASE_URL", localProperties.getProperty("DIRECT_DEBRID_API_BASE_URL", ""))}\"")
         }
         release {
             isMinifyEnabled = true
@@ -147,6 +160,7 @@ android {
             buildConfigField("String", "DONATIONS_DONATE_URL", "\"${localProperties.getProperty("DONATIONS_DONATE_URL", "")}\"")
             buildConfigField("String", "AVATAR_PUBLIC_BASE_URL", "\"${localProperties.getProperty("AVATAR_PUBLIC_BASE_URL", "")}\"")
             buildConfigField("String", "UNIQUE_CONTRIBUTIONS_BASE_URL", "\"${localProperties.getProperty("UNIQUE_CONTRIBUTIONS_BASE_URL", "")}\"")
+            buildConfigField("String", "DIRECT_DEBRID_API_BASE_URL", "\"${localProperties.getProperty("DIRECT_DEBRID_API_BASE_URL", "")}\"")
         }
         create("benchmark") {
             initWith(buildTypes.getByName("release"))
@@ -315,11 +329,21 @@ dependencies {
     // Local AAR libraries from forked ExoPlayer (matching Just Player setup):
     // - lib-exoplayer-release.aar    — Custom forked ExoPlayer core (replaces media3-exoplayer)
     // - lib-ui-release.aar           — Custom forked ExoPlayer UI
-    // - lib-decoder-ffmpeg-release.aar — FFmpeg audio decoders (vorbis,opus,flac,alac,pcm,mp3,amr,aac,ac3,eac3,dca,mlp,truehd)
     // - lib-decoder-av1-release.aar  — AV1 software video decoder (libgav1)
     // - lib-decoder-iamf-release.aar — IAMF immersive audio decoder
     // - lib-decoder-mpegh-release.aar — MPEG-H 3D audio decoder
-    implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("lib-*.aar"))))
+    implementation(files(
+        "libs/lib-exoplayer-release.aar",
+        "libs/lib-ui-release.aar",
+        "libs/lib-decoder-av1-release.aar",
+        "libs/lib-decoder-iamf-release.aar",
+        "libs/lib-decoder-mpegh-release.aar"
+    ))
+    if (useLocalFfmpegDecoder) {
+        implementation(project(":ffmpeg-decoder-downmix"))
+    } else {
+        implementation(files("libs/lib-decoder-ffmpeg-release.aar"))
+    }
 
     // libass-android for ASS/SSA subtitle support (from Maven Central)
     implementation("io.github.peerless2012:ass-media:0.4.0-beta01")

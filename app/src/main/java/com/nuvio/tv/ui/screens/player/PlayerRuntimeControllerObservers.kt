@@ -250,7 +250,18 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
                 settings.persistAudioAmplification -> settings.audioAmplificationDb
                 else -> currentState.audioAmplificationDb
             }
-
+            val resolvedCenterMixLevelDb = when {
+                !hasInitializedCenterMixForSession -> {
+                    hasInitializedCenterMixForSession = true
+                    if (settings.persistAudioAmplification) {
+                        settings.centerMixLevelDb
+                    } else {
+                        0
+                    }
+                }
+                settings.persistAudioAmplification -> settings.centerMixLevelDb
+                else -> currentState.centerMixLevelDb
+            }
 
             _uiState.update { state ->
                 val shouldShowOverlay = if (settings.loadingOverlayEnabled && !hasRenderedFirstFrame) {
@@ -271,12 +282,16 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
                     frameRateMatchingMode = settings.frameRateMatchingMode,
                     tunnelingEnabled = settings.tunnelingEnabled,
                     persistAudioAmplification = settings.persistAudioAmplification,
-                    audioAmplificationDb = resolvedAudioAmplificationDb
+                    audioAmplificationDb = resolvedAudioAmplificationDb,
+                    centerMixLevelDb = resolvedCenterMixLevelDb
                 )
             }
 
             if (resolvedAudioAmplificationDb != currentState.audioAmplificationDb) {
                 applyAudioAmplification(resolvedAudioAmplificationDb)
+            }
+            if (resolvedCenterMixLevelDb != currentState.centerMixLevelDb) {
+                applyCenterMixLevel(resolvedCenterMixLevelDb)
             }
 
             if (settings.rememberAudioDelayPerDevice && !wasRememberingAudioDelayPerDevice) {
@@ -310,8 +325,13 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
             autoSwitchInternalPlayerOnErrorEnabled = settings.autoSwitchInternalPlayerOnError
             currentInternalPlayerEngine = resolvedInternalPlayerEngine
             streamAutoPlayModeSetting = settings.streamAutoPlayMode
-            _uiState.update { it.copy(streamAutoPlayMode = settings.streamAutoPlayMode) }
             streamAutoPlayNextEpisodeEnabledSetting = settings.streamAutoPlayNextEpisodeEnabled
+            _uiState.update {
+                it.copy(
+                    streamAutoPlayMode = settings.streamAutoPlayMode,
+                    streamAutoPlayNextEpisodeEnabled = settings.streamAutoPlayNextEpisodeEnabled
+                )
+            }
             streamAutoPlayPreferBingeGroupForNextEpisodeSetting =
                 settings.streamAutoPlayPreferBingeGroupForNextEpisode
             nextEpisodeThresholdModeSetting = settings.nextEpisodeThresholdMode
@@ -373,8 +393,16 @@ internal fun PlayerRuntimeController.observeSubtitleSettings() {
 
             val wasEnabled = skipIntroEnabled
             skipIntroEnabled = settings.skipIntroEnabled
+            parentalGuideEnabled = settings.parentalGuideEnabled
             autoSkipSegmentTypes = settings.autoSkipSegmentTypes
             playerSettingsInitialized = true
+
+            // Fetch parental guide on first settings emission (after we know
+            // whether the feature is enabled). Subsequent emissions skip this.
+            if (settings.parentalGuideEnabled && _uiState.value.parentalWarnings.isEmpty()) {
+                fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
+            }
+
             if (!skipIntroEnabled) {
                 if (skipIntervals.isNotEmpty() || _uiState.value.activeSkipInterval != null) {
                     skipIntervals = emptyList()

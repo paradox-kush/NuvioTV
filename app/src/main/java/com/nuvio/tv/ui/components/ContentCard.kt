@@ -73,14 +73,8 @@ import coil3.request.crossfade
 import com.nuvio.tv.ui.util.recompositionHighlighter
 import com.nuvio.tv.ui.screens.home.LocalFastScrollActive
 import com.nuvio.tv.ui.theme.ThemeColors
+import com.nuvio.tv.ui.util.rememberLongPressKeyTracker
 import kotlinx.coroutines.delay
-
-/**
- * When true, vertical scrolling is in progress and image loading should be
- * restricted to memory cache only (no disk / network) to keep the scroll smooth.
- */
-val LocalVerticalScrollSuppressImages = androidx.compose.runtime.compositionLocalOf { false }
-
 
 private const val BACKDROP_ASPECT_RATIO = 16f / 9f
 private const val TRAILER_PREVIEW_REQUEST_FOCUS_DEBOUNCE_MS = 140L
@@ -126,6 +120,7 @@ fun ContentCard(
 
     var isFocused by remember { mutableStateOf(false) }
     var longPressTriggered by remember { mutableStateOf(false) }
+    val longPressKeyTracker = rememberLongPressKeyTracker()
     var interactionNonce by remember { mutableIntStateOf(0) }
     var isBackdropExpanded by remember { mutableStateOf(false) }
     var trailerFirstFrameRendered by remember(trailerPreviewUrl) { mutableStateOf(false) }
@@ -173,7 +168,7 @@ fun ContentCard(
 
     // Only pay the animation cost on the card that is actually focused/expanding.
     // Unfocused cards snap directly to baseCardWidth — no animation state overhead.
-    val isFastScrollActive = LocalFastScrollActive.current
+    val isFastScrollActive = LocalFastScrollActive.current.value
     val animatedCardWidth = when {
         !focusedPosterBackdropExpandEnabled -> baseCardWidth
         !isFocused && !isBackdropExpanded -> baseCardWidth
@@ -249,21 +244,6 @@ fun ContentCard(
                 .size(width = requestWidthPx, height = requestHeightPx)
                 .build()
         }
-        // Coil 3's skippable AsyncImage makes the memory-only-during-scroll hack incompatible.
-        val isSuppressingImages = LocalVerticalScrollSuppressImages.current
-        val scrollAwareImageModel = if (!isSuppressingImages || imageModel == null) {
-            imageModel
-        } else {
-            remember(imageModel) {
-                (imageModel as? ImageRequest)?.newBuilder()
-                    ?.memoryCachePolicy(CachePolicy.ENABLED)
-                    ?.diskCachePolicy(CachePolicy.DISABLED)
-                    ?.networkCachePolicy(CachePolicy.DISABLED)
-                    ?.build()
-                    ?: imageModel
-            }
-        }
-        val scrollPhaseKey = isSuppressingImages
         val logoRequestHeightPx = remember(density) {
             with(density) { 48.dp.roundToPx() }
         }
@@ -324,17 +304,22 @@ fun ContentCard(
                                 onLongPress()
                                 return@onPreviewKeyEvent true
                             }
-                            val isLongPress = native.isLongPress || native.repeatCount > 0
-                            if (isLongPress && isSelectKey(native.keyCode)) {
-                                longPressTriggered = true
-                                onLongPress()
-                                return@onPreviewKeyEvent true
-                            }
                         }
+                    }
+                    if (onLongPress != null &&
+                        longPressKeyTracker.handle(native, ::isSelectKey) {
+                            longPressTriggered = true
+                            onLongPress()
+                        }
+                    ) {
+                        if (native.action == AndroidKeyEvent.ACTION_UP) {
+                            longPressTriggered = false
+                        }
+                        return@onPreviewKeyEvent true
                     }
                     if (native.action == AndroidKeyEvent.ACTION_UP &&
                         longPressTriggered &&
-                        isSelectKey(native.keyCode)
+                        (isSelectKey(native.keyCode) || native.keyCode == AndroidKeyEvent.KEYCODE_MENU)
                     ) {
                         longPressTriggered = false
                         return@onPreviewKeyEvent true
@@ -386,17 +371,15 @@ fun ContentCard(
                             )
                     )
                 } else if (!imageUrl.isNullOrBlank()) {
-                    key(scrollPhaseKey) {
-                        AsyncImage(
-                            model = scrollAwareImageModel,
-                            contentDescription = item.name,
-                            modifier = Modifier.fillMaxSize(),
-                            placeholder = backgroundPainter,
-                            error = backgroundPainter,
-                            fallback = backgroundPainter,
-                            contentScale = ContentScale.Crop
-                        )
-                    }
+                    AsyncImage(
+                        model = imageModel,
+                        contentDescription = item.name,
+                        modifier = Modifier.fillMaxSize(),
+                        placeholder = backgroundPainter,
+                        error = backgroundPainter,
+                        fallback = backgroundPainter,
+                        contentScale = ContentScale.Crop
+                    )
                 } else {
                     MonochromePosterPlaceholder()
                 }

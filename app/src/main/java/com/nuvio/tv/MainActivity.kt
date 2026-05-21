@@ -381,7 +381,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalBringIntoViewSpec provides bringIntoViewSpec,
                     LocalFastHorizontalNavigationEnabled provides mainUiPrefs.fastHorizontalNavigationEnabled,
-                    LocalRecompositionHighlighterEnabled provides mainUiPrefs.composeHighlighterEnabled,
+                    LocalRecompositionHighlighterEnabled provides (BuildConfig.IS_DEBUG_BUILD && mainUiPrefs.composeHighlighterEnabled),
                     com.nuvio.tv.core.player.LocalTrailerPlayerPool provides trailerPlayerPool
                 ) {
                 Surface(
@@ -956,7 +956,7 @@ private fun LegacySidebarScaffold(
                                             targetRoute = item.route
                                         )
                                         drawerState.setValue(DrawerValue.Closed)
-                                        pendingContentFocusTransfer = true
+                                        pendingContentFocusTransfer = currentRoute == item.route
                                     },
                                     modifier = Modifier.focusRequester(
                                         drawerItemFocusRequesters.getValue(item.route)
@@ -1490,7 +1490,7 @@ private fun ModernSidebarScaffold(
                             pendingSidebarFocusRequest = false
                             isSidebarExpanded = false
                             sidebarCollapsePending = false
-                            pendingContentFocusTransfer = true
+                            pendingContentFocusTransfer = currentRoute == targetRoute
                         },
                         activeProfileName = activeProfileName,
                         activeProfileColorHex = activeProfileColorHex,

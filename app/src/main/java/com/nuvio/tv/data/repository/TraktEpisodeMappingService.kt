@@ -127,8 +127,7 @@ class TraktEpisodeMappingService @Inject constructor(
     ): Boolean {
         // Compare per-season episode counts, not just the set of season numbers.
         // Anime often uses the same season numbers in both sources but with completely
-        // different episode distributions (e.g. One Piece has seasons 1-24 in both
-        // AIOMetadata and Trakt but with different episode counts per season).
+        // different episode distributions.
         val addonPerSeason = addonEpisodes.groupBy { it.season }.mapValues { it.value.size }
         val traktPerSeason = traktEpisodes.groupBy { it.season }.mapValues { it.value.size }
         return addonPerSeason == traktPerSeason

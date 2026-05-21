@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,11 +41,13 @@ fun NuvioDialog(
     content: @Composable ColumnScope.() -> Unit
 ) {
     var suppressNextKeyUp by remember { mutableStateOf(suppressFirstKeyUp) }
+    val maxDialogHeight = (LocalConfiguration.current.screenHeightDp.dp - 48.dp).coerceAtLeast(320.dp)
 
     Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .width(width)
+                .heightIn(max = maxDialogHeight)
                 .clip(RoundedCornerShape(16.dp))
                 .background(NuvioColors.BackgroundElevated, RoundedCornerShape(16.dp))
                 .border(1.dp, NuvioColors.Border, RoundedCornerShape(16.dp))
@@ -58,7 +63,10 @@ fun NuvioDialog(
                     false
                 }
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleLarge,

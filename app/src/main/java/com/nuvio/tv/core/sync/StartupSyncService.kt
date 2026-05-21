@@ -213,6 +213,9 @@ class StartupSyncService @Inject constructor(
 
     private suspend fun pullRemoteData(includeProfileSettings: Boolean): Result<Unit> {
         try {
+            // Capture profile ID once at the start of the sync operation.
+            // All sub-operations must use this captured value to prevent data
+            // from leaking between profiles if the user switches mid-sync.
             val profileId = profileManager.activeProfileId.value
             Log.d(TAG, "Pulling remote data for profile $profileId")
 
@@ -305,6 +308,7 @@ class StartupSyncService @Inject constructor(
             val isTraktConnected = traktAuthDataStore.isEffectivelyAuthenticated.first()
             val shouldUseSupabaseWatchProgressSync = watchProgressSyncService.shouldUseSupabaseWatchProgressSync()
             watchProgressSyncService.restoreLastPushTimestamp()
+            watchedItemsSyncService.restoreLastPushTimestamp()
             Log.d(
                 TAG,
                 "Watch progress sync: isTraktConnected=$isTraktConnected shouldUseSupabaseWatchProgressSync=$shouldUseSupabaseWatchProgressSync"
@@ -330,23 +334,35 @@ class StartupSyncService @Inject constructor(
                 try {
                     val remoteWatchedItems = watchedItemsSyncService.pullFromRemote().getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteWatchedItems.size} watched items from remote")
-                    watchedItemsPreferences.replaceWithRemoteItems(remoteWatchedItems)
+                    val hadUnsyncedItems = watchedItemsPreferences.replaceWithRemoteItems(
+                        remoteWatchedItems,
+                        lastSuccessfulPushMs = watchedItemsSyncService.lastSuccessfulPushMs
+                    )
                     watchProgressRepository.hasCompletedInitialWatchedItemsPull = true
                     Log.d(TAG, "Reconciled local watched items with ${remoteWatchedItems.size} remote items")
+                    if (hadUnsyncedItems) {
+                        Log.d(TAG, "Detected unsynced watched items, pushing to remote")
+                        watchedItemsSyncService.pushToRemote()
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to pull watched items, continuing with other syncs", e)
                 }
 
                 watchProgressRepository.isSyncingFromRemote = true
                 try {
-                    val remoteEntries = watchProgressSyncService.pullFromRemote().getOrElse { throw it }
+                    val remoteEntries = watchProgressSyncService.pullFromRemote(profileId).getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteEntries.size} watch progress entries from remote")
-                    watchProgressPreferences.mergeRemoteEntries(
+                    val hadUnsyncedProgress = watchProgressPreferences.mergeRemoteEntries(
                         remoteEntries.toMap(),
-                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs
+                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
+                        profileId = profileId
                     )
                     watchProgressRepository.hasCompletedInitialPull = true
                     Log.d(TAG, "Merged local watch progress with ${remoteEntries.size} remote entries")
+                    if (hadUnsyncedProgress) {
+                        Log.d(TAG, "Detected unsynced watch progress, pushing to remote")
+                        watchProgressSyncService.pushToRemote(profileId)
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to pull watch progress, continuing", e)
                 } finally {
@@ -358,20 +374,28 @@ class StartupSyncService @Inject constructor(
                 try {
                     val remoteWatchedItems = watchedItemsSyncService.pullFromRemote().getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteWatchedItems.size} watched items from remote")
-                    watchedItemsPreferences.replaceWithRemoteItems(remoteWatchedItems)
+                    val hadUnsyncedItems = watchedItemsPreferences.replaceWithRemoteItems(
+                        remoteWatchedItems,
+                        lastSuccessfulPushMs = watchedItemsSyncService.lastSuccessfulPushMs
+                    )
                     watchProgressRepository.hasCompletedInitialWatchedItemsPull = true
                     Log.d(TAG, "Reconciled local watched items with ${remoteWatchedItems.size} remote items")
+                    if (hadUnsyncedItems) {
+                        Log.d(TAG, "Detected unsynced watched items (Trakt mode), pushing to remote")
+                        watchedItemsSyncService.pushToRemote()
+                    }
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to pull watched items, continuing with Trakt library mode", e)
                 }
 
                 watchProgressRepository.isSyncingFromRemote = true
                 try {
-                    val remoteEntries = watchProgressSyncService.pullFromRemote().getOrElse { throw it }
+                    val remoteEntries = watchProgressSyncService.pullFromRemote(profileId).getOrElse { throw it }
                     Log.d(TAG, "Pulled ${remoteEntries.size} watch progress entries from remote")
                     watchProgressPreferences.mergeRemoteEntries(
                         remoteEntries.toMap(),
-                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs
+                        lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
+                        profileId = profileId
                     )
                     watchProgressRepository.hasCompletedInitialPull = true
                     Log.d(TAG, "Merged local watch progress with ${remoteEntries.size} remote entries")

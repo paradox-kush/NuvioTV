@@ -86,7 +86,7 @@ internal data class PlayerNavigationArgs(
                 val value = savedStateHandle.get<String>(key) ?: return null
                 if (value.isEmpty()) return null
                 // Stream metadata occasionally contains stray `%` or malformed escapes
-                // (e.g. via AIOStreams Formatter). Fall back to the raw value rather
+                // Fall back to the raw value rather
                 // than crashing the player on launch.
                 return runCatching { URLDecoder.decode(value, "UTF-8") }.getOrDefault(value)
             }

@@ -7,6 +7,7 @@ import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.resolveContentLanguage
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -39,6 +40,10 @@ internal fun PlayerRuntimeController.applyMetaDetails(meta: Meta) {
     metaVideos = meta.videos
     metaGenres = meta.genres
     metaCountry = meta.country
+    // Fill in content language from meta if not provided via navigation args.
+    if (contentLanguage == null) {
+        contentLanguage = meta.resolveContentLanguage()
+    }
     val description = resolveDescription(meta)
 
     _uiState.update { state ->
@@ -404,6 +409,7 @@ internal fun PlayerRuntimeController.tryShowParentalGuide() {
 }
 
 internal fun PlayerRuntimeController.fetchParentalGuide(id: String?, type: String?, season: Int?, episode: Int?) {
+    if (!parentalGuideEnabled) return
     if (id.isNullOrBlank()) return
 
     val imdbId = id.split(":").firstOrNull()?.takeIf { it.startsWith("tt") } ?: return
