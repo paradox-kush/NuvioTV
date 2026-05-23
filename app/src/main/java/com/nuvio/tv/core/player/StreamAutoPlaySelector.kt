@@ -78,8 +78,8 @@ object StreamAutoPlaySelector {
         }
         if (candidateStreams.isEmpty()) return null
 
-        if (mode == StreamAutoPlayMode.MANUAL) return null
-
+        // Binge group matching takes priority over mode — even in MANUAL mode,
+        // a persisted binge group should auto-play without showing the picker.
         val targetBingeGroup = preferredBingeGroup?.trim().orEmpty()
         if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
             val bingeGroupMatch = candidateStreams.firstOrNull { stream ->
@@ -91,6 +91,8 @@ object StreamAutoPlaySelector {
             // return null so the caller shows the stream picker instead.
             if (bingeGroupOnly) return null
         }
+
+        if (mode == StreamAutoPlayMode.MANUAL) return null
 
         return when (mode) {
             StreamAutoPlayMode.MANUAL -> null
