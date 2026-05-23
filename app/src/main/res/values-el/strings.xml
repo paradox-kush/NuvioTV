@@ -891,22 +891,31 @@
     <string name="mdblist_not_set">Δεν έχει οριστεί</string>
     <string name="mdblist_invalid_api_key">Μη έγκυρο κλειδί API MDBList</string>
 
-    <string name="debrid_title">Debrid</string>
-    <string name="debrid_subtitle">Πειραματικές πηγές cloud λογαριασμού</string>
+    <string name="debrid_title">Συνδεδεμένες υπηρεσίες</string>
+    <string name="debrid_subtitle">Συνδέστε λογαριασμούς για συνδέσμους και πρόσβαση στη βιβλιοθήκη</string>
     <string name="debrid_experimental_notice">Η υποστήριξη Debrid είναι πειραματική και μπορεί να διατηρηθεί, να αλλάξει ή να αφαιρεθεί αργότερα.</string>
-    <string name="debrid_enable_title">Ενεργοποίηση πηγών</string>
-    <string name="debrid_enable_subtitle">Εμφάνιση αναπαραγώγιμων αποτελεσμάτων από συνδεδεμένους λογαριασμούς.</string>
-    <string name="debrid_add_key_first">Προσθέστε πρώτα ένα κλειδί API.</string>
-    <string name="debrid_section_account">Λογαριασμός</string>
-    <string name="debrid_section_instant_playback">Άμεση αναπαραγωγή</string>
+    <string name="debrid_cloud_library">Βιβλιοθήκη cloud</string>
+    <string name="debrid_cloud_library_description">Περιηγηθείτε και αναπαράγετε αρχεία που υπάρχουν ήδη στους συνδεδεμένους λογαριασμούς σας.</string>
+    <string name="debrid_enable_title">Επίλυση αναπαραγώγιμων συνδέσμων</string>
+    <string name="debrid_enable_subtitle">Ζητήστε από μια συνδεδεμένη υπηρεσία αναπαραγώγιμους συνδέσμους όταν ένα αποτέλεσμα το απαιτεί. Αυτό μπορεί να προσθέσει το στοιχείο σε αυτή την υπηρεσία.</string>
+    <string name="debrid_resolve_with">Επίλυση με</string>
+    <string name="debrid_resolve_with_description">Επιλέξτε ποιος συνδεδεμένος λογαριασμός θα χειρίζεται τους αναπαραγώγιμους συνδέσμους.</string>
+    <string name="debrid_add_key_first">Συνδέστε πρώτα έναν λογαριασμό.</string>
+    <string name="debrid_section_account">Λογαριασμοί</string>
+    <string name="debrid_section_instant_playback">Προετοιμασία συνδέσμων</string>
     <string name="debrid_section_filters">Φίλτρα &amp; ταξινόμηση</string>
-    <string name="debrid_section_formatting">Ρυθμίσεις web</string>
+    <string name="debrid_section_formatting">Μορφοποίηση</string>
     <string name="debrid_provider_title">Πάροχος</string>
     <string name="debrid_provider_subtitle">Θα προστεθούν επιπλέον πάροχοι αργότερα</string>
     <string name="debrid_provider_torbox">Torbox</string>
     <string name="debrid_provider_available">Torbox</string>
     <string name="debrid_api_key_title">Torbox</string>
     <string name="debrid_api_key_subtitle">Συνδέστε τον λογαριασμό Torbox σας.</string>
+    <string name="debrid_provider_description">Συνδέστε τον λογαριασμό σας %1$s.</string>
+    <string name="debrid_provider_device_description">Συνδέστε τον λογαριασμό σας %1$s στο πρόγραμμα περιήγησης.</string>
+    <string name="debrid_api_key_dialog_title">Κλειδί API %1$s</string>
+    <string name="debrid_api_key_dialog_subtitle">Εισάγετε το κλειδί API %1$s σας.</string>
+    <string name="debrid_api_key_dialog_placeholder">Εισάγετε κλειδί API %1$s</string>
     <string name="debrid_dialog_title">Κλειδί API Torbox</string>
     <string name="debrid_dialog_subtitle">Εισάγετε το κλειδί API Torbox σας.</string>
     <string name="debrid_dialog_placeholder">Εισάγετε κλειδί API Torbox</string>
@@ -916,6 +925,19 @@
     <string name="debrid_real_debrid_dialog_subtitle">Εισάγετε το διακριτικό API Real-Debrid για Direct Debrid</string>
     <string name="debrid_real_debrid_dialog_placeholder">Εισάγετε διακριτικό API Real-Debrid</string>
     <string name="debrid_not_set">Δεν έχει οριστεί</string>
+    <string name="debrid_connected">Συνδεδεμένο</string>
+    <string name="debrid_connect_provider">Σύνδεση %1$s</string>
+    <string name="debrid_disconnect_provider">Αποσύνδεση %1$s</string>
+    <string name="debrid_disconnect">Αποσύνδεση</string>
+    <string name="debrid_device_auth_connected">Το %1$s είναι συνδεδεμένο σε αυτή τη συσκευή.</string>
+    <string name="debrid_device_auth_starting">Εκκίνηση ασφαλούς σύνδεσης…</string>
+    <string name="debrid_device_auth_instructions">Σαρώστε το QR και εισάγετε αυτόν τον κωδικό για έγκριση του Nuvio.</string>
+    <string name="debrid_device_auth_code_copied">Ο κωδικός αντιγράφηκε.</string>
+    <string name="debrid_device_auth_waiting">Αναμονή για έγκριση…</string>
+    <string name="debrid_device_auth_failed">Δεν ήταν δυνατή η εκκίνηση της σύνδεσης.</string>
+    <string name="debrid_device_auth_missing_configuration">Αυτή η μέθοδος σύνδεσης δεν έχει ρυθμιστεί σε αυτή την έκδοση.</string>
+    <string name="debrid_device_auth_expired">Αυτός ο κωδικός έληξε. Δοκιμάστε ξανά.</string>
+    <string name="debrid_key_invalid">Δεν ήταν δυνατή η επικύρωση αυτού του κλειδιού API.</string>
     <string name="debrid_invalid_torbox_api_key">Δεν ήταν δυνατή η επικύρωση αυτού του κλειδιού API.</string>
     <string name="debrid_invalid_real_debrid_api_key">Δεν ήταν δυνατή η επικύρωση αυτού του κλειδιού API.</string>
     <string name="debrid_prepare_instant_playback">Προετοιμασία συνδέσμων</string>
@@ -1231,6 +1253,7 @@
     <string name="addon_refresh_action">Ανανέωση πρόσθετων</string>
     <string name="addon_refresh_default_subtitle">Ανάκτηση των τελευταίων αλλαγών πρόσθετων για το τρέχον προφίλ</string>
     <string name="addon_refresh_done_subtitle">Τα πρόσθετα ανανεώθηκαν μόλις τώρα</string>
+    <string name="addons_badge_disabled">Απενεργοποιημένο</string>
     <string name="addon_pending_collections_updated">Οι συλλογές ενημερώθηκαν</string>
     <string name="addon_pending_collections_replace">%1$d συλλογές θα αντικαταστήσουν τις τρέχουσες συλλογές</string>
 
@@ -1253,6 +1276,7 @@
     <string name="debrid_resolving_stream">Επίλυση ροής debrid</string>
     <string name="debrid_stale_stream">Αυτό το αποτέλεσμα Debrid έληξε. Ανανέωση ροών.</string>
     <string name="debrid_missing_api_key">Προσθέστε κλειδί API Debrid στις Ρυθμίσεις.</string>
+    <string name="debrid_not_cached">Δεν είναι αποθηκευμένο στην προσωρινή μνήμη σε αυτή την υπηρεσία.</string>
     <string name="debrid_resolution_failed">Δεν ήταν δυνατή η επίλυση αυτής της ροής Debrid.</string>
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
@@ -1516,8 +1540,8 @@
     <string name="genre_action_adventure">Δράση &amp; Περιπέτεια</string>
     <string name="genre_kids">Παιδικά</string>
     <string name="genre_news">Ειδήσεις</string>
-    <string name="genre_reality">Reality</string>
-    <string name="genre_sci_fi_fantasy">Sci-Fi &amp; Φαντασία</string>
+    <string name="genre_reality">Ριάλιτι</string>
+    <string name="genre_sci_fi_fantasy">Επιστημονική Φαντασία &amp; Φαντασία</string>
     <string name="genre_soap">Σαπουνόπερα</string>
     <string name="genre_talk">Συζήτηση</string>
     <string name="genre_war_politics">Πόλεμος &amp; Πολιτική</string>
@@ -1545,6 +1569,8 @@
     <string name="library_source_local">ΤΟΠΙΚΗ</string>
     <string name="library_source_nuvio">NUVIO</string>
     <string name="library_source_trakt">TRAKT</string>
+    <string name="library_source_saved">Αποθηκευμένα</string>
+    <string name="library_source_cloud">Cloud</string>
     <string name="library_watchlist">Λίστα παρακολούθησης</string>
     <string name="library_syncing_library">Συγχρονισμός βιβλιοθήκης…</string>
     <string name="library_type_all">Όλα</string>
@@ -1555,6 +1581,34 @@
     <string name="library_empty_trakt_subtitle">Χρησιμοποιήστε το + στις λεπτομέρειες για προσθήκη στη watchlist ή σε λίστες</string>
     <string name="library_empty_trakt_not_auth_title">Το Trakt δεν είναι συνδεδεμένο</string>
     <string name="library_empty_trakt_not_auth_subtitle">Συνδέστε τον λογαριασμό Trakt στις Ρυθμίσεις για να δείτε τη βιβλιοθήκη Trakt</string>
+    <string name="cloud_library_connect_action">Σύνδεση λογαριασμού</string>
+    <string name="cloud_library_connect_message">Συνδέστε έναν λογαριασμό στις ρυθμίσεις Συνδεδεμένων υπηρεσιών για να περιηγηθείτε σε αναπαραγώγιμα αρχεία από τη βιβλιοθήκη cloud σας.</string>
+    <string name="cloud_library_connect_title">Δεν έχει συνδεθεί λογαριασμός cloud</string>
+    <string name="cloud_library_disabled_action">Άνοιγμα Συνδεδεμένων υπηρεσιών</string>
+    <string name="cloud_library_disabled_message">Ενεργοποιήστε τη βιβλιοθήκη cloud στις ρυθμίσεις Συνδεδεμένων υπηρεσιών για να περιηγηθείτε σε αρχεία από συνδεδεμένους λογαριασμούς.</string>
+    <string name="cloud_library_disabled_title">Η βιβλιοθήκη cloud είναι ανενεργή</string>
+    <string name="cloud_library_empty_message">Δεν υπάρχουν αναπαραγώγιμα αρχεία cloud που να ταιριάζουν στα τρέχοντα φίλτρα.</string>
+    <string name="cloud_library_empty_title">Δεν υπάρχει ακόμα περιεχόμενο</string>
+    <string name="cloud_library_file_picker_title">Επιλέξτε αρχείο για αναπαραγωγή</string>
+    <string name="cloud_library_load_failed">Δεν ήταν δυνατή η φόρτωση της βιβλιοθήκης cloud %1$s</string>
+    <string name="cloud_library_no_files_message">Αυτό το στοιχείο δεν εκθέτει αναπαραγώγιμο αρχείο βίντεο.</string>
+    <string name="cloud_library_no_files_title">Δεν υπάρχουν αναπαραγώγιμα αρχεία</string>
+    <string name="cloud_library_no_playable_files">Δεν υπάρχουν αναπαραγώγιμα αρχεία</string>
+    <string name="cloud_library_one_playable_file">1 αναπαραγώγιμο αρχείο</string>
+    <string name="cloud_library_opening">Άνοιγμα…</string>
+    <string name="cloud_library_play_failed">Δεν ήταν δυνατή η αναπαραγωγή αυτού του αρχείου cloud.</string>
+    <string name="cloud_library_play_file">Αναπαραγωγή αρχείου</string>
+    <string name="cloud_library_playable_file_count">%1$d αναπαραγώγιμα αρχεία</string>
+    <string name="cloud_library_provider_all">Όλα</string>
+    <string name="cloud_library_refresh">Ανανέωση βιβλιοθήκης cloud</string>
+    <string name="cloud_library_select_provider">Επιλογή παρόχου</string>
+    <string name="cloud_library_select_type">Επιλογή τύπου</string>
+    <string name="cloud_library_status_ready">Έτοιμο για αναπαραγωγή</string>
+    <string name="cloud_library_type_all">Όλα</string>
+    <string name="cloud_library_type_torrents">Torrents</string>
+    <string name="cloud_library_type_usenet">Usenet</string>
+    <string name="cloud_library_type_web">Web</string>
+    <string name="cloud_library_type_files">Αρχεία</string>
 
     <!-- AccountSettingsContent -->
     <string name="account_loading">Φόρτωση…</string>
@@ -2173,7 +2227,7 @@
     <string name="catalog_see_all_title_fallback">Κατάλογος</string>
 
     <!-- Collection editor: emoji categories -->
-    <string name="collections_editor_emoji_category_streaming">Streaming</string>
+    <string name="collections_editor_emoji_category_streaming">Ροές</string>
     <string name="collections_editor_emoji_category_genres">Είδη</string>
     <string name="collections_editor_emoji_category_sports">Αθλητικά</string>
     <string name="collections_editor_emoji_category_music">Μουσική</string>
@@ -2217,10 +2271,10 @@
     <string name="playback_player_internal_desc">Χρήση του ενσωματωμένου προγράμματος αναπαραγωγής NuvioTV</string>
 
     <!-- Player runtime: torrent overlay + tracks -->
-    <string name="player_torrent_peer_info">%1$d seeds · %2$d peers</string>
-    <string name="player_torrent_buffered_status">%1$s buffered · %2$s · %3$s</string>
+    <string name="player_torrent_peer_info">%1$d διανομείς · %2$d λήπτες</string>
+    <string name="player_torrent_buffered_status">%1$s στην προσωρινή μνήμη · %2$s · %3$s</string>
     <string name="player_torrent_status">%1$s · %2$s</string>
-    <string name="player_torrent_stats">%1$d peers · %2$d seeds · %3$d%%</string>
+    <string name="player_torrent_stats">%1$d λήπτες · %2$d διανομείς · %3$d%%</string>
     <string name="player_torrent_connecting_peers">Σύνδεση με peers…</string>
     <string name="player_track_audio_fallback">Ήχος %1$d</string>
     <string name="player_track_subtitle_fallback">Υπότιτλος %1$d</string>
@@ -2359,7 +2413,7 @@
 
     <!-- Player runtime: stream / external link errors -->
     <string name="player_torrent_starting_engine">Εκκίνηση μηχανής P2P…</string>
-    <string name="player_torrent_rebuffer_status">%1$s buffered</string>
+    <string name="player_torrent_rebuffer_status">%1$s στην προσωρινή μνήμη</string>
     <string name="player_stream_error_invalid_external_url">Μη έγκυρη εξωτερική URL</string>
     <string name="player_stream_error_open_external_link_failed">Δεν ήταν δυνατό το άνοιγμα εξωτερικού συνδέσμου</string>
     <string name="player_stream_error_invalid_url">Μη έγκυρη URL ροής</string>
