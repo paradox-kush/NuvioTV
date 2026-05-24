@@ -154,6 +154,7 @@
     <string name="cw_airs_today">Tayang hari ini</string>
     <string name="cw_airs_tomorrow">Tayang besok</string>
     <plurals name="cw_airs_in_days">
+        <item quantity="one">Tayang dalam %d hari</item>
         <item quantity="other">Tayang dalam %d hari</item>
     </plurals>
     <string name="cw_action_go_to_details">Lihat detail</string>
@@ -254,7 +255,7 @@
     <string name="tmdb_entity_kind_company">Perusahaan Produksi</string>
     <string name="tmdb_entity_kind_network">Jaringan</string>
     <string name="tmdb_entity_rail_popular">Populer</string>
-    <string name="tmdb_entity_rail_top_rated">Nilai Tertinggi</string>
+    <string name="tmdb_entity_rail_top_rated">Rating Tertinggi</string>
     <string name="tmdb_entity_rail_recent">Terbaru</string>
     <string name="tmdb_entity_rail_most_voted">Vote Terbanyak</string>
     <string name="collections_editor_tmdb_watch_region">Wilayah Tayang</string>
@@ -344,8 +345,8 @@
     <string name="about_check_updates_subtitle">Unduh rilis terbaru</string>
     <string name="about_privacy_policy">Kebijakan Privasi</string>
     <string name="about_privacy_policy_subtitle">Lihat kebijakan privasi kami</string>
-    <string name="about_supporters_contributors">Pendukung &amp; Kontributor</string>
-    <string name="about_supporters_contributors_subtitle">Penghargaan terbuka dan kredit proyek</string>
+    <string name="about_supporters_contributors">Kontributor &amp; Donatur</string>
+    <string name="about_supporters_contributors_subtitle">Apresiasi terbuka dan kredit proyek</string>
     <string name="about_licenses_attributions">Lisensi &amp; Atribusi</string>
     <string name="about_licenses_attributions_subtitle">Sumber data, pengakuan, dan lisensi Android</string>
     <string name="licenses_attributions_title">Lisensi &amp; Atribusi</string>
@@ -511,7 +512,7 @@
     <string name="action_close">Tutup</string>
 
     <!-- SupportersContributorsScreen -->
-    <string name="supporters_contributors_title">Pendukung &amp; Kontributor</string>
+    <string name="supporters_contributors_title">Kontributor &amp; Donatur</string>
     <string name="supporters_contributors_subtitle">Orang-orang yang mendukung Nuvio dan kontributor yang membangunnya di TV dan mobile.</string>
     <string name="supporters_contributors_supporters_copy">Pendukung dan donatur membantu proyek terus berjalan, mendanai infrastruktur, dan membuka ruang untuk fitur-fitur ambisius.</string>
     <string name="supporters_contributors_donate_copy">Nuvio akan tetap gratis dan open source. Jika Anda ingin mendukung proyek ini, Anda bisa membantu menutup waktu dan infrastruktur di baliknya.</string>
@@ -520,12 +521,12 @@
     <string name="supporters_contributors_qr_subtitle">Buka tautannya di ponsel Anda dan dukung Nuvio melalui Ko-fi.</string>
     <string name="supporters_contributors_qr_hint">Arahkan kamera ke kode QR atau gunakan tombol di bawah.</string>
     <string name="supporters_contributors_back_button">Kembali ke detail</string>
-    <string name="supporters_tab">Pendukung</string>
+    <string name="supporters_tab">Donatur</string>
     <string name="sponsors_tab">Sponsor</string>
     <string name="contributors_tab">Kontributor</string>
-    <string name="supporters_loading">Memuat pendukung…</string>
-    <string name="supporters_empty">Belum ada pendukung ditemukan.</string>
-    <string name="supporters_error_title">Tidak dapat memuat pendukung</string>
+    <string name="supporters_loading">Memuat donatur…</string>
+    <string name="supporters_empty">Belum ada donatur ditemukan.</string>
+    <string name="supporters_error_title">Tidak dapat memuat donatur</string>
     <string name="supporters_no_message">Tidak ada pesan yang dibagikan.</string>
     <string name="supporters_open_donations">Buka halaman donasi</string>
     <string name="sponsors_loading">Memuat sponsor…</string>
@@ -714,6 +715,8 @@
     <string name="autoplay_next_episode_sub">Mulai episode berikutnya secara otomatis saat prompt muncul.</string>
     <string name="autoplay_prefer_binge_group">Utamakan Grup Maraton (Episode Berikutnya)</string>
     <string name="autoplay_prefer_binge_group_sub">Coba profil sumber yang sama terlebih dahulu (addon/grup kualitas yang sama) sebelum aturan putar otomatis normal.</string>
+    <string name="autoplay_reuse_binge_group">Gunakan kembali Grup Maraton</string>
+    <string name="autoplay_reuse_binge_group_sub">Ingat dan gunakan lagi grup maraton terakhir pada lintas sesi.</string>
     <string name="autoplay_threshold_pct">Persentase</string>
     <string name="autoplay_threshold_min">Menit sebelum akhir</string>
     <string name="autoplay_threshold_mode">Mode Ambang Batas Episode Berikutnya</string>
@@ -888,22 +891,31 @@
     <string name="mdblist_not_set">Tidak diatur</string>
     <string name="mdblist_invalid_api_key">Kunci API MDBList tidak valid</string>
 
-    <string name="debrid_title">Debrid</string>
-    <string name="debrid_subtitle">Sumber akun cloud eksperimental</string>
-    <string name="debrid_experimental_notice">Dukungan Debrid bersifat eksperimental dan dapat dipertahankan, diubah, atau dihapus di sewaktu-waktu.</string>
-    <string name="debrid_enable_title">Aktifkan sumber</string>
-    <string name="debrid_enable_subtitle">Tampilkan hasil dari akun yang terhubung.</string>
-    <string name="debrid_add_key_first">Tambahkan API Key terlebih dahulu.</string>
+    <string name="debrid_title">Layanan Debrid</string>
+    <string name="debrid_subtitle">Hubungkan akun untuk akses link dan pustaka cloud</string>
+    <string name="debrid_experimental_notice">Integrasi ini masih bersifat eksperimental dan dapat dipertahankan, diubah, atau dihapus di sewaktu-waktu.</string>
+    <string name="debrid_cloud_library">Pustaka Cloud</string>
+    <string name="debrid_cloud_library_description">Telusuri dan mainkan file yang tersedia di akun Anda.</string>
+    <string name="debrid_enable_title">Uraikan link yang dapat diputar</string>
+    <string name="debrid_enable_subtitle">Minta layanan debrid menyediakan link ketika dibutuhkan. Hal ini dapat menambahkan item ke layanan itu.</string>
+    <string name="debrid_resolve_with">Uraikan dengan</string>
+    <string name="debrid_resolve_with_description">Pilih akun layanan debrid mana untuk menangani link yang dapat dimainkan.</string>
+    <string name="debrid_add_key_first">Hubungkan akun terlebih dahulu.</string>
     <string name="debrid_section_account">Akun</string>
-    <string name="debrid_section_instant_playback">Pemutaran Instan</string>
+    <string name="debrid_section_instant_playback">Preparasi sumber</string>
     <string name="debrid_section_filters">Filter &amp; Pengurutan</string>
-    <string name="debrid_section_formatting">Pengaturan Web</string>
+    <string name="debrid_section_formatting">Format</string>
     <string name="debrid_provider_title">Penyedia Layanan</string>
     <string name="debrid_provider_subtitle">Penyedia layanan lain akan ditambahkan kemudian</string>
     <string name="debrid_provider_torbox">Torbox</string>
     <string name="debrid_provider_available">Torbox</string>
     <string name="debrid_api_key_title">Torbox</string>
     <string name="debrid_api_key_subtitle">Hubungkan akun Torbox Anda.</string>
+    <string name="debrid_provider_description">Hubungkan akun %1$s Anda.</string>
+    <string name="debrid_provider_device_description">Hubungkan akun Anda %1$s melalui browser.</string>
+    <string name="debrid_api_key_dialog_title">%1$s API Key</string>
+    <string name="debrid_api_key_dialog_subtitle">Masukkan %1$s API key Anda.</string>
+    <string name="debrid_api_key_dialog_placeholder">Masukkan %1$s API key</string>
     <string name="debrid_dialog_title">Torbox API Key</string>
     <string name="debrid_dialog_subtitle">Masukkan Torbox API Key Anda.</string>
     <string name="debrid_dialog_placeholder">Masukkan Torbox API Key</string>
@@ -913,11 +925,25 @@
     <string name="debrid_real_debrid_dialog_subtitle">Masukkan Real-Debrid API token untuk Direct Debrid</string>
     <string name="debrid_real_debrid_dialog_placeholder">Masukkan Real-Debrid API token</string>
     <string name="debrid_not_set">Belum diatur</string>
-    <string name="debrid_invalid_torbox_api_key">Tidak dapat memvalidasi kunci API ini.</string>
+    <string name="debrid_connected">Terhubung</string>
+    <string name="debrid_connect_provider">Hubungkan %1$s</string>
+    <string name="debrid_disconnect_provider">Putuskan %1$s</string>
+    <string name="debrid_disconnect">Terputus</string>
+    <string name="debrid_device_auth_connected">%1$s telah terhubung di perangkat ini.</string>
+    <string name="debrid_device_auth_starting">Memulai sign-in dengan aman...</string>
+    <string name="debrid_device_auth_instructions">Scan QR dan masukkan kode ini untuk mengizinkan Nuvio.</string>
+    <string name="debrid_device_auth_code_copied">Kode tersalin.</string>
+    <string name="debrid_device_auth_waiting">Menunggu persetujuan...</string>
+    <string name="debrid_device_auth_failed">Tidak dapat memulai sign-in.</string>
+    <string name="debrid_device_auth_missing_configuration">Metode sign-in ini tidak dikonfigurasi dalam rilis ini.</string>
+    <string name="debrid_device_auth_expired">Kode ini telah kedaluwarsa. Coba lagi.</string>
+    <string name="debrid_key_invalid">Tidak dapat memvalidasi API key ini.</string>
+    <string name="debrid_invalid_torbox_api_key">Tidak dapat memvalidasi API key ini.</string>
     <string name="debrid_invalid_real_debrid_api_key">Tidak dapat memvalidasi token API ini.</string>
     <string name="debrid_prepare_instant_playback">Menyiapkan tautan</string>
-    <string name="debrid_prepare_instant_playback_description">Mengurai sumber pertama sebelum pemutaran dimulai.</string>
-    <string name="debrid_prepare_stream_count">Sumber yang akan disiapkan</string>
+    <string name="debrid_prepare_instant_playback_description">Siapkan sumber video sebelum mulai pemutaran dimulai.</string>
+    <string name="debrid_prepare_stream_count">Jumlah sumber yang disiapkan</string>
+    <string name="settings_debrid_prepare_stream_count_warning">Gunakan jumlah sekecil mungkin. Penyedia layanan Debrid bisa saja membatasi seberapa banyak tautan yang dapat diurai dalam jangka waktu tertentu. Membuka film atau episode serial dihitung dalam batas tersebut meskipun Anda tidak menonton, karena tautan tetap disiapkan terlebih dahulu.</string>
     <string name="debrid_prepare_count_one">1 sumber</string>
     <string name="debrid_prepare_count_many">%1$d sumber</string>
     <string name="debrid_stream_max_results_title">Hasil maksimal</string>
@@ -1204,6 +1230,7 @@
     <string name="addon_installed_section">Terpasang</string>
     <string name="addon_empty">Tidak ada addon terpasang. Tambahkan satu untuk memulai.</string>
     <string name="addon_remove">Hapus</string>
+    <string name="addons_badge_disabled">Tidak Aktif</string>
     <string name="addon_manage_from_phone_title">Kelola dari ponsel</string>
     <string name="addon_manage_from_phone_subtitle">Pindai kode QR untuk mengelola addon, katalog, dan koleksi dari ponsel Anda</string>
     <string name="addon_manage_addons_only_from_phone_subtitle">Pindai kode QR untuk memasang atau menghapus add-on dari ponsel Anda</string>
@@ -1249,6 +1276,7 @@
     <string name="debrid_resolving_stream">Mengurai stream debrid</string>
     <string name="debrid_stale_stream">Hasil Debrid ini telah kedaluwarsa. Muat ulang stream.</string>
     <string name="debrid_missing_api_key">Tambahkan kunci API Debrid di Pengaturan.</string>
+    <string name="debrid_not_cached">Belum cached di Layanan Debrid ini.</string>
     <string name="debrid_resolution_failed">Tidak dapat mengurai stream Debrid ini.</string>
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
@@ -1533,6 +1561,8 @@
     <string name="library_source_local">LOKAL</string>
     <string name="library_source_nuvio">NUVIO</string>
     <string name="library_source_trakt">TRAKT</string>
+    <string name="library_source_saved">Tersimpan</string>
+    <string name="library_source_cloud">Cloud</string>
     <string name="library_watchlist">Daftar Tonton</string>
     <string name="library_syncing_library">Menyinkronkan pustaka\u2026</string>
     <string name="library_type_all">Semua</string>
@@ -1543,6 +1573,34 @@
     <string name="library_empty_trakt_subtitle">Gunakan + di detail untuk menambahkan item ke daftar tonton atau daftar</string>
     <string name="library_empty_trakt_not_auth_title">Trakt belum terhubung</string>
     <string name="library_empty_trakt_not_auth_subtitle">Hubungkan akun Trakt Anda di Pengaturan untuk melihat pustaka Trakt Anda</string>
+    <string name="cloud_library_connect_action">Hubungkan akun</string>
+    <string name="cloud_library_connect_message">Hubungkan akun di pengaturan Layanan Debrid untuk menelusuri file yang dapat diputar dari pustaka cloud Anda.</string>
+    <string name="cloud_library_connect_title">Tidak ada akun cloud yang terhubung</string>
+    <string name="cloud_library_disabled_action">Buka Layanan Debrid</string>
+    <string name="cloud_library_disabled_message">Aktifkan pustaka cloud di pengaturan Layanan Debrid untuk menelusuri file dari akun yang terhubung.</string>
+    <string name="cloud_library_disabled_title">Pustaka cloud tidak aktif</string>
+    <string name="cloud_library_empty_message">Tidak ada file yang dapat diputar sesuai dengan filter saat ini.</string>
+    <string name="cloud_library_empty_title">Belum ada apapun di sini</string>
+    <string name="cloud_library_file_picker_title">Pilih file untuk diputar</string>
+    <string name="cloud_library_load_failed">Tidak dapat memuat pustaka cloud %1$s </string>
+    <string name="cloud_library_no_files_message">Item ini tidak terlihat seperti file video yang dapat diputar.</string>
+    <string name="cloud_library_no_files_title">Tidak ada file yang dapat diputar</string>
+    <string name="cloud_library_no_playable_files">Tidak ada file yang dapat diputar</string>
+    <string name="cloud_library_one_playable_file">1 file dapat diputar</string>
+    <string name="cloud_library_opening">Membuka\u2026</string>
+    <string name="cloud_library_play_failed">Tidak dapat memutar file ini.</string>
+    <string name="cloud_library_play_file">Memutar file</string>
+    <string name="cloud_library_playable_file_count">%1$d file dapat diputar</string>
+    <string name="cloud_library_provider_all">Semua</string>
+    <string name="cloud_library_refresh">Perbarui pustaka cloud</string>
+    <string name="cloud_library_select_provider">Pilih provider</string>
+    <string name="cloud_library_select_type">Pilih tipe</string>
+    <string name="cloud_library_status_ready">Siap diputar</string>
+    <string name="cloud_library_type_all">Semua</string>
+    <string name="cloud_library_type_torrents">Torrents</string>
+    <string name="cloud_library_type_usenet">Usenet</string>
+    <string name="cloud_library_type_web">Web</string>
+    <string name="cloud_library_type_files">Files</string>
 
     <!-- AccountSettingsContent -->
     <string name="account_loading">Memuat\u2026</string>
@@ -1685,7 +1743,7 @@
     <string name="ratings_season_summary">Musim %1$d - %2$d episode</string>
 
     <!-- SearchDiscoverSection -->
-    <string name="discover_title">Penemuan</string>
+    <string name="discover_title">Temukan</string>
     <string name="discover_load_more">Muat lebih banyak</string>
     <string name="discover_loading">Memuat...</string>
     <string name="discover_filter_type">Tipe</string>
@@ -1986,7 +2044,7 @@
     <string name="collections_editor_trakt_search_results">Hasil pencarian</string>
     <string name="collections_editor_trakt_trending">Daftar trending</string>
     <string name="collections_editor_trakt_popular">Daftar populer</string>
-    <string name="collections_editor_trakt_direction">Arah</string>
+    <string name="collections_editor_trakt_direction">Urutan</string>
     <string name="collections_editor_trakt_ascending">Naik</string>
     <string name="collections_editor_trakt_descending">Turun</string>
     <string name="collections_editor_tmdb_id_or_url">ID atau URL TMDB</string>
@@ -2030,21 +2088,21 @@
     <string name="collections_editor_tmdb_person_id">ID Orang</string>
     <string name="collections_editor_tmdb_person_helper">Contoh: https://www.themoviedb.org/person/31-tom-hanks atau 31.</string>
     <string name="collections_editor_tmdb_title_helper">Ditampilkan sebagai nama baris/tab. Jika kosong, Nuvio akan membuatnya dari sumber.</string>
-    <string name="collections_editor_tmdb_quick_genres">Genre cepat</string>
-    <string name="collections_editor_tmdb_quick_languages">Bahasa cepat</string>
-    <string name="collections_editor_tmdb_quick_countries">Negara cepat</string>
-    <string name="collections_editor_tmdb_quick_keywords">Kata kunci cepat</string>
-    <string name="collections_editor_tmdb_quick_companies">Studio cepat</string>
-    <string name="collections_editor_tmdb_quick_networks">Jaringan cepat</string>
+    <string name="collections_editor_tmdb_quick_genres">Pintasan Genre</string>
+    <string name="collections_editor_tmdb_quick_languages">Pintasan Bahasa</string>
+    <string name="collections_editor_tmdb_quick_countries">Pintasan Negara</string>
+    <string name="collections_editor_tmdb_quick_keywords">Pintasan Kata Kunci</string>
+    <string name="collections_editor_tmdb_quick_companies">Pintasan Studio</string>
+    <string name="collections_editor_tmdb_quick_networks">Pintasan Jaringan</string>
     <string name="collections_editor_tmdb_genres">ID Genre</string>
-    <string name="collections_editor_tmdb_genres_helper">Gunakan nomor genre TMDB. Pisahkan beberapa dengan koma untuk AND, atau pipa untuk OR.</string>
+    <string name="collections_editor_tmdb_genres_helper">Gunakan nomor genre TMDB. Pisahkan beberapa nilai dengan koma untuk fungsi DAN, atau garis tegak untuk fungsi ATAU.</string>
     <string name="collections_editor_tmdb_date_from">Tanggal rilis atau tayang dari</string>
     <string name="collections_editor_tmdb_date_to">Tanggal rilis atau tayang hingga</string>
     <string name="collections_editor_tmdb_date_helper">Gunakan YYYY-MM-DD, misalnya 2024-01-01.</string>
     <string name="collections_editor_tmdb_rating_min">Rating minimum</string>
     <string name="collections_editor_tmdb_rating_max">Rating maksimum</string>
     <string name="collections_editor_tmdb_rating_helper">Rating TMDB dari 0 hingga 10. Contoh: 7.0.</string>
-    <string name="collections_editor_tmdb_votes_min">Suara minimum</string>
+    <string name="collections_editor_tmdb_votes_min">Vote minimum</string>
     <string name="collections_editor_tmdb_votes_helper">Gunakan ini untuk menghindari judul dengan sedikit suara. Contoh: 100.</string>
     <string name="collections_editor_tmdb_language">Bahasa asli</string>
     <string name="collections_editor_tmdb_language_helper">Gunakan kode bahasa dua huruf, misalnya en, ko, ja, hi.</string>
@@ -2063,7 +2121,7 @@
     <string name="collections_editor_sort_recently_added">Baru Ditambahkan</string>
     <string name="collections_editor_sort_title">Judul</string>
     <string name="collections_editor_sort_released">Dirilis</string>
-    <string name="collections_editor_sort_votes">Suara</string>
+    <string name="collections_editor_sort_votes">Vote</string>
     <string name="collections_editor_direction_asc_short">Naik</string>
     <string name="collections_editor_direction_desc_short">Turun</string>
     <string name="collections_editor_trakt_movie_list">Daftar Film Trakt</string>
@@ -2319,7 +2377,7 @@
     <string name="language_english">Inggris</string>
 
     <!-- Supporters / contributors / sponsors errors -->
-    <string name="supporters_error_load">Tidak dapat memuat pendukung.</string>
+    <string name="supporters_error_load">Tidak dapat memuat donatur.</string>
     <string name="contributors_error_load">Tidak dapat memuat kontributor.</string>
     <string name="sponsors_error_load">Tidak dapat memuat sponsor.</string>
     <string name="contributors_error_api_not_configured">API Kontributor belum dikonfigurasi.</string>
