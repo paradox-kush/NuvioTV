@@ -227,7 +227,18 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var trailerPlayerPool: com.nuvio.tv.core.player.TrailerPlayerPool
 
+    @Inject
+    lateinit var externalPlaybackTracker: com.nuvio.tv.core.player.ExternalPlaybackTracker
+
     private lateinit var jankStats: JankStats
+
+    /** Activity-level launcher for external video players. Survives all navigation changes. */
+    private val externalPlayerLauncher = registerForActivityResult(
+        com.nuvio.tv.core.player.ExternalPlayerResultContract()
+    ) { result ->
+        Log.d("MainActivity", "External player ActivityResult: $result")
+        externalPlaybackTracker.onActivityResult(result)
+    }
 
     @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
     override fun attachBaseContext(newBase: Context) {
@@ -252,6 +263,9 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         window?.setBackgroundDrawable(null)
+
+        // Wire the Activity-level launcher to the tracker
+        externalPlaybackTracker.activityLauncher = externalPlayerLauncher
 
         PluginRuntimeHooks.onActivityCreate(this)
 

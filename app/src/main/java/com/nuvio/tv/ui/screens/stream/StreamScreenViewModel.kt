@@ -76,6 +76,7 @@ class StreamScreenViewModel @Inject constructor(
     private val traktAuthService: TraktAuthService,
     private val directDebridResolver: DirectDebridResolver,
     private val directDebridStreamPreparer: DirectDebridStreamPreparer,
+    private val externalPlaybackTracker: com.nuvio.tv.core.player.ExternalPlaybackTracker,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private var autoPlayHandledForSession = false
@@ -198,8 +199,7 @@ class StreamScreenViewModel @Inject constructor(
         playerPreference: PlayerPreference,
         streamAutoPlayMode: StreamAutoPlayMode
     ): Boolean {
-        return playerPreference == PlayerPreference.INTERNAL &&
-            streamAutoPlayMode != StreamAutoPlayMode.MANUAL
+        return streamAutoPlayMode != StreamAutoPlayMode.MANUAL
     }
 
     private fun loadStreams() {
@@ -1051,6 +1051,41 @@ class StreamScreenViewModel @Inject constructor(
         // Don't resume if completed
         if (wp.isCompleted()) return 0L
         return wp.position
+    }
+
+    /**
+     * Launch external player via the centralized [ExternalPlaybackTracker].
+     * Handles metadata, keep-alive service, Zidoo polling, and ActivityResult - all
+     * independently of composable lifecycle.
+     */
+    fun launchExternalPlayer(
+        playbackInfo: StreamPlaybackInfo,
+        url: String,
+        resumePositionMs: Long,
+        context: android.content.Context
+    ) {
+        val contentId = playbackInfo.contentId ?: videoId.substringBefore(":")
+        val metadata = com.nuvio.tv.core.player.ExternalPlaybackMetadata(
+            contentId = contentId,
+            contentType = playbackInfo.contentType ?: "movie",
+            contentName = playbackInfo.contentName ?: playbackInfo.title,
+            poster = playbackInfo.poster,
+            backdrop = playbackInfo.backdrop,
+            logo = playbackInfo.logo,
+            videoId = playbackInfo.videoId ?: contentId,
+            season = playbackInfo.season,
+            episode = playbackInfo.episode,
+            episodeTitle = playbackInfo.episodeTitle,
+            year = playbackInfo.year
+        )
+        externalPlaybackTracker.launchPlayer(
+            metadata = metadata,
+            url = url,
+            title = playbackInfo.title,
+            headers = playbackInfo.headers,
+            resumePositionMs = resumePositionMs,
+            context = context
+        )
     }
 
     /**

@@ -10,7 +10,6 @@ import android.view.KeyEvent
 import android.view.View
 import androidx.annotation.RawRes
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -110,9 +109,6 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
-import com.nuvio.tv.core.player.ExternalPlayerLauncher
-import com.nuvio.tv.core.player.ExternalPlayerResultContract
-import com.nuvio.tv.core.player.ExternalPlayerResult
 import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.SubtitleStyleSettings
@@ -143,6 +139,7 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val containerFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
     val progressBarFocusRequester = remember { FocusRequester() }
@@ -156,24 +153,6 @@ fun PlayerScreen(
     val nextEpisodeFocusRequester = remember { FocusRequester() }
     var subtitleDelayAutoSyncFocused by remember { mutableStateOf(false) }
     var subtitleTimingConsumeNextConfirmKeyUp by remember { mutableStateOf(false) }
-
-    // Launcher for external player with result - receives progress when user returns
-    val externalPlayerLauncher = rememberLauncherForActivityResult(
-        contract = ExternalPlayerResultContract()
-    ) { result: ExternalPlayerResult? ->
-        Log.d("PlayerScreen", "External player result: $result")
-        if (result != null && result.positionMs > 0L) {
-            // Update progress with position from external player
-            viewModel.saveExternalPlayerProgress(result.positionMs, result.durationMs)
-        }
-        // Now exit the player screen
-        val timeline = viewModel.playbackTimeline.value
-        val effectivePosition = result?.positionMs ?: timeline.currentPosition
-        val effectiveDuration = result?.durationMs ?: timeline.duration
-        val completed = effectiveDuration > 0L &&
-            (effectivePosition.toFloat() / effectiveDuration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
-        onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
-    }
 
     val exitPlayer: () -> Unit = {
         val timeline = viewModel.playbackTimeline.value
@@ -935,23 +914,12 @@ fun PlayerScreen(
                     val headers = viewModel.getCurrentHeaders()
                     val timeline = viewModel.playbackTimeline.value
                     viewModel.stopAndRelease()
-                    // Launch with result contract - don't exit yet, wait for result callback
-                    try {
-                        externalPlayerLauncher.launch(
-                            ExternalPlayerLauncher.createInput(
-                                url = url,
-                                title = title,
-                                headers = headers,
-                                resumePositionMs = timeline.currentPosition
-                            )
-                        )
-                    } catch (e: Exception) {
-                        // Fallback: no player can handle the intent - exit normally
-                        Log.w("PlayerScreen", "External player launch failed", e)
-                        val completed = timeline.duration > 0L &&
-                            (timeline.currentPosition.toFloat() / timeline.duration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
-                        onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
-                    }
+                    // Launch via tracker - it handles progress saving independently
+                    viewModel.launchInExternalPlayer(context, timeline.currentPosition)
+                    // Exit PlayerScreen - tracker will save progress when external player returns
+                    val completed = timeline.duration > 0L &&
+                        (timeline.currentPosition.toFloat() / timeline.duration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
+                    onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
                 },
                 onShowStreamInfo = {
                     restoreStreamInfoFocus = true

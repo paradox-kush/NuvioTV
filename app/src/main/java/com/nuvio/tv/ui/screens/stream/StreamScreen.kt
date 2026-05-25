@@ -104,11 +104,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import com.nuvio.tv.core.player.ExternalPlayerResultContract
-import com.nuvio.tv.core.player.ExternalPlayerResult
-import com.nuvio.tv.core.player.ExternalPlayerInput
-import com.nuvio.tv.core.player.ZidooPlayerMonitor
 
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -135,94 +130,16 @@ fun StreamScreen(
     val p2pEnabled by viewModel.p2pEnabled.collectAsStateWithLifecycle(initialValue = false)
     val scope = rememberCoroutineScope()
 
-    // Track which playback info was used for the external player launch
-    var externalPlayerPlaybackInfo by remember { mutableStateOf<StreamPlaybackInfo?>(null) }
-    val isZidooDevice = remember { ZidooPlayerMonitor.isZidooDevice() }
-
-    // Launcher that receives progress from external players (MX Player, VLC, Just Player, etc.)
-    val externalPlayerLauncher = rememberLauncherForActivityResult(
-        contract = ExternalPlayerResultContract()
-    ) { result: ExternalPlayerResult? ->
-        val info = externalPlayerPlaybackInfo
-        Log.d("StreamScreen", "ActivityResult callback: result=$result, info=${info != null}")
-        if (result != null && info != null) {
-            Log.d("StreamScreen", "External player returned: pos=${result.positionMs}ms, dur=${result.durationMs}ms, endedByUser=${result.endedByUser}")
-            viewModel.saveExternalPlayerProgress(
-                playbackInfo = info,
-                positionMs = result.positionMs,
-                durationMs = result.durationMs
-            )
-        } else if (info != null && isZidooDevice) {
-            // No ActivityResult data — on Zidoo devices, poll the local REST API for progress
-            Log.d("StreamScreen", "No ActivityResult, starting Zidoo player monitor")
-            scope.coroutineLaunch {
-                val zidooResult = ZidooPlayerMonitor.awaitPlaybackEnd()
-                if (zidooResult != null) {
-                    Log.d("StreamScreen", "Zidoo player returned: pos=${zidooResult.positionMs}ms, dur=${zidooResult.durationMs}ms")
-                    viewModel.saveExternalPlayerProgress(
-                        playbackInfo = info,
-                        positionMs = zidooResult.positionMs,
-                        durationMs = zidooResult.durationMs
-                    )
-                }
-            }
-        } else {
-            Log.d("StreamScreen", "External player returned no progress data (info=${info != null}, isZidoo=$isZidooDevice)")
-        }
-        externalPlayerPlaybackInfo = null
-    }
-
     fun launchExternalPlayer(playbackInfo: StreamPlaybackInfo) {
         val url = playbackInfo.url ?: return
-        externalPlayerPlaybackInfo = playbackInfo
         scope.coroutineLaunch {
             val resumePositionMs = viewModel.getResumePositionMs(playbackInfo)
-            if (isZidooDevice) {
-                // Zidoo player doesn't return ActivityResult — use fire-and-forget launch
-                // and monitor via REST API polling
-                ExternalPlayerLauncher.launch(
-                    context = context,
-                    url = url,
-                    title = playbackInfo.title,
-                    headers = playbackInfo.headers,
-                    resumePositionMs = resumePositionMs
-                )
-                // Monitor Zidoo player in background (also handles seek to resume position)
-                val zidooResult = ZidooPlayerMonitor.awaitPlaybackEnd(
-                    resumePositionMs = resumePositionMs
-                )
-                if (zidooResult != null) {
-                    Log.d("StreamScreen", "Zidoo player stopped: pos=${zidooResult.positionMs}ms, dur=${zidooResult.durationMs}ms")
-                    viewModel.saveExternalPlayerProgress(
-                        playbackInfo = playbackInfo,
-                        positionMs = zidooResult.positionMs,
-                        durationMs = zidooResult.durationMs
-                    )
-                }
-                externalPlayerPlaybackInfo = null
-            } else {
-                try {
-                    externalPlayerLauncher.launch(
-                        ExternalPlayerLauncher.createInput(
-                            url = url,
-                            title = playbackInfo.title,
-                            headers = playbackInfo.headers,
-                            resumePositionMs = resumePositionMs
-                        )
-                    )
-                } catch (e: Exception) {
-                    // Fallback to fire-and-forget if no activity can handle the intent
-                    Log.w("StreamScreen", "ExternalPlayerResultContract failed, falling back", e)
-                    externalPlayerPlaybackInfo = null
-                    ExternalPlayerLauncher.launch(
-                        context = context,
-                        url = url,
-                        title = playbackInfo.title,
-                        headers = playbackInfo.headers,
-                        resumePositionMs = resumePositionMs
-                    )
-                }
-            }
+            viewModel.launchExternalPlayer(
+                playbackInfo = playbackInfo,
+                url = url,
+                resumePositionMs = resumePositionMs,
+                context = context
+            )
         }
     }
 
@@ -281,7 +198,25 @@ fun StreamScreen(
             return
         }
         if (uiState.isDirectAutoPlayFlow) {
-            onAutoPlayResolved(playbackInfo)
+            // Respect player preference even in direct autoplay flow
+            when (playerPreference) {
+                PlayerPreference.EXTERNAL -> {
+                    playbackInfo.url?.let {
+                        launchExternalPlayer(playbackInfo)
+                    }
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                    // Pop StreamScreen so user returns to Detail/Home after external player
+                    onBackPress()
+                }
+                PlayerPreference.ASK_EVERY_TIME -> {
+                    pendingPlaybackInfo = playbackInfo
+                    showPlayerChoiceDialog = true
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                }
+                else -> {
+                    onAutoPlayResolved(playbackInfo)
+                }
+            }
             return
         } else {
             pendingRestoreOnResume = true
