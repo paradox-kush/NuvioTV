@@ -210,7 +210,7 @@ class AddonRepositoryImpl @Inject constructor(
         val baseQuery = if (queryStart >= 0) cleanBaseUrl.substring(queryStart) else ""
         val manifestUrl = "$basePath/manifest.json$baseQuery"
 
-        return when (val result = safeApiCall { api.getManifest(manifestUrl) }) {
+        return when (val result = safeApiCall(context) { api.getManifest(manifestUrl) }) {
             is NetworkResult.Success -> {
                 val addon = result.data.toDomain(cleanBaseUrl)
                 manifestCache[cleanBaseUrl] = addon

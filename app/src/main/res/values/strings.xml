@@ -1635,6 +1635,10 @@
     <string name="cloud_library_type_web">Web</string>
     <string name="cloud_library_type_files">Files</string>
 
+    <!-- Cloud library repository errors -->
+    <string name="cloud_library_error_provider_unavailable">Cloud library is not available for %1$s.</string>
+    <string name="cloud_library_error_disabled">Cloud library is disabled.</string>
+
     <!-- AccountSettingsContent -->
     <string name="account_loading">Loading\u2026</string>
     <string name="account_sync_description">Sync your library, watch progress, addons, and plugins across devices.</string>
@@ -1828,6 +1832,12 @@
     <string name="update_open_settings">Open Settings</string>
     <string name="update_install">Install</string>
     <string name="update_ignore">Ignore</string>
+
+    <!-- Update flow errors -->
+    <string name="update_error_check_failed">Update check failed</string>
+    <string name="update_error_download_failed">Download failed</string>
+    <string name="update_error_apk_missing">Downloaded file is missing</string>
+
     <string name="watchlist_added">Added to watchlist</string>
     <string name="watchlist_removed">Removed from watchlist</string>
 

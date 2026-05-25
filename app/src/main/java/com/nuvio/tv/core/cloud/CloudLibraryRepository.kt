@@ -1,16 +1,20 @@
 package com.nuvio.tv.core.cloud
 
+import android.content.Context
+import com.nuvio.tv.R
 import com.nuvio.tv.core.debrid.DebridProviderCapability
 import com.nuvio.tv.core.debrid.DebridProviders
 import com.nuvio.tv.core.debrid.DebridServiceCredential
 import com.nuvio.tv.core.debrid.supports
 import com.nuvio.tv.data.local.DebridSettingsDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.first
 
 @Singleton
 class CloudLibraryRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val dataStore: DebridSettingsDataStore,
     torboxApi: TorboxCloudLibraryProviderApi,
     premiumizeApi: PremiumizeCloudLibraryProviderApi
@@ -31,7 +35,10 @@ class CloudLibraryRepository @Inject constructor(
             if (api == null) {
                 return@map CloudLibraryProviderState(
                     provider = credential.provider,
-                    errorMessage = "Cloud library is not available for ${credential.provider.displayName}."
+                    errorMessage = context.getString(
+                        R.string.cloud_library_error_provider_unavailable,
+                        credential.provider.displayName
+                    )
                 )
             }
 
@@ -67,7 +74,9 @@ class CloudLibraryRepository @Inject constructor(
         if (!file.playable) return CloudLibraryPlaybackResult.NotPlayable
         val settings = dataStore.settings.first()
         if (!settings.cloudLibraryEnabled) {
-            return CloudLibraryPlaybackResult.Failed("Cloud library is disabled.")
+            return CloudLibraryPlaybackResult.Failed(
+                context.getString(R.string.cloud_library_error_disabled)
+            )
         }
         val credential = DebridProviders.configuredServices(settings)
             .firstOrNull { credential -> credential.provider.id == item.providerId }
