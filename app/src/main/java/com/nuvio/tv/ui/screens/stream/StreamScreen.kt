@@ -321,7 +321,8 @@ fun StreamScreen(
             isLoading = uiState.isLoading
         )
 
-        if (uiState.showDirectAutoPlayOverlay || viewModel.isExternalPlayerActive()) {
+        val showOverlay = uiState.showDirectAutoPlayOverlay || uiState.externalPlayerOverlayVisible
+        if (showOverlay) {
             LoadingOverlay(
                 visible = true,
                 backdropUrl = uiState.backdrop ?: uiState.poster,

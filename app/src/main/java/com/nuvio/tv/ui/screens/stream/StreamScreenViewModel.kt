@@ -974,14 +974,22 @@ class StreamScreenViewModel @Inject constructor(
 
     /** Set to true when external player is launched, reset on stop. */
     private var externalPlayerLaunched = false
+    private var externalPlayerLaunchTimeMs = 0L
 
     fun stopExternalPlayerTracking() {
         if (!externalPlayerLaunched) return
+        // Ignore if called within 500ms of launch - this is a spurious ON_RESUME
+        // from DisposableEffect registration, not a real return from external player.
+        if (System.currentTimeMillis() - externalPlayerLaunchTimeMs < 500L) {
+            return
+        }
         externalPlayerLaunched = false
+        externalPlayerLaunchTimeMs = 0L
         externalPlaybackTracker.stopTracking()
         updateUiStateIfChanged {
             it.copy(
                 showDirectAutoPlayOverlay = false,
+                externalPlayerOverlayVisible = false,
                 directAutoPlayMessage = null
             )
         }
@@ -1108,10 +1116,12 @@ class StreamScreenViewModel @Inject constructor(
         updateUiStateIfChanged {
             it.copy(
                 showDirectAutoPlayOverlay = true,
+                externalPlayerOverlayVisible = true,
                 directAutoPlayMessage = null
             )
         }
         externalPlayerLaunched = true
+        externalPlayerLaunchTimeMs = System.currentTimeMillis()
 
         val contentId = playbackInfo.contentId ?: videoId.substringBefore(":")
         val metadata = com.nuvio.tv.core.player.ExternalPlaybackMetadata(
