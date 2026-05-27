@@ -422,12 +422,15 @@ fun HomeScreen(
         val item = selectedPoster.item
         val statusKey = homeItemStatusKey(item.id, item.apiType)
         val isMovie = item.apiType.equals("movie", ignoreCase = true)
+        val isSeries = item.apiType.equals("series", ignoreCase = true) ||
+            item.apiType.equals("tv", ignoreCase = true)
         HomePosterOptionsDialog(
             title = item.name,
             isInLibrary = uiState.posterLibraryMembership[statusKey] == true,
             isLibraryPending = statusKey in uiState.posterLibraryPending,
             showManageLists = uiState.librarySourceMode == LibrarySourceMode.TRAKT,
             isMovie = isMovie,
+            isSeries = isSeries,
             isWatched = movieWatchedStatus[statusKey] == true,
             isWatchedPending = statusKey in uiState.movieWatchedPending,
             onDismiss = { posterOptionsTarget = null },
@@ -444,7 +447,11 @@ fun HomeScreen(
                 posterOptionsTarget = null
             },
             onToggleWatched = {
-                viewModel.togglePosterMovieWatched(item)
+                if (isMovie) {
+                    viewModel.togglePosterMovieWatched(item)
+                } else {
+                    viewModel.togglePosterSeriesWatched(item)
+                }
                 posterOptionsTarget = null
             }
         )
@@ -648,6 +655,7 @@ private fun HomePosterOptionsDialog(
     isLibraryPending: Boolean,
     showManageLists: Boolean,
     isMovie: Boolean,
+    isSeries: Boolean = false,
     isWatched: Boolean,
     isWatchedPending: Boolean,
     onDismiss: () -> Unit,
@@ -701,7 +709,7 @@ private fun HomePosterOptionsDialog(
             )
         }
 
-        if (isMovie) {
+        if (isMovie || isSeries) {
             Button(
                 onClick = onToggleWatched,
                 enabled = !isWatchedPending,

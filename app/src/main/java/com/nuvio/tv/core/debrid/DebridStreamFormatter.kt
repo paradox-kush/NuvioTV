@@ -86,7 +86,7 @@ class DebridStreamFormatter @Inject constructor(
             "service.cached" to serviceCached(stream, resolve),
             "service.shortName" to serviceShortName(stream, resolve),
             "service.name" to serviceName(stream, resolve),
-            "addon.name" to "Nuvio Direct Debrid"
+            "addon.name" to stream.addonName
         )
     }
 
