@@ -1510,6 +1510,12 @@
     <string name="update_open_settings">Ouvrir les paramètres</string>
     <string name="update_install">Installer</string>
     <string name="update_ignore">Ignorer</string>
+
+    <!-- Erreurs du flow de mise à jour -->
+    <string name="update_error_check_failed">Échec de la vérification des mises à jour</string>
+    <string name="update_error_download_failed">Échec du téléchargement</string>
+    <string name="update_error_apk_missing">Fichier téléchargé introuvable</string>
+
     <string name="watchlist_added">Ajouté à la liste de suivi</string>
     <string name="watchlist_removed">Retiré de la liste de suivi</string>
 
@@ -2515,4 +2521,8 @@
     <string name="cloud_library_type_usenet">Usenet</string>
     <string name="cloud_library_type_web">Web</string>
     <string name="cloud_library_type_files">Fichiers</string>
+
+    <!-- Erreurs du dépôt Bibliothèque cloud -->
+    <string name="cloud_library_error_provider_unavailable">Bibliothèque cloud indisponible pour %1$s.</string>
+    <string name="cloud_library_error_disabled">La bibliothèque cloud est désactivée.</string>
 </resources>
