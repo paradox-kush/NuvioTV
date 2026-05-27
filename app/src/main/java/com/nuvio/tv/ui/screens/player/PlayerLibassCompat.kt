@@ -14,6 +14,7 @@ import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.mkv.MatroskaExtractor
 import androidx.media3.extractor.text.SubtitleParser
+import com.nuvio.tv.core.player.dvmkv.MatroskaExtractor as DvMatroskaExtractor
 import io.github.peerless2012.ass.media.AssHandler
 import io.github.peerless2012.ass.media.extractor.AssMatroskaExtractor
 import io.github.peerless2012.ass.media.kt.withAssSupport
@@ -100,7 +101,9 @@ private fun ExtractorsFactory.withAssMkvSupportCompat(
     return ExtractorsFactory {
         val extractors = createExtractors()
         extractors.forEachIndexed { index, extractor ->
-            if (extractor is MatroskaExtractor) {
+            // The DV7 factory swaps in a vendored MatroskaExtractor; libass needs the ASS-aware
+            // one for MKV, so replace either. DV7-MKV conversion yields to ASS while libass is on.
+            if (extractor is MatroskaExtractor || extractor is DvMatroskaExtractor) {
                 extractors[index] = AssMatroskaExtractor(subtitleParserFactory, assHandler)
             }
         }
