@@ -178,16 +178,10 @@ class StreamRepositoryImpl @Inject constructor(
                 // Emit results as they arrive
                 for (result in resultChannel) {
                     val checkingResult = localDebridAvailabilityService.markChecking(listOf(result)).firstOrNull() ?: result
-                    mergePresentedResult(accumulatedResults, checkingResult)
-                    emit(NetworkResult.Success(accumulatedResults.toList()))
-                    Log.d(TAG, "Emitted ${accumulatedResults.size} addon(s), latest: ${checkingResult.addonName} with ${checkingResult.streams.size} streams")
-
                     val checkedResult = localDebridAvailabilityService.annotateCachedAvailability(listOf(checkingResult)).firstOrNull() ?: checkingResult
-                    if (checkedResult != checkingResult) {
-                        mergePresentedResult(accumulatedResults, checkedResult)
-                        emit(NetworkResult.Success(accumulatedResults.toList()))
-                        Log.d(TAG, "Emitted debrid cache status for ${checkedResult.addonName} with ${checkedResult.streams.size} streams")
-                    }
+                    mergePresentedResult(accumulatedResults, checkedResult)
+                    emit(NetworkResult.Success(accumulatedResults.toList()))
+                    Log.d(TAG, "Emitted ${accumulatedResults.size} addon(s), latest: ${checkedResult.addonName} with ${checkedResult.streams.size} streams")
                 }
             }
 
