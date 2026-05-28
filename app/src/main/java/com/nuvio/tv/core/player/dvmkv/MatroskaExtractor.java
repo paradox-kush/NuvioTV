@@ -2854,6 +2854,20 @@ public class MatroskaExtractor implements Extractor {
             }
           }
         }
+      } else if (dolbyVisionSampleTransformer != null && codecs != null) {
+        String lower = codecs.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("dvhe.")
+            || lower.startsWith("dvh1.")
+            || lower.startsWith("dvav.")
+            || lower.startsWith("dva1.")) {
+          @Nullable
+          String transformedCodecs =
+              dolbyVisionSampleTransformer.onDolbyVisionCodecString(codecs, null);
+          if (transformedCodecs != null && !transformedCodecs.isEmpty()) {
+            codecs = transformedCodecs;
+            mimeType = MimeTypes.VIDEO_DOLBY_VISION;
+          }
+        }
       }
       if (DolbyVisionCompatibility.shouldMapDolbyVisionProfile7(mimeType, codecs)) {
         // NOTE: Vendored for app-level (AAR) DV7 use. The original called
