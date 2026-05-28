@@ -1937,7 +1937,10 @@ private suspend fun HomeViewModel.findNextUpEpisodeFromMetaSeed(
         }
         return null
     }
-    val nextVideo = resolveNextUpVideoFromMeta(progress, meta, showUnairedNextUp)
+    val nextVideo = resolveNextUpVideoFromMeta(progress, meta, showUnairedNextUp,
+        watchedEpisodes = if (layoutPreferenceDataStore.nextUpFromFurthestEpisode.first())
+            watchProgressRepository.getWatchedShowEpisodes()[progress.contentId]
+        else null)
     if (nextVideo == null) {
         debug?.recordNextUpResult(
             progress = progress,
@@ -2002,7 +2005,8 @@ private const val CW_NEXT_UP_NEW_SEASON_UNAIRED_WINDOW_DAYS = 7
 private fun resolveNextUpVideoFromMeta(
     progress: WatchProgress,
     meta: CwMetaSummary,
-    showUnairedNextUp: Boolean
+    showUnairedNextUp: Boolean,
+    watchedEpisodes: Set<Pair<Int, Int>>? = null
 ): CwVideoSummary? {
     val episodes = meta.videos
         .filter { video ->
@@ -2052,6 +2056,10 @@ private fun resolveNextUpVideoFromMeta(
     val todayLocal = LocalDate.now(ZoneId.systemDefault())
     val watchedEpisodeSeason = episodes[watchedIndex].season
     val nextVideo = episodes.drop(watchedIndex + 1).firstOrNull { video ->
+        // Skip episodes already marked as watched.
+        if (watchedEpisodes != null && video.season != null && video.episode != null) {
+            if ((video.season to video.episode) in watchedEpisodes) return@firstOrNull false
+        }
         val releaseDate = parseEpisodeReleaseDate(video.released)
         val isSeasonRollover = video.season != watchedEpisodeSeason
         if (isSeasonRollover) {
