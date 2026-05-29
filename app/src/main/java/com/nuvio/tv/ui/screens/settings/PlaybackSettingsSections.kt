@@ -135,6 +135,7 @@ internal fun PlaybackSettingsSections(
     onSetStreamAutoPlayPreferBingeGroupForNextEpisode: (Boolean) -> Unit,
     onSetStreamAutoPlayReuseBingeGroup: (Boolean) -> Unit,
     onSetAutoSwitchInternalPlayerOnError: (Boolean) -> Unit,
+    onSetExternalPlayerForwardSubtitles: (Boolean) -> Unit,
     onSetNextEpisodeThresholdPercent: (Float) -> Unit,
     onSetNextEpisodeThresholdMinutesBeforeEnd: (Float) -> Unit,
     onSetStreamAutoPlayTimeoutSeconds: (Int) -> Unit,
@@ -470,6 +471,19 @@ internal fun PlaybackSettingsSections(
                 )
             }
 
+            if (playerSettings.playerPreference != PlayerPreference.INTERNAL) {
+                item(key = "external_player_forward_subtitles") {
+                    ToggleSettingsItem(
+                        icon = Icons.Default.Info,
+                        title = stringResource(R.string.playback_external_forward_subtitles),
+                        subtitle = stringResource(R.string.playback_external_forward_subtitles_sub),
+                        isChecked = playerSettings.externalPlayerForwardSubtitles,
+                        onCheckedChange = onSetExternalPlayerForwardSubtitles,
+                        onFocused = { focusedSection = PlaybackSection.STREAM_SELECTION }
+                    )
+                }
+            }
+
             item(key = "stream_internal_player_engine") {
                 NavigationSettingsItem(
                     icon = Icons.Default.PlayArrow,
@@ -626,7 +640,8 @@ internal fun PlaybackSettingsSections(
                 onSetUseLibass = onSetUseLibass,
                 onSetLibassRenderType = onSetLibassRenderType,
                 onItemFocused = { focusedSection = PlaybackSection.SUBTITLES },
-                enabled = !generalUi.isExternalPlayer
+                enabled = !generalUi.isExternalPlayer,
+                languageSelectionEnabled = !generalUi.isExternalPlayer || playerSettings.externalPlayerForwardSubtitles
             )
         }
 

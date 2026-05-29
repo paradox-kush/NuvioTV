@@ -59,6 +59,7 @@ class PlayerViewModel @Inject constructor(
     private val trailerPlayerPool: com.nuvio.tv.core.player.TrailerPlayerPool,
     private val directDebridResolver: DirectDebridResolver,
     private val directDebridStreamPreparer: DirectDebridStreamPreparer,
+    private val externalPlaybackTracker: com.nuvio.tv.core.player.ExternalPlaybackTracker,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -161,5 +162,63 @@ class PlayerViewModel @Inject constructor(
         // Allow the trailer player to be re-created when returning to home screen.
         trailerPlayerPool.reclaim()
         super.onCleared()
+    }
+
+    /**
+     * Save watch progress returned by an external player after "Open in External Player".
+     * Uses the controller's current content metadata (contentId, season, episode, etc.)
+     * which are still available since the controller hasn't been cleared yet.
+     */
+    fun saveExternalPlayerProgress(positionMs: Long, durationMs: Long?) {
+        val effectiveDuration = durationMs ?: controller.playbackTimeline.value.duration
+        controller.saveWatchProgressInternal(
+            position = positionMs,
+            duration = effectiveDuration
+        )
+    }
+
+    /**
+     * Launch the current stream in an external player via the centralized tracker.
+     * The tracker handles progress saving independently of PlayerScreen lifecycle.
+     */
+    fun launchInExternalPlayer(activityContext: Context, resumePositionMs: Long) {
+        val url = controller.getCurrentStreamUrl()
+        val metadata = com.nuvio.tv.core.player.ExternalPlaybackMetadata(
+            contentId = controller.contentId ?: return,
+            contentType = controller.contentType ?: "movie",
+            contentName = controller.contentName ?: controller.title,
+            poster = controller.poster,
+            backdrop = controller.backdrop,
+            logo = controller.logo,
+            videoId = controller.currentVideoId ?: controller.contentId ?: return,
+            season = controller.currentSeason,
+            episode = controller.currentEpisode,
+            episodeTitle = controller.currentEpisodeTitle,
+            year = controller.year
+        )
+
+        // Pass already-loaded addon subtitles if forward setting is enabled
+        val subtitleInputs = if (controller.uiState.value.subtitleStyle.preferredLanguage.trim().lowercase() != "none") {
+            val addonSubtitles = controller.uiState.value.addonSubtitles
+            if (addonSubtitles.isNotEmpty()) {
+                addonSubtitles.map {
+                    com.nuvio.tv.core.player.SubtitleInput(
+                        url = it.url,
+                        name = "${it.getDisplayLanguage()} - ${it.addonName}",
+                        lang = it.lang
+                    )
+                }
+            } else null
+        } else null
+
+        externalPlaybackTracker.launchPlayer(
+            metadata = metadata,
+            url = url,
+            title = controller.contentName ?: controller.title,
+            headers = controller.getCurrentHeaders(),
+            resumePositionMs = resumePositionMs,
+            subtitles = subtitleInputs,
+            context = activityContext
+        )
     }
 }

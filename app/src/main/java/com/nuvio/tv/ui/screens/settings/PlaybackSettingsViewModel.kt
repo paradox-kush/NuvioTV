@@ -85,6 +85,10 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setAutoSwitchInternalPlayerOnError(enabled)
     }
 
+    suspend fun setExternalPlayerForwardSubtitles(enabled: Boolean) {
+        playerSettingsDataStore.setExternalPlayerForwardSubtitles(enabled)
+    }
+
     suspend fun setTrailerEnabled(enabled: Boolean) {
         trailerSettingsDataStore.setEnabled(enabled)
     }

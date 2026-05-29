@@ -103,6 +103,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
+import android.util.Log
 
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -128,6 +129,17 @@ fun StreamScreen(
     var pendingTorrentPlaybackInfo by remember { mutableStateOf<StreamPlaybackInfo?>(null) }
     val p2pEnabled by viewModel.p2pEnabled.collectAsStateWithLifecycle(initialValue = false)
     val scope = rememberCoroutineScope()
+
+    fun launchExternalPlayer(playbackInfo: StreamPlaybackInfo) {
+        val url = playbackInfo.url ?: return
+        scope.coroutineLaunch {
+            viewModel.launchExternalPlayer(
+                playbackInfo = playbackInfo,
+                url = url,
+                context = context
+            )
+        }
+    }
 
     fun openExternalInBrowser(playbackInfo: StreamPlaybackInfo): Boolean {
         if (!playbackInfo.isExternal) return false
@@ -161,13 +173,8 @@ fun StreamScreen(
                 onStreamSelected(playbackInfo)
             }
             PlayerPreference.EXTERNAL -> {
-                playbackInfo.url?.let { url ->
-                    ExternalPlayerLauncher.launch(
-                        context = context,
-                        url = url,
-                        title = playbackInfo.title,
-                        headers = playbackInfo.headers
-                    )
+                playbackInfo.url?.let {
+                    launchExternalPlayer(playbackInfo)
                 }
             }
             PlayerPreference.ASK_EVERY_TIME -> {
@@ -189,7 +196,33 @@ fun StreamScreen(
             return
         }
         if (uiState.isDirectAutoPlayFlow) {
-            onAutoPlayResolved(playbackInfo)
+            // Respect player preference even in direct autoplay flow
+            when (playerPreference) {
+                PlayerPreference.EXTERNAL -> {
+                    playbackInfo.url?.let { url ->
+                        scope.coroutineLaunch {
+                            viewModel.launchExternalPlayer(
+                                playbackInfo = playbackInfo,
+                                url = url,
+                                autoLaunch = true,
+                                context = context
+                            )
+                            // Delay pop so external player appears on top
+                            coroutineDelay(1000)
+                            viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                            onBackPress()
+                        }
+                    }
+                }
+                PlayerPreference.ASK_EVERY_TIME -> {
+                    pendingPlaybackInfo = playbackInfo
+                    showPlayerChoiceDialog = true
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                }
+                else -> {
+                    onAutoPlayResolved(playbackInfo)
+                }
+            }
             return
         } else {
             pendingRestoreOnResume = true
@@ -232,16 +265,47 @@ fun StreamScreen(
                 showP2pConsentDialog = true
                 return@LaunchedEffect
             }
-            onAutoPlayResolved(playbackInfo)
-            viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+            // Respect player preference for cached links too
+            when (playerPreference) {
+                PlayerPreference.EXTERNAL -> {
+                    playbackInfo.url?.let { url ->
+                        Log.d("StreamScreen", "autoPlayPlaybackInfo EXTERNAL: launching player, will pop after 800ms")
+                        viewModel.launchExternalPlayer(
+                            playbackInfo = playbackInfo,
+                            url = url,
+                            autoLaunch = true,
+                            context = context
+                        )
+                    }
+                    // Delay pop so external player appears on top, keep overlay visible
+                    coroutineDelay(1000)
+                    Log.d("StreamScreen", "autoPlayPlaybackInfo EXTERNAL: popping now")
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                    onBackPress()
+                }
+                PlayerPreference.ASK_EVERY_TIME -> {
+                    pendingPlaybackInfo = playbackInfo
+                    showPlayerChoiceDialog = true
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                }
+                else -> {
+                    onAutoPlayResolved(playbackInfo)
+                    viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
+                }
+            }
         }
     }
 
-    DisposableEffect(lifecycleOwner, pendingRestoreOnResume) {
+    DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && pendingRestoreOnResume) {
-                restoreFocusedStream = true
-                pendingRestoreOnResume = false
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Always dismiss overlay and stop tracking on resume
+                // covers both ActivityResult path and fire-and-forget path.
+                viewModel.stopExternalPlayerTracking()
+                if (pendingRestoreOnResume) {
+                    restoreFocusedStream = true
+                    pendingRestoreOnResume = false
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -259,7 +323,8 @@ fun StreamScreen(
             isLoading = uiState.isLoading
         )
 
-        if (uiState.showDirectAutoPlayOverlay) {
+        val showOverlay = uiState.showDirectAutoPlayOverlay || uiState.externalPlayerOverlayVisible
+        if (showOverlay) {
             LoadingOverlay(
                 visible = true,
                 backdropUrl = uiState.backdrop ?: uiState.poster,
@@ -316,8 +381,8 @@ fun StreamScreen(
                             val playbackInfo = viewModel.resolveStreamForPlayback(stream)
                             if (playbackInfo != null) {
                                 pendingRestoreOnResume = true
-                                viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
                                 routePlayback(playbackInfo)
+                                viewModel.onEvent(StreamScreenEvent.OnAutoPlayConsumed)
                             }
                         }
                     },
@@ -343,13 +408,8 @@ fun StreamScreen(
                 onExternalSelected = {
                     showPlayerChoiceDialog = false
                     pendingPlaybackInfo?.let { info ->
-                        info.url?.let { url ->
-                            ExternalPlayerLauncher.launch(
-                                context = context,
-                                url = url,
-                                title = info.title,
-                                headers = info.headers
-                            )
+                        info.url?.let {
+                            launchExternalPlayer(info)
                         }
                     }
                     pendingPlaybackInfo = null

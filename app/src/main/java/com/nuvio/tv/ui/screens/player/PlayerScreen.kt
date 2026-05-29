@@ -109,7 +109,6 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
-import com.nuvio.tv.core.player.ExternalPlayerLauncher
 import com.nuvio.tv.data.local.InternalPlayerEngine
 import com.nuvio.tv.data.local.LibassRenderType
 import com.nuvio.tv.data.local.SubtitleStyleSettings
@@ -140,6 +139,7 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val containerFocusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
     val progressBarFocusRequester = remember { FocusRequester() }
@@ -153,6 +153,7 @@ fun PlayerScreen(
     val nextEpisodeFocusRequester = remember { FocusRequester() }
     var subtitleDelayAutoSyncFocused by remember { mutableStateOf(false) }
     var subtitleTimingConsumeNextConfirmKeyUp by remember { mutableStateOf(false) }
+
     val exitPlayer: () -> Unit = {
         val timeline = viewModel.playbackTimeline.value
         viewModel.stopAndRelease()
@@ -930,15 +931,12 @@ fun PlayerScreen(
                     val headers = viewModel.getCurrentHeaders()
                     val timeline = viewModel.playbackTimeline.value
                     viewModel.stopAndRelease()
+                    // Launch via tracker - it handles progress saving independently
+                    viewModel.launchInExternalPlayer(context, timeline.currentPosition)
+                    // Exit PlayerScreen - tracker will save progress when external player returns
                     val completed = timeline.duration > 0L &&
                         (timeline.currentPosition.toFloat() / timeline.duration.toFloat()) >= WatchProgress.COMPLETED_THRESHOLD
                     onBackPress(uiState.currentVideoId, uiState.currentSeason, uiState.currentEpisode, uiState.streamAutoPlayMode != StreamAutoPlayMode.MANUAL, completed)
-                    ExternalPlayerLauncher.launch(
-                        context = context,
-                        url = url,
-                        title = title,
-                        headers = headers
-                    )
                 },
                 onShowStreamInfo = {
                     restoreStreamInfoFocus = true
