@@ -908,7 +908,11 @@ class StreamScreenViewModel @Inject constructor(
         updateUiStateIfChanged {
             it.copy(
                 showDirectAutoPlayOverlay = true,
-                directAutoPlayMessage = context.getString(R.string.debrid_resolving_stream),
+                directAutoPlayMessage = if (playerSettingsDataStore.playerSettings.first().showPlayerLoadingStatus) {
+                    context.getString(R.string.debrid_resolving_stream)
+                } else {
+                    null
+                },
                 playbackErrorMessage = null
             )
         }

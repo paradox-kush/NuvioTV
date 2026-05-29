@@ -1103,7 +1103,9 @@ private fun StreamCard(
                 Text(
                     text = streamName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = NuvioColors.TextPrimary
+                    color = NuvioColors.TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 streamDescription?.let { description ->
@@ -1111,15 +1113,19 @@ private fun StreamCard(
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NuvioTheme.extendedColors.textSecondary
+                            color = NuvioTheme.extendedColors.textSecondary,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                StreamBadgeChips(
-                    badges = stream.badges,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+                if (stream.badges.isNotEmpty()) {
+                    StreamBadgeChips(
+                        badges = stream.badges,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
 
             Column(

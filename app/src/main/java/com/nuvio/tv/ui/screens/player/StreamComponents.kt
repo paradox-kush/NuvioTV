@@ -70,6 +70,18 @@ internal fun StreamItem(
     onClick: () -> Unit,
     onUpKey: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val streamName = remember(stream) { stream.getDisplayName() }
+    val streamDescription = remember(stream) { stream.getDisplayDescription() }
+    val addonLogoModel = remember(context, stream.addonLogo) {
+        stream.addonLogo?.let { logo ->
+            ImageRequest.Builder(context)
+                .data(logo)
+                .crossfade(true)
+                .build()
+        }
+    }
+
     Card(
         onClick = onClick,
         modifier = Modifier
@@ -117,9 +129,11 @@ internal fun StreamItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = stream.getDisplayName(),
+                        text = streamName,
                         style = MaterialTheme.typography.titleMedium,
-                        color = NuvioColors.TextPrimary
+                        color = NuvioColors.TextPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     if (isCurrentStream) {
@@ -138,31 +152,32 @@ internal fun StreamItem(
                     }
                 }
 
-                stream.getDisplayDescription()?.let { description ->
-                    if (description != stream.getDisplayName()) {
+                streamDescription?.let { description ->
+                    if (description != streamName) {
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = NuvioTheme.extendedColors.textSecondary
+                            color = NuvioTheme.extendedColors.textSecondary,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                StreamBadgeChips(
-                    badges = stream.badges,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+                if (stream.badges.isNotEmpty()) {
+                    StreamBadgeChips(
+                        badges = stream.badges,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
 
             Column(
                 horizontalAlignment = Alignment.End
             ) {
-                if (stream.addonLogo != null) {
+                if (addonLogoModel != null) {
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(stream.addonLogo)
-                            .crossfade(true)
-                            .build(),
+                        model = addonLogoModel,
                         contentDescription = stream.addonName,
                         modifier = Modifier
                             .size(32.dp)
