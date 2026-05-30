@@ -27,7 +27,8 @@ import java.io.ByteArrayOutputStream
  */
 @UnstableApi
 internal class DolbyVisionMatroskaTransformer(
-    private val config: DolbyVisionConversionConfig
+    private val config: DolbyVisionConversionConfig,
+    private val stripRpuOnly: Boolean = false
 ) : MatroskaExtractor.DolbyVisionSampleTransformer {
 
     private var lastTransformedLength = 0
@@ -45,6 +46,7 @@ internal class DolbyVisionMatroskaTransformer(
         dolbyVisionConfigBytes: ByteArray?
     ): ByteArray? {
         if (blockAdditionalData == null) return null
+        if (stripRpuOnly) return ByteArray(0)
         val profile = resolveProfile(null, dolbyVisionConfigBytes)
         if (!config.shouldConvert(profile)) return null
         return convertRpuNal(blockAdditionalData, config.conversionMode(profile))
@@ -68,6 +70,7 @@ internal class DolbyVisionMatroskaTransformer(
         dolbyVisionConfigBytes: ByteArray?
     ): ByteArray? {
         val sample = sampleLengthDelimitedData ?: return null
+        if (stripRpuOnly) return null
         val profile = resolveProfile(null, dolbyVisionConfigBytes)
         if (!config.shouldConvert(profile)) return null
         // DV5 signal-only unless a mode is forced in Advanced; keep the profile-5 RPU.
@@ -103,6 +106,9 @@ internal class DolbyVisionMatroskaTransformer(
         codecs: String?,
         dolbyVisionConfigBytes: ByteArray?
     ): String? {
+        if (stripRpuOnly) {
+            return DvRpuStrippingTrackOutput.stripDvCodecString(codecs)
+        }
         val profile = resolveProfile(codecs, dolbyVisionConfigBytes)
         if (!config.shouldConvert(profile)) return null
         DolbyVisionConversionStats.recordSourceProfile(profile)

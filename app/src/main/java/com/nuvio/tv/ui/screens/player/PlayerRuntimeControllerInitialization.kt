@@ -623,24 +623,28 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             // The app-level factory performs DV7 conversion for the in-band-RPU containers
             // (MP4/fMP4/TS); MKV goes through the vendored extractor. Pass-through for non-DV.
+            val stripDvRpuEnabled = playerSettings.stripDvFromHdr10PlusFiles
+            if (stripDvRpuEnabled) {
+                Log.i(PlayerRuntimeController.TAG, "DV_RPU_STRIP: enabled — will remove DV RPU NALs to fix Fire TV DOVIWithHDR10Plus black screen host=${url.safeHost()}")
+            }
+
             val effectiveExtractorsFactory: ExtractorsFactory =
-                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback) {
+                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback || stripDvRpuEnabled) {
                     DolbyVisionExtractorsFactory(
                         delegate = extractorsFactory,
                         config = DolbyVisionConversionConfig(
-                            active = true,
+                            active = isExperimentalDv7ToDv81ActiveForCurrentPlayback,
                             forcedMode = when {
                                 libdoviModeOverrideActive -> libdoviModeOverride
                                 dv7Mode1Forced -> 1
                                 else -> -1
                             },
-                            // Manual-only; in AUTO the mode is auto-picked, so a stored value
-                            // must not override it.
                             preserveMapping = playerSettings.dv7ToDv81PreserveMappingEnabled &&
                                     manualDv81Selected,
                             dv5Enabled = playerSettings.dv5ToDv81Enabled,
                             manualDv81 = manualDv81Selected && !dv7Mode1Forced
-                        )
+                        ),
+                        stripDvRpu = stripDvRpuEnabled   // ADD THIS
                     )
                 } else {
                     extractorsFactory

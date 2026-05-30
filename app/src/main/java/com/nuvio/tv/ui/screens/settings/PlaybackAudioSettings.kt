@@ -75,6 +75,7 @@ internal fun LazyListScope.trailerAndAudioSettingsItems(
     onSetTunnelingEnabled: (Boolean) -> Unit,
     onSetDv5ToDv81Enabled: (Boolean) -> Unit,
     onSetDv7ToDv81PreserveMappingEnabled: (Boolean) -> Unit,
+    onSetStripDvFromHdr10PlusFiles: (Boolean) -> Unit,
     onItemFocused: () -> Unit = {},
     enabled: Boolean = true,
     videoExtraItems: (LazyListScope.() -> Unit)? = null
@@ -307,6 +308,18 @@ internal fun LazyListScope.trailerAndAudioSettingsItems(
                 onCheckedChange = onSetDv5ToDv81Enabled,
                 onFocused = onItemFocused,
                 enabled = enabled && playerSettings.dv7HandlingMode == Dv7HandlingMode.DV81_LIBDOVI
+            )
+        }
+
+        item(key = "strip_dv_from_hdr10plus") {
+            ToggleSettingsItem(
+                icon = Icons.Default.Tune,
+                title = stringResource(R.string.strip_dv_hdr10plus_title),
+                subtitle = stringResource(R.string.strip_dv_hdr10plus_sub),
+                isChecked = playerSettings.stripDvFromHdr10PlusFiles,
+                onCheckedChange = onSetStripDvFromHdr10PlusFiles,
+                onFocused = onItemFocused,
+                enabled = enabled
             )
         }
     }
