@@ -466,8 +466,8 @@
     <string name="playback_engine_mvplayer">Libmpv (bêta)</string>
     <string name="playback_auto_switch_internal_player_on_error">Changement auto du moteur en cas d’erreur au démarrage</string>
     <string name="playback_auto_switch_internal_player_on_error_sub">Si le démarrage du flux échoue, bascule automatiquement entre ExoPlayer et libmpv.</string>
-    <string name="playback_section_audio">Audio et bande-annonce</string>
-    <string name="playback_section_audio_desc">Comportement des bandes-annonces et contrôles audio.</string>
+    <string name="playback_section_audio">Audio et vidéo</string>
+    <string name="playback_section_audio_desc">Contrôles audio et compatibilité vidéo.</string>
     <string name="playback_section_subtitles">Sous-titres</string>
     <string name="playback_section_subtitles_desc">Langue, style et mode de rendu.</string>
     <string name="playback_afr_open">Ouvert</string>

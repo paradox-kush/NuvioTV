@@ -369,8 +369,8 @@
     <string name="playback_engine_mvplayer">Libmpv (Бета)</string>
     <string name="playback_auto_switch_internal_player_on_error">Авто-переключение движка при ошибке запуска</string>
     <string name="playback_auto_switch_internal_player_on_error_sub">Если запуск потока не удался, автоматически переключаться между ExoPlayer и libmpv.</string>
-    <string name="playback_section_audio">Аудио и Трейлер</string>
-    <string name="playback_section_audio_desc">Поведение трейлеров и настройки аудио.</string>
+    <string name="playback_section_audio">Аудио и видео</string>
+    <string name="playback_section_audio_desc">Настройки аудио и совместимость видео.</string>
     <string name="playback_section_subtitles">Субтитры</string>
     <string name="playback_section_subtitles_desc">Язык, стиль и режим рендеринга.</string>
     <string name="playback_afr_open">Открыть</string>
