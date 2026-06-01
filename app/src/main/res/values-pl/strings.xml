@@ -2525,4 +2525,35 @@
     <string name="update_error_apk_missing">Pobrany plik nie istnieje</string>
     <string name="update_error_check_failed">Sprawdzanie aktualizacji nie powiodło się</string>
     <string name="update_error_download_failed">Pobieranie nie powiodło się</string>
+
+    <!-- Streams / Layout -->
+    <string name="layout_section_streams">Źródła</string>
+    <string name="layout_section_streams_desc">Ustawienia wyświetlania wyników źródeł i paneli odtwarzacza.</string>
+
+    <!-- Stream badges / Fusion -->
+    <string name="settings_stream_badges_section">Styl Fusion</string>
+    <string name="settings_stream_size_badges_title">Znaczniki rozmiaru</string>
+    <string name="settings_stream_size_badges_description">Pokazuj znaczniki rozmiaru pliku w wynikach źródeł i panelach odtwarzacza.</string>
+    <string name="settings_stream_badge_urls_title">Adresy URL znaczników Fusion</string>
+    <string name="settings_stream_badge_urls_description">Importuj do %1$d adresów URL ze znacznikami Fusion w formacie JSON. Każdy URL można osobno edytować lub usunąć.</string>
+    <string name="settings_stream_badge_urls_search_description">Zarządzaj zaimportowanymi adresami URL znaczników Fusion.</string>
+    <string name="settings_fusion_badges_summary">%1$d/%2$d URL-i, %3$d aktywnych znaczników Fusion</string>
+    <string name="settings_fusion_badges_empty">Brak zaimportowanych adresów URL znaczników Fusion.</string>
+    <string name="settings_fusion_badge_url_label">URL JSON znaczników Fusion</string>
+    <string name="settings_fusion_badge_urls_imported">%1$d/%2$d URL-i Fusion zaimportowanych</string>
+    <string name="settings_fusion_badge_url_active">Aktywny</string>
+    <string name="settings_fusion_badge_url_inactive">Nieaktywny</string>
+    <string name="settings_fusion_badge_url_status_summary">%1$s, %2$d włączonych znaczników, %3$d grup</string>
+    <string name="settings_fusion_badge_preview_action">Podgląd</string>
+    <string name="settings_fusion_badge_preview_title">Podgląd znaczników Fusion</string>
+    <string name="settings_fusion_badge_preview_count">%1$d znaczników Fusion z tego URL</string>
+    <string name="settings_fusion_badge_preview_empty">Brak obrazów znaczników Fusion w tym URL.</string>
+    <string name="settings_fusion_badge_group_title">Grupa %1$d</string>
+    <string name="settings_fusion_badge_other_group_title">Inne znaczniki Fusion</string>
+    <string name="stream_badge_qr_instruction">Zeskanuj ten kod QR telefonem, aby zarządzać adresami URL znaczników Fusion.</string>
+    <string name="streams_size">ROZMIAR %1$s</string>
+
+    <!-- Actions -->
+    <string name="action_import">Importuj</string>
+    <string name="action_delete">Usuń</string>
 </resources>
