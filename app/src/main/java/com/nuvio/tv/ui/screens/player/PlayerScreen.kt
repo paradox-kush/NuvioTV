@@ -1433,6 +1433,7 @@ private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSe
     }
     setTag(R.id.player_view_subtitle_style_tag, subtitleStyle)
     subtitleView?.apply {
+        setViewType(androidx.media3.ui.SubtitleView.VIEW_TYPE_WEB)
         val baseFontSize = 24f
         val scaledFontSize = baseFontSize * (subtitleStyle.size / 100f)
         setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, scaledFontSize)
