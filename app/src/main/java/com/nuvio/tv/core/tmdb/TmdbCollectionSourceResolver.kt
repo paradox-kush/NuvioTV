@@ -194,6 +194,7 @@ class TmdbCollectionSourceResolver @Inject constructor(
                     releaseInfo = it.releaseDate?.take(4),
                     released = it.releaseDate?.takeIf { value -> value.isNotBlank() },
                     imdbRating = it.voteAverage?.toFloat(),
+                    voteCount = it.voteCount,
                     genres = emptyList()
                 )
             }
@@ -362,6 +363,7 @@ class TmdbCollectionSourceResolver @Inject constructor(
             releaseInfo = (releaseDate ?: firstAirDate)?.take(4),
             released = (releaseDate ?: firstAirDate)?.takeIf { it.isNotBlank() },
             imdbRating = voteAverage?.toFloat(),
+            voteCount = voteCount,
             genres = emptyList()
         )
     }
@@ -393,6 +395,7 @@ class TmdbCollectionSourceResolver @Inject constructor(
                 TmdbCollectionMediaType.TV -> firstAirDate?.takeIf { it.isNotBlank() }
             },
             imdbRating = voteAverage?.toFloat(),
+            voteCount = voteCount,
             genres = emptyList()
         )
     }
