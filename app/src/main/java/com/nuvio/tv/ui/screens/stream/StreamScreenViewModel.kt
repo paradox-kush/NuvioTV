@@ -323,7 +323,7 @@ class StreamScreenViewModel @Inject constructor(
                                 url = cached.url.takeIf { u -> u.isNotBlank() },
                                 title = title,
                                 streamName = cached.streamName,
-                                year = year,
+                                year = cached.year ?: year,
                                 isExternal = false,
                                 isTorrent = isCachedTorrent,
                                 infoHash = cached.infoHash,
@@ -1050,7 +1050,8 @@ class StreamScreenViewModel @Inject constructor(
                             videoHash = resolved.videoHash,
                             videoSize = resolved.videoSize,
                             bingeGroup = resolved.bingeGroup,
-                            contentLanguage = contentLanguage
+                            contentLanguage = contentLanguage,
+                            year = year
                         )
                     }
                 }
@@ -1185,7 +1186,8 @@ class StreamScreenViewModel @Inject constructor(
                     videoHash = playbackInfo.videoHash,
                     videoSize = playbackInfo.videoSize,
                     bingeGroup = playbackInfo.bingeGroup,
-                    contentLanguage = contentLanguage
+                    contentLanguage = contentLanguage,
+                    year = year
                 )
             }
         }

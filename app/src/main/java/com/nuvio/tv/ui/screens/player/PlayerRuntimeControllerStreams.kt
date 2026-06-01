@@ -477,7 +477,8 @@ private fun PlayerRuntimeController.persistSelectedStreamForReuse(
             videoHash = currentVideoHash,
             videoSize = currentVideoSize,
             bingeGroup = stream.behaviorHints?.bingeGroup,
-            contentLanguage = contentLanguage
+            contentLanguage = contentLanguage,
+            year = year
         )
     }
 }
@@ -503,7 +504,8 @@ private fun PlayerRuntimeController.persistTorrentStreamForReuse(stream: Stream)
             fileIdx = stream.fileIdx,
             sources = stream.sources,
             bingeGroup = stream.behaviorHints?.bingeGroup,
-            contentLanguage = contentLanguage
+            contentLanguage = contentLanguage,
+            year = year
         )
     }
 }

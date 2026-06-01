@@ -23,7 +23,8 @@ data class CachedStreamLink(
     val fileIdx: Int? = null,
     val sources: List<String>? = null,
     val bingeGroup: String? = null,
-    val contentLanguage: String? = null
+    val contentLanguage: String? = null,
+    val year: String? = null
 )
 
 @Singleton
@@ -50,7 +51,8 @@ class StreamLinkCacheDataStore @Inject constructor(
         fileIdx: Int? = null,
         sources: List<String>? = null,
         bingeGroup: String? = null,
-        contentLanguage: String? = null
+        contentLanguage: String? = null,
+        year: String? = null
     ) {
         val payload = JSONObject().apply {
             put("url", url)
@@ -65,6 +67,7 @@ class StreamLinkCacheDataStore @Inject constructor(
             sources?.let { put("sources", JSONArray(it)) }
             bingeGroup?.let { put("bingeGroup", it) }
             contentLanguage?.let { put("contentLanguage", it) }
+            year?.let { put("year", it) }
         }.toString()
 
         store().edit { prefs ->
@@ -117,7 +120,8 @@ class StreamLinkCacheDataStore @Inject constructor(
                 fileIdx = if (json.has("fileIdx")) json.optInt("fileIdx", -1).takeIf { it >= 0 } else null,
                 sources = sources,
                 bingeGroup = json.optString("bingeGroup", "").ifBlank { null },
-                contentLanguage = json.optString("contentLanguage", "").ifBlank { null }
+                contentLanguage = json.optString("contentLanguage", "").ifBlank { null },
+                year = json.optString("year", "").ifBlank { null }
             )
         }.getOrNull()
 

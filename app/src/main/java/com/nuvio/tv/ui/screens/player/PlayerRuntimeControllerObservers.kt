@@ -72,7 +72,8 @@ internal suspend fun PlayerRuntimeController.fetchAddonSubtitlesNow(
                         fileIdx = currentFileIdx,
                         sources = currentTorrentSources,
                         bingeGroup = currentStreamBingeGroup,
-                        contentLanguage = contentLanguage
+                        contentLanguage = contentLanguage,
+                        year = year
                     )
                 } else if (currentStreamUrl.isNotBlank()) {
                     streamLinkCacheDataStore.save(
@@ -84,7 +85,8 @@ internal suspend fun PlayerRuntimeController.fetchAddonSubtitlesNow(
                         videoHash = currentVideoHash,
                         videoSize = currentVideoSize,
                         bingeGroup = currentStreamBingeGroup,
-                        contentLanguage = contentLanguage
+                        contentLanguage = contentLanguage,
+                        year = year
                     )
                 }
             }
