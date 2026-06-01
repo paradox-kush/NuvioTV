@@ -323,7 +323,7 @@ class StreamScreenViewModel @Inject constructor(
                                 url = cached.url.takeIf { u -> u.isNotBlank() },
                                 title = title,
                                 streamName = cached.streamName,
-                                year = year,
+                                year = cached.year ?: year,
                                 isExternal = false,
                                 isTorrent = isCachedTorrent,
                                 infoHash = cached.infoHash,
@@ -345,7 +345,7 @@ class StreamScreenViewModel @Inject constructor(
                                 videoSize = cached.videoSize,
                                 fileIdx = cached.fileIdx,
                                 sources = cached.sources,
-                                contentLanguage = contentLanguage
+                                contentLanguage = cached.contentLanguage ?: contentLanguage
                             ),
                             showDirectAutoPlayOverlay = showOverlay || it.showDirectAutoPlayOverlay,
                             isDirectAutoPlayFlow = showOverlay || it.isDirectAutoPlayFlow
@@ -1049,7 +1049,9 @@ class StreamScreenViewModel @Inject constructor(
                             filename = resolved.filename,
                             videoHash = resolved.videoHash,
                             videoSize = resolved.videoSize,
-                            bingeGroup = resolved.bingeGroup
+                            bingeGroup = resolved.bingeGroup,
+                            contentLanguage = contentLanguage,
+                            year = year
                         )
                     }
                 }
@@ -1183,7 +1185,9 @@ class StreamScreenViewModel @Inject constructor(
                     filename = playbackInfo.filename,
                     videoHash = playbackInfo.videoHash,
                     videoSize = playbackInfo.videoSize,
-                    bingeGroup = playbackInfo.bingeGroup
+                    bingeGroup = playbackInfo.bingeGroup,
+                    contentLanguage = contentLanguage,
+                    year = year
                 )
             }
         }
