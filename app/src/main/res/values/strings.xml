@@ -2562,6 +2562,10 @@
     <!-- Subtitle selection: unknown language fallback -->
     <string name="subtitle_language_unknown">Unknown</string>
 
+    <!-- External playback keep-alive notification -->
+    <string name="external_playback_channel_description">Keeps app alive during external player playback</string>
+    <string name="external_playback_notification_text">Playing in external player</string>
+
     <!-- Playback — Buffer & Network settings -->
     <string name="playback_section_buffer_network">Buffer &amp; Network</string>
     <string name="playback_section_buffer_network_desc">How much content to keep in memory and how to fetch streams.</string>
