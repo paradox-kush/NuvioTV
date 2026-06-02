@@ -264,6 +264,7 @@ android {
 
     packaging {
         jniLibs {
+            useLegacyPackaging = true
             // Keep one consistent native set across dependencies.
             pickFirsts += listOf(
                 "lib/*/libc++_shared.so",
