@@ -545,14 +545,6 @@ internal fun PlayerRuntimeController.initializePlayer(
                         )
                     )
                 }
-                if (playerSettings.stripDvFromHdr10Files &&
-                    effectiveDv7Mode != Dv7HandlingMode.DV81_LIBDOVI) {
-                    setParameters(
-                        buildUponParameters()
-                            .setTunnelingEnabled(false)
-                            .setConstrainAudioChannelCountToDeviceCapabilities(true)
-                    )
-                }
             }
 
             // ── Extractors & DV Hook ──
