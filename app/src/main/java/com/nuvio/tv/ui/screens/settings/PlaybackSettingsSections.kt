@@ -160,7 +160,7 @@ internal fun PlaybackSettingsSections(
     onShowDv7HandlingModeDialog: () -> Unit,
     onSetDv5ToDv81Enabled: (Boolean) -> Unit,
     onSetDv7ToDv81PreserveMappingEnabled: (Boolean) -> Unit,
-    onSetStripDvFromHdr10PlusFiles: (Boolean) -> Unit,
+    onSetStripDvFromHdr10Files: (Boolean) -> Unit,
     onSetSubtitleSize: (Int) -> Unit,
     onSetSubtitleVerticalOffset: (Int) -> Unit,
     onSetSubtitleBold: (Boolean) -> Unit,
@@ -561,7 +561,7 @@ internal fun PlaybackSettingsSections(
                 onSetTunnelingEnabled = onSetTunnelingEnabled,
                 onSetDv5ToDv81Enabled = onSetDv5ToDv81Enabled,
                 onSetDv7ToDv81PreserveMappingEnabled = onSetDv7ToDv81PreserveMappingEnabled,
-                onSetStripDvFromHdr10PlusFiles = onSetStripDvFromHdr10PlusFiles,
+                onSetStripDvFromHdr10Files = onSetStripDvFromHdr10Files,
                 onItemFocused = { focusedSection = PlaybackSection.AUDIO_TRAILER },
                 enabled = !generalUi.isExternalPlayer,
                 videoExtraItems = {

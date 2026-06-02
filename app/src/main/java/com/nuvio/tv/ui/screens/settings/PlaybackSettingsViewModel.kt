@@ -189,8 +189,8 @@ class PlaybackSettingsViewModel @Inject constructor(
         playerSettingsDataStore.setDv7ToDv81PreserveMappingEnabled(enabled)
     }
 
-    suspend fun setStripDvFromHdr10PlusFiles(enabled: Boolean) {
-        playerSettingsDataStore.setStripDvFromHdr10PlusFiles(enabled)
+    suspend fun setStripDvFromHdr10Files(enabled: Boolean) {
+        playerSettingsDataStore.setStripDvFromHdr10Files(enabled)
     }
 
     suspend fun setDv7HandlingMode(mode: Dv7HandlingMode) {

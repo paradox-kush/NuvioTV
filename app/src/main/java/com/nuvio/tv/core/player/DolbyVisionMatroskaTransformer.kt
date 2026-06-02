@@ -72,14 +72,18 @@ internal class DolbyVisionMatroskaTransformer(
         dolbyVisionConfigBytes: ByteArray?
     ): ByteArray? {
         val sample = sampleLengthDelimitedData ?: return null
+        val profile = resolveProfile(null, dolbyVisionConfigBytes)
         if (stripRpuOnly) {
+            if (profile == 5) {
+                return null
+            }
             val stripped = HevcDvRpuStripper.stripRpuLengthDelimited(
                 sample, sampleLength, nalUnitLengthFieldLength
             ) ?: return null
             lastTransformedLength = stripped.size
             return stripped
         }
-        val profile = resolveProfile(null, dolbyVisionConfigBytes)
+
         if (!config.shouldConvert(profile)) return null
         // DV5 signal-only unless a mode is forced in Advanced; keep the profile-5 RPU.
         if (profile == 5 && !config.convertDv5Rpu) return null

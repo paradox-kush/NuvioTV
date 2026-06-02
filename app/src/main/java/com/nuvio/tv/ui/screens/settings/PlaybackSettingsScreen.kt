@@ -296,9 +296,9 @@ fun PlaybackSettingsContent(
                         viewModel.setDv7ToDv81PreserveMappingEnabled(enabled)
                     }
                 },
-                onSetStripDvFromHdr10PlusFiles = { enabled ->
+                onSetStripDvFromHdr10Files = { enabled ->
                     coroutineScope.launch {
-                        viewModel.setStripDvFromHdr10PlusFiles(enabled)
+                        viewModel.setStripDvFromHdr10Files(enabled)
                     }
                 },
                 onSetBufferEngineEnabled = { enabled ->
