@@ -1470,7 +1470,11 @@ private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSe
 
         post {
             val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt().coerceAtLeast(0)
-            setPadding(paddingLeft, paddingTop, paddingRight, extraPadding)
+            setPadding(0, 0, 0, extraPadding)
+            findWebView()?.let { wv ->
+                wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                wv.layoutDirection = android.view.View.LAYOUT_DIRECTION_LTR
+            }
         }
     }
 }
@@ -2833,4 +2837,19 @@ private fun PlayerBufferingIndicator(
             LoadingIndicator()
         }
     }
+}
+
+private fun View.findWebView(): android.webkit.WebView? {
+    if (this is android.webkit.WebView) {
+        return this
+    }
+    if (this is android.view.ViewGroup) {
+        for (i in 0 until childCount) {
+            val webView = getChildAt(i).findWebView()
+            if (webView != null) {
+                return webView
+            }
+        }
+    }
+    return null
 }
