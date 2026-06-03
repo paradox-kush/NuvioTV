@@ -37,7 +37,9 @@ import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
@@ -78,6 +80,8 @@ private const val MPV_AFR_SETTLE_DELAY_MS = 2_000L
 private const val AUDIO_DELAY_REFRESH_DEBOUNCE_MS = 120L
 private const val PLAYER_RELEASE_TIMEOUT_MS = 3000L
 private const val PLAYER_REBUILD_SETTLE_DELAY_MS = 120L
+private const val ADAPTIVE_QUALITY_INCREASE_MIN_DURATION_MS = 2_000
+private const val ADAPTIVE_INITIAL_BITRATE_ESTIMATE_BPS = 25_000_000L
 
 internal data class StartupSubtitlePreparation(
     val fetchedSubtitles: List<Subtitle>,
@@ -498,7 +502,13 @@ internal fun PlayerRuntimeController.initializePlayer(
             }
 
             // ── Track Selector Setup ──
-            trackSelector = DefaultTrackSelector(context).apply {
+            val adaptiveTrackSelectionFactory = AdaptiveTrackSelection.Factory(
+                ADAPTIVE_QUALITY_INCREASE_MIN_DURATION_MS,
+                AdaptiveTrackSelection.DEFAULT_MAX_DURATION_FOR_QUALITY_DECREASE_MS,
+                AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
+                AdaptiveTrackSelection.DEFAULT_BANDWIDTH_FRACTION
+            )
+            trackSelector = DefaultTrackSelector(context, adaptiveTrackSelectionFactory).apply {
                 setParameters(buildUponParameters().setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true))
                 if (playerSettings.tunnelingEnabled && !safeAudioModeEnabled) {
                     setParameters(buildUponParameters().setTunnelingEnabled(true))
@@ -646,6 +656,10 @@ internal fun PlayerRuntimeController.initializePlayer(
                     extractorsFactory
                 }
 
+            val bandwidthMeter = DefaultBandwidthMeter.Builder(context)
+                .setInitialBitrateEstimate(ADAPTIVE_INITIAL_BITRATE_ESTIMATE_BPS)
+                .build()
+
             if (showLoadingStatus) _uiState.update { it.copy(loadingMessage = context.getString(R.string.player_loading_building)) }
             // ── Build ExoPlayer ──
             val buildDefaultPlayer = {
@@ -661,6 +675,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 )
                 val playerDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, headers)
                 ExoPlayer.Builder(context)
+                    .setBandwidthMeter(bandwidthMeter)
                     .setTrackSelector(trackSelector!!)
                     .setMediaSourceFactory(DefaultMediaSourceFactory(playerDataSourceFactory, effectiveExtractorsFactory))
                     .setRenderersFactory(renderersFactory)
@@ -676,6 +691,7 @@ internal fun PlayerRuntimeController.initializePlayer(
             _exoPlayer = if (useLibass) {
                 val playerDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, headers)
                 ExoPlayer.Builder(context)
+                    .setBandwidthMeter(bandwidthMeter)
                     .setLoadControl(loadControl)
                     .setTrackSelector(trackSelector!!)
                     .setMediaSourceFactory(DefaultMediaSourceFactory(playerDataSourceFactory, effectiveExtractorsFactory))
@@ -837,6 +853,9 @@ internal fun PlayerRuntimeController.initializePlayer(
                                     // Tunneled mode — onRenderedFirstFrame() won't
                                     // fire; treat STATE_READY as the sync point.
                                     hasRenderedFirstFrame = true
+                                    if (_uiState.value.postPlayDismissedForCurrentEpisode) {
+                                        _uiState.update { it.copy(postPlayDismissedForCurrentEpisode = false) }
+                                    }
                                     if (!startPaused && !userPausedManually) {
                                         playWhenReady = true
                                         play()
@@ -923,6 +942,9 @@ internal fun PlayerRuntimeController.initializePlayer(
                     override fun onRenderedFirstFrame() {
                         val isFirstFrame = !hasRenderedFirstFrame  // capture BEFORE flipping
                         hasRenderedFirstFrame = true
+                        if (isFirstFrame && _uiState.value.postPlayDismissedForCurrentEpisode) {
+                            _uiState.update { it.copy(postPlayDismissedForCurrentEpisode = false) }
+                        }
                         updateAudioControlAvailability()
                         // Start playback now that the first video frame is
                         // visible: audio and video begin in sync.
@@ -1052,6 +1074,22 @@ internal fun PlayerRuntimeController.initializePlayer(
                             append(" [${error.errorCode}]")
                         }
                         cancelStableProgressReset()
+
+                        // If the codec crashed while the app is in the background (e.g. another
+                        // app reclaimed the hardware decoder), don't run the retry chain. Each
+                        // retry just re-acquires a decoder the foreground app immediately reclaims
+                        // again, burning the retry budget and landing on an unrecoverable
+                        // ERROR_CODE_DECODING_FAILED by the time the user returns. Save the
+                        // position, free the decoder, and rebuild paused on resume instead.
+                        if (isInBackground && isRetryablePlaybackError(error)) {
+                            backgroundCrashSavedPositionMs = currentPosition.takeIf { it > 0L } ?: 0L
+                            pendingBackgroundCrashRecovery = true
+                            errorRetryJob?.cancel()
+                            errorRetryJob = scope.launch {
+                                releasePlayer(flushPlaybackState = false)
+                            }
+                            return
+                        }
 
                         // Error handlers: DV codec failures, audio decoder issues, codec state errors.
                         if (error.isDolbyVisionDecoderFailure() && !isMapDv7ToHevcActiveForCurrentPlayback) {
