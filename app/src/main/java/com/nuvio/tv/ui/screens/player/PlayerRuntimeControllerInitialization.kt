@@ -304,6 +304,7 @@ internal fun PlayerRuntimeController.initializePlayer(
             } else {
                 val reason = when (effectiveDv7Mode) {
                     Dv7HandlingMode.HDR10_BASE_LAYER -> "hdr10-base-layer-mode"
+                    Dv7HandlingMode.STRIP_DV -> "strip-dv-mode"
                     Dv7HandlingMode.OFF -> "dv7-mode-off"
                     Dv7HandlingMode.AUTO -> "auto-mode-no-dv81"  // unreachable; AUTO is collapsed above
                     Dv7HandlingMode.DV81_LIBDOVI -> "setting-disabled"  // unreachable
@@ -633,24 +634,28 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             // The app-level factory performs DV7 conversion for the in-band-RPU containers
             // (MP4/fMP4/TS); MKV goes through the vendored extractor. Pass-through for non-DV.
+            val stripDvRpuEnabled = playerSettings.dv7HandlingMode == Dv7HandlingMode.STRIP_DV
+            if (stripDvRpuEnabled) {
+                Log.i(PlayerRuntimeController.TAG, "DV_RPU_STRIP: enabled — will remove DV RPU NALs")
+            }
+
             val effectiveExtractorsFactory: ExtractorsFactory =
-                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback) {
+                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback || stripDvRpuEnabled) {
                     DolbyVisionExtractorsFactory(
                         delegate = extractorsFactory,
                         config = DolbyVisionConversionConfig(
-                            active = true,
+                            active = isExperimentalDv7ToDv81ActiveForCurrentPlayback,
                             forcedMode = when {
                                 libdoviModeOverrideActive -> libdoviModeOverride
                                 dv7Mode1Forced -> 1
                                 else -> -1
                             },
-                            // Manual-only; in AUTO the mode is auto-picked, so a stored value
-                            // must not override it.
                             preserveMapping = playerSettings.dv7ToDv81PreserveMappingEnabled &&
                                     manualDv81Selected,
                             dv5Enabled = playerSettings.dv5ToDv81Enabled,
                             manualDv81 = manualDv81Selected && !dv7Mode1Forced
-                        )
+                        ),
+                        stripDvRpu = stripDvRpuEnabled
                     )
                 } else {
                     extractorsFactory
@@ -670,7 +675,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 // conversion never runs. (The libass path wires it via buildWithAssSupportCompat.)
                 mediaSourceFactory.configureSubtitleParsing(
                     extractorsFactory =
-                        if (isExperimentalDv7ToDv81ActiveForCurrentPlayback) effectiveExtractorsFactory else null,
+                        if (isExperimentalDv7ToDv81ActiveForCurrentPlayback || stripDvRpuEnabled) effectiveExtractorsFactory else null,
                     subtitleParserFactory = null
                 )
                 val playerDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, headers)
@@ -1823,8 +1828,10 @@ private fun friendlyVideoHdrType(
         else -> null
     }
     return when {
-        // Stripped to the HDR10 base layer: output is HDR10/SDR, never Dolby Vision.
+        // Ignore DV data: output is HDR10/SDR, never Dolby Vision.
         effectiveModeName == "HDR10_BASE_LAYER" -> fromTransfer() ?: "HDR10"
+        // DV RPU stripped: output is HDR10 base layer, never Dolby Vision.
+        effectiveModeName == "STRIP_DV" -> fromTransfer() ?: "Strip DV"
         // DV8.1 conversion, but only label it DV if a conversion actually ran. AUTO arms
         // this mode for every file on a DV display, so plain SDR/HDR10 lands here too.
         effectiveModeName == "DV81_LIBDOVI" && dvConversionOccurred -> "Dolby Vision"
