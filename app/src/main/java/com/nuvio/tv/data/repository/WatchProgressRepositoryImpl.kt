@@ -307,7 +307,28 @@ class WatchProgressRepositoryImpl @Inject constructor(
         get() = useTraktProgressFlow()
             .flatMapLatest { useTraktProgress ->
                 if (useTraktProgress) {
-                    traktAllProgressFlow()
+                    // Merge Trakt remote progress with local-only entries that use
+                    // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
+                    // Trakt will never return these IDs, so they must come from local storage.
+                    combine(
+                        traktAllProgressFlow(),
+                        watchProgressPreferences.allProgress
+                    ) { traktItems, localItems ->
+                        val localNonTraktItems = localItems.filter { !isTraktCompatibleId(it.contentId) }
+                        if (localNonTraktItems.isEmpty()) {
+                            traktItems
+                        } else {
+                            val traktKeys = traktItems.map { progressKey(it) }.toSet()
+                            val merged = traktItems.toMutableList()
+                            localNonTraktItems.forEach { localItem ->
+                                val key = progressKey(localItem)
+                                if (key !in traktKeys) {
+                                    merged.add(localItem)
+                                }
+                            }
+                            merged.sortedByDescending { it.lastWatched }
+                        }
+                    }
                 } else {
                     watchProgressPreferences.allProgress
                         .onEach { items ->
