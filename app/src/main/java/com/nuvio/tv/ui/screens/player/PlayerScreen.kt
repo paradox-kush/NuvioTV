@@ -1472,7 +1472,7 @@ private fun PlayerView.applySubtitleStyleIfNeeded(subtitleStyle: SubtitleStyleSe
             val extraPadding = (height * (subtitleStyle.verticalOffset / 400f)).toInt().coerceAtLeast(0)
             setPadding(0, 0, 0, extraPadding)
             findWebView()?.let { wv ->
-                wv.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                wv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                 wv.layoutDirection = android.view.View.LAYOUT_DIRECTION_LTR
             }
         }
