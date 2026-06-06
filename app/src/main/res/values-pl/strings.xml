@@ -2639,4 +2639,6 @@
     <string name="web_stream_badge_imported">Zaimportowano URL badge\'a.</string>
     <string name="web_stream_badge_importing">Importowanie…</string>
     <string name="web_stream_badge_load_error">Nie udało się załadować ustawień badge\'a strumieni</string>
+    <!-- External auto next -->
+    <string name="external_auto_next_loading">Ładowanie następnego odcinka…</string>
 </resources>
