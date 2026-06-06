@@ -84,6 +84,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.nuvio.tv.core.player.ExternalPlayerLauncher
+import com.nuvio.tv.core.streams.StreamBadgePlacement
 import com.nuvio.tv.core.streams.StreamBadgeSettings
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.domain.model.Stream
@@ -391,6 +392,7 @@ fun StreamScreen(
                     sourceChips = uiState.sourceChips,
                     selectedAddonFilter = uiState.selectedAddonFilter,
                     showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                    badgePlacement = streamBadgeSettings.badgePlacement,
                     onAddonFilterSelected = { viewModel.onEvent(StreamScreenEvent.OnAddonFilterSelected(it)) },
                     onStreamSelected = { stream ->
                         val currentIndex = uiState.filteredStreams.indexOfFirst {
@@ -658,6 +660,7 @@ private fun RightStreamSection(
     sourceChips: List<SourceChipItem>,
     selectedAddonFilter: String?,
     showFileSizeBadges: Boolean,
+    badgePlacement: StreamBadgePlacement,
     onAddonFilterSelected: (String?) -> Unit,
     onStreamSelected: (Stream) -> Unit,
     focusedStreamIndex: Int,
@@ -772,6 +775,7 @@ private fun RightStreamSection(
                             availableAddons = availableAddons,
                             selectedAddonFilter = selectedAddonFilter,
                             showFileSizeBadges = showFileSizeBadges,
+                            badgePlacement = badgePlacement,
                             onAddonFilterSelected = { onAddonFilterSelectedGuarded(it) },
                             chipFocusRequesters = chipFocusRequesters,
                             orderedAddonNames = orderedAddonNames,
@@ -981,6 +985,7 @@ private fun StreamsList(
     availableAddons: List<String> = emptyList(),
     selectedAddonFilter: String? = null,
     showFileSizeBadges: Boolean = true,
+    badgePlacement: StreamBadgePlacement = StreamBadgePlacement.BOTTOM,
     onAddonFilterSelected: (String?) -> Unit = {},
     chipFocusRequesters: List<FocusRequester> = emptyList(),
     orderedAddonNames: List<String> = emptyList(),
@@ -1063,6 +1068,7 @@ private fun StreamsList(
                 StreamCard(
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
+                    badgePlacement = badgePlacement,
                     onClick = { onStreamSelected(stream) },
                     focusRequester = when {
                         shouldRestoreFocusedStream && index == focusedStreamIndex.coerceIn(0, (streams.lastIndex).coerceAtLeast(0)) -> restoreFocusRequester
@@ -1087,6 +1093,7 @@ private fun StreamsList(
 private fun StreamCard(
     stream: Stream,
     showFileSizeBadges: Boolean,
+    badgePlacement: StreamBadgePlacement,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
     onUpKey: (() -> Unit)? = null
@@ -1095,6 +1102,7 @@ private fun StreamCard(
     val density = LocalDensity.current
     val streamName = remember(stream) { stream.getDisplayName() }
     val streamDescription = remember(stream) { stream.getDisplayDescription() }
+    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)
     // Pre-upscale: decode at 2× target pixels so the hardware compositor
     // has enough pixel data for smooth edges inside Card RenderNodes.
     val logoDecodeSize = remember(density) {
@@ -1139,6 +1147,15 @@ private fun StreamCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
+                    StreamBadgeChips(
+                        badges = stream.badges,
+                        fileSizeBytes = stream.behaviorHints?.videoSize,
+                        showFileSizeBadge = showFileSizeBadges
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
                 Text(
                     text = streamName,
                     style = MaterialTheme.typography.titleMedium,
@@ -1155,7 +1172,7 @@ private fun StreamCard(
                     }
                 }
 
-                if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
                     StreamBadgeChips(
                         badges = stream.badges,
                         fileSizeBytes = stream.behaviorHints?.videoSize,

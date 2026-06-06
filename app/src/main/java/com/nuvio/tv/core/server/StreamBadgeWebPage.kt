@@ -20,6 +20,11 @@ object StreamBadgeWebPage {
         val appName = context?.getString(R.string.app_name) ?: "NuvioTV"
         val title = context?.getString(R.string.settings_stream_badges_section) ?: "Fusion Style"
         val urlsTitle = context?.getString(R.string.settings_stream_badge_urls_title) ?: "Fusion badge URLs"
+        val badgePositionTitle = context?.getString(R.string.settings_stream_badge_position_title) ?: "Badge position"
+        val badgePositionDescription = context?.getString(R.string.settings_stream_badge_position_description)
+            ?: "Choose whether Fusion and size badges appear above or below stream cards."
+        val badgePositionTop = context?.getString(R.string.settings_stream_badge_position_top) ?: "Top"
+        val badgePositionBottom = context?.getString(R.string.settings_stream_badge_position_bottom) ?: "Bottom"
         val description = context?.getString(
             R.string.settings_stream_badge_urls_description,
             STREAM_BADGE_IMPORT_LIMIT
@@ -72,6 +77,12 @@ object StreamBadgeWebPage {
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 100px; padding: 0.875rem 1.3rem; color: #fff; font-family: inherit; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: all 0.25s ease; white-space: nowrap; }
   .btn:hover { background: #fff; color: #000; border-color: #fff; }
   .mini-btn { flex: 0 0 auto; padding: 0.5rem 0.8rem; font-size: 0.78rem; }
+  .option-card { border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 1rem; background: rgba(255,255,255,0.025); margin: 1.25rem 0; }
+  .option-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.35rem; }
+  .option-copy { color: rgba(255,255,255,0.44); font-size: 0.82rem; font-weight: 300; }
+  .segmented { display: flex; gap: 0.5rem; margin-top: 0.9rem; }
+  .segment { flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.16); border-radius: 100px; padding: 0.72rem 1rem; color: rgba(255,255,255,0.72); font-family: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+  .segment.active { background: #fff; color: #000; border-color: #fff; }
   .summary { color: rgba(255,255,255,0.6); font-size: 0.875rem; margin: 1.25rem 0; }
   .list { display: grid; gap: 0.75rem; margin-top: 1rem; }
   .row { border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 0.9rem; background: rgba(255,255,255,0.02); }
@@ -108,6 +119,14 @@ object StreamBadgeWebPage {
   <div class="actions">
     <button class="btn" id="importBadges" type="button">${importAction.html()}</button>
   </div>
+  <div class="option-card">
+    <div class="option-title">${badgePositionTitle.html()}</div>
+    <div class="option-copy">${badgePositionDescription.html()}</div>
+    <div class="segmented" role="group" aria-label="${badgePositionTitle.html()}">
+      <button class="segment" id="badgePlacementBottom" type="button">${badgePositionBottom.html()}</button>
+      <button class="segment" id="badgePlacementTop" type="button">${badgePositionTop.html()}</button>
+    </div>
+  </div>
   <div class="summary" id="badgeSummary">${closeEmpty.html()}</div>
   <div class="list" id="badgeImports"></div>
   <div class="preview" id="badgePreview"></div>
@@ -119,7 +138,12 @@ const badgeImports = document.getElementById('badgeImports');
 const badgeSummary = document.getElementById('badgeSummary');
 const badgePreview = document.getElementById('badgePreview');
 const statusBox = document.getElementById('status');
+const badgePlacementButtons = {
+  BOTTOM: document.getElementById('badgePlacementBottom'),
+  TOP: document.getElementById('badgePlacementTop')
+};
 let streamBadgeRules = {imports:[]};
+let badgePlacement = 'BOTTOM';
 const labels = {
   empty: '${closeEmpty.js()}',
   active: '${active.js()}',
@@ -162,6 +186,14 @@ function isImportActive(importItem){
 function normalizeBadgeRules(rules){
   const imports=((rules&&rules.imports)||[]).map(importItem=>Object.assign({},importItem,{isActive:isImportActive(importItem)}));
   return Object.assign({},rules||{},{imports});
+}
+function normalizeBadgePlacement(value){
+  return String(value||'BOTTOM').toUpperCase()==='TOP'?'TOP':'BOTTOM';
+}
+function renderBadgePlacement(){
+  Object.keys(badgePlacementButtons).forEach(placement=>{
+    badgePlacementButtons[placement].classList.toggle('active', placement===badgePlacement);
+  });
 }
 function badgeRulesPreviewText(rules){
   const imports=normalizeBadgeRules(rules).imports;
@@ -258,13 +290,34 @@ async function deleteBadge(sourceUrl){
     statusBox.className='status error';
   }
 }
+async function saveBadgePlacement(nextPlacement){
+  const previousPlacement=badgePlacement;
+  badgePlacement=normalizeBadgePlacement(nextPlacement);
+  renderBadgePlacement();
+  const res=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify({badgePlacement})});
+  const body=await res.json().catch(()=>({error:labels.saveError}));
+  if(res.ok){
+    statusBox.textContent=labels.saved;
+    statusBox.className='status';
+  }else{
+    badgePlacement=previousPlacement;
+    renderBadgePlacement();
+    statusBox.textContent=body.error||labels.saveError;
+    statusBox.className='status error';
+  }
+}
 async function load(){
   const res = await fetch('/api/settings');
   const body = await res.json();
-  streamBadgeRules = normalizeBadgeRules(body.settings.streamBadgeRules || {imports:[]});
+  const settings = body.settings || {};
+  streamBadgeRules = normalizeBadgeRules(settings.streamBadgeRules || {imports:[]});
+  badgePlacement = normalizeBadgePlacement(settings.badgePlacement);
+  renderBadgePlacement();
   renderBadgeImports();
 }
 document.getElementById('importBadges').addEventListener('click',importBadges);
+badgePlacementButtons.BOTTOM.addEventListener('click',()=>saveBadgePlacement('BOTTOM'));
+badgePlacementButtons.TOP.addEventListener('click',()=>saveBadgePlacement('TOP'));
 load().catch(()=>{statusBox.textContent=labels.loadError;statusBox.className='status error';});
 </script>
 </body>
