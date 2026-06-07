@@ -381,8 +381,8 @@ class PluginRuntime @Inject constructor() {
                         documentCache[docId] = doc
                         loadedDocIds.add(docId)
                         
-                        // Limit size to 3 active documents to reduce memory footprint
-                        if (loadedDocIds.size > 3) {
+                        // Limit size to 8 active documents to reduce memory footprint while safely supporting parallel scraper requests
+                        if (loadedDocIds.size > 8) {
                             val evictedId = try { loadedDocIds.removeAt(0) } catch (_: Exception) { null }
                             if (evictedId != null) {
                                 documentCache.remove(evictedId)
