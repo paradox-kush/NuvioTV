@@ -9,7 +9,9 @@ import com.google.gson.GsonBuilder
 import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.domain.model.LocalScraperResult
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.coroutineContext
@@ -56,13 +58,158 @@ class PluginRuntime @Inject constructor() {
         .followRedirects(true)
         .followSslRedirects(true)
         .proxy(java.net.Proxy.NO_PROXY)
+        .dispatcher(okhttp3.Dispatcher(
+            java.util.concurrent.Executors.newCachedThreadPool { runnable ->
+                Thread({
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                    runnable.run()
+                }, "okhttp-plugin-worker").apply {
+                    isDaemon = true
+                }
+            }
+        ))
         .build()
 
     // Pre-compiled regex for :contains() selector conversion
     private val containsRegex = Regex(""":contains\(["']([^"']+)["']\)""")
 
+    init {
+        // Pre-compile static JS bytecodes (polyfill, call code, crypto-js) on a background thread
+        // during runtime initialization to avoid thread contention and runtime compilation overhead.
+        CoroutineScope(Dispatchers.Default).launch {
+            precompileStaticBytecode()
+        }
+    }
+
+    private suspend fun precompileStaticBytecode() {
+        try {
+            com.dokar.quickjs.quickJs {
+                // Compile polyfill
+                val polyfillCode = getStaticPolyfillCode()
+                compiledPolyfillBytecode = compile(polyfillCode, "polyfill.js", false)
+
+                // Compile call
+                val callCode = getStaticCallCode()
+                compiledCallBytecode = compile(callCode, "call.js", false)
+
+                // Compile crypto-js if available
+                loadCryptoJsSourceOrNull()?.let { source ->
+                    compiledCryptoJsBytecode = compile(source, "crypto-js.js", false)
+                }
+            }
+            Log.i(TAG, "Successfully pre-compiled static JS bytecodes (polyfill, call, crypto-js)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to pre-compile static JS bytecodes during init: ${e.message}", e)
+        }
+    }
+
     @Volatile
     private var cachedCryptoJsSource: String? = null
+
+    @Volatile
+    private var compiledCryptoJsBytecode: ByteArray? = null
+
+    @Volatile
+    private var compiledPolyfillBytecode: ByteArray? = null
+
+    @Volatile
+    private var compiledCallBytecode: ByteArray? = null
+
+    private val compiledScrapers = ConcurrentHashMap<String, ByteArray>()
+
+    private fun getCompiledCryptoJsBytecode(qjs: com.dokar.quickjs.QuickJs): ByteArray? {
+        compiledCryptoJsBytecode?.let { return it }
+        synchronized(this) {
+            compiledCryptoJsBytecode?.let { return it }
+            val source = loadCryptoJsSourceOrNull() ?: return null
+            try {
+                val bytecode = qjs.compile(source, "crypto-js.js", false)
+                compiledCryptoJsBytecode = bytecode
+                return bytecode
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to compile crypto-js to bytecode: ${e.message}", e)
+                return null
+            }
+        }
+    }
+
+    private fun getCompiledPolyfillBytecode(qjs: com.dokar.quickjs.QuickJs): ByteArray {
+        compiledPolyfillBytecode?.let { return it }
+        synchronized(this) {
+            compiledPolyfillBytecode?.let { return it }
+            try {
+                val bytecode = qjs.compile(getStaticPolyfillCode(), "polyfill.js", false)
+                compiledPolyfillBytecode = bytecode
+                return bytecode
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to compile polyfill to bytecode: ${e.message}", e)
+                throw e
+            }
+        }
+    }
+
+    private fun getCompiledCallBytecode(qjs: com.dokar.quickjs.QuickJs): ByteArray {
+        compiledCallBytecode?.let { return it }
+        synchronized(this) {
+            compiledCallBytecode?.let { return it }
+            try {
+                val bytecode = qjs.compile(getStaticCallCode(), "call.js", false)
+                compiledCallBytecode = bytecode
+                return bytecode
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to compile call code to bytecode: ${e.message}", e)
+                throw e
+            }
+        }
+    }
+
+    private fun getCompiledScraperBytecode(
+        qjs: com.dokar.quickjs.QuickJs,
+        scraperId: String,
+        wrappedCode: String
+    ): ByteArray {
+        val hash = sha256(wrappedCode)
+        val cacheKey = "$scraperId:$hash"
+        val cached = compiledScrapers[cacheKey]
+        if (cached != null) return cached
+
+        try {
+            val bytecode = qjs.compile(wrappedCode, "$scraperId.js", false)
+            compiledScrapers[cacheKey] = bytecode
+            return bytecode
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to compile scraper $scraperId to bytecode: ${e.message}", e)
+            throw e
+        }
+    }
+
+    private fun sha256(text: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+        return bytesToHex(digest)
+    }
+
+    private fun getStaticCallCode(): String {
+        return """
+            (async function() {
+                try {
+                    var getStreams = module.exports.getStreams || globalThis.getStreams;
+                    if (!getStreams) {
+                        console.error("getStreams function not found on module.exports or globalThis");
+                        __capture_result(JSON.stringify([]));
+                        return;
+                    }
+                    var args = JSON.parse(__get_call_args());
+                    console.log("Calling getStreams with tmdbId=" + args.tmdbId + " type=" + args.mediaType + " s=" + args.season + " e=" + args.episode);
+                    var result = await getStreams(args.tmdbId, args.mediaType, args.season, args.episode);
+                    console.log("getStreams returned: " + (result ? result.length : 0) + " streams");
+                    __capture_result(JSON.stringify(result || []));
+                } catch (e) {
+                    console.error("getStreams error:", e.message || e, e.stack || "");
+                    __capture_result(JSON.stringify([]));
+                }
+            })();
+        """.trimIndent()
+    }
 
     private fun loadCryptoJsSourceOrNull(): String? {
         cachedCryptoJsSource?.let { return it }
@@ -148,6 +295,7 @@ class PluginRuntime @Inject constructor() {
         scraperSettings: Map<String, Any>
     ): List<LocalScraperResult> {
         val documentCache = ConcurrentHashMap<String, Document>()
+        val loadedDocIds = java.util.Collections.synchronizedList(mutableListOf<String>())
         val elementCache = ConcurrentHashMap<String, Element>()
         val inFlightCalls = ConcurrentHashMap.newKeySet<Call>()
 
@@ -160,6 +308,7 @@ class PluginRuntime @Inject constructor() {
         }
 
         var resultJson = "[]"
+        var qjsInstance: Any? = null
 
         // Inherit the caller's dispatcher (the low-priority
         // pluginDispatcher set up by PluginManager) instead of hard-coding
@@ -171,8 +320,9 @@ class PluginRuntime @Inject constructor() {
 
         try {
             quickJs(parentDispatcher) {
-                    // Define console object - must return null to avoid quickjs conversion issues
-                    define("console") {
+                qjsInstance = this
+                // Define console object - must return null to avoid quickjs conversion issues
+                define("console") {
                         function("log") { args ->
                             Log.d("Plugin:$scraperId", args.joinToString(" ") { it?.toString() ?: "null" })
                             null
@@ -229,6 +379,19 @@ class PluginRuntime @Inject constructor() {
                         val docId = UUID.randomUUID().toString()
                         val doc = Jsoup.parse(html)
                         documentCache[docId] = doc
+                        loadedDocIds.add(docId)
+                        
+                        // Limit size to 3 active documents to reduce memory footprint
+                        if (loadedDocIds.size > 3) {
+                            val evictedId = try { loadedDocIds.removeAt(0) } catch (_: Exception) { null }
+                            if (evictedId != null) {
+                                documentCache.remove(evictedId)
+                                // Evict associated elements
+                                elementCache.keys.filter { it.startsWith("$evictedId:") }.forEach { key ->
+                                    elementCache.remove(key)
+                                }
+                            }
+                        }
                         docId
                     }
 
@@ -346,18 +509,26 @@ class PluginRuntime @Inject constructor() {
 
                 // Inject JavaScript polyfills
                 val settingsJson = gson.toJson(scraperSettings)
-                val polyfillCode = buildPolyfillCode(scraperId, settingsJson)
-                evaluate<Any?>(polyfillCode)
+                function("__get_scraper_id") { scraperId }
+                function("__get_scraper_settings") { settingsJson }
+                function("__get_tmdb_api_key") { BuildConfig.TMDB_API_KEY }
 
-                // Load real crypto-js into the JS runtime before plugin code runs.
-                loadCryptoJsSourceOrNull()?.let { cryptoJsSource ->
-                    evaluate<Any?>(cryptoJsSource)
+                val qjs = this
+                function("__load_crypto_js") {
+                    val cryptoJsBytecode = getCompiledCryptoJsBytecode(qjs)
+                    if (cryptoJsBytecode != null) {
+                        kotlinx.coroutines.runBlocking {
+                            qjs.evaluate<Any?>(cryptoJsBytecode)
+                        }
+                    }
+                    null
                 }
+
+                val polyfillBytecode = getCompiledPolyfillBytecode(this)
+                evaluate<Any?>(polyfillBytecode)
 
                 // Execute plugin code with module wrapper - wrapped in IIFE to avoid
                 // redeclaration conflicts with polyfill vars (e.g. cheerio, URL, fetch).
-                // Must NOT pass polyfill names as parameters, because plugins use
-                // 'const cheerio = require(...)' which would conflict with a parameter named 'cheerio'.
                 val wrappedCode = """
                     var module = { exports: {} };
                     var exports = module.exports;
@@ -365,33 +536,23 @@ class PluginRuntime @Inject constructor() {
                         $code
                     })();
                 """.trimIndent()
-                evaluate<Any?>(wrappedCode)
+                val wrappedScraperBytecode = getCompiledScraperBytecode(this, scraperId, wrappedCode)
+                evaluate<Any?>(wrappedScraperBytecode)
 
                 // Call getStreams and capture result
-                val seasonArg = season?.toString() ?: "undefined"
-                val episodeArg = episode?.toString() ?: "undefined"
+                function("__get_call_args") {
+                    gson.toJson(
+                        mapOf(
+                            "tmdbId" to tmdbId,
+                            "mediaType" to mediaType,
+                            "season" to season,
+                            "episode" to episode
+                        )
+                    )
+                }
 
-                val callCode = """
-                    (async function() {
-                        try {
-                            var getStreams = module.exports.getStreams || globalThis.getStreams;
-                            if (!getStreams) {
-                                console.error("getStreams function not found on module.exports or globalThis");
-                                __capture_result(JSON.stringify([]));
-                                return;
-                            }
-                            console.log("Calling getStreams with tmdbId=$tmdbId type=$mediaType s=$seasonArg e=$episodeArg");
-                            var result = await getStreams("$tmdbId", "$mediaType", $seasonArg, $episodeArg);
-                            console.log("getStreams returned: " + (result ? result.length : 0) + " streams");
-                            __capture_result(JSON.stringify(result || []));
-                        } catch (e) {
-                            console.error("getStreams error:", e.message || e, e.stack || "");
-                            __capture_result(JSON.stringify([]));
-                        }
-                    })();
-                """.trimIndent()
-
-                    evaluate<Any?>(callCode)
+                val callBytecode = getCompiledCallBytecode(this)
+                evaluate<Any?>(callBytecode)
             }
 
             return parseJsonResults(resultJson)
@@ -407,6 +568,7 @@ class PluginRuntime @Inject constructor() {
             // Cancel any network calls still in progress when plugin execution exits.
             inFlightCalls.forEach { call -> call.cancel() }
             inFlightCalls.clear()
+            // qjsInstance is cleared automatically when block finishes
         }
     }
 
@@ -590,13 +752,13 @@ class PluginRuntime @Inject constructor() {
         }
     }
 
-    private fun buildPolyfillCode(scraperId: String, settingsJson: String): String {
+    private fun getStaticPolyfillCode(): String {
         return """
             // Global constants (using globalThis to avoid redeclaration errors)
-            globalThis.SCRAPER_ID = "$scraperId";
-            globalThis.SCRAPER_SETTINGS = $settingsJson;
+            globalThis.SCRAPER_ID = __get_scraper_id();
+            globalThis.SCRAPER_SETTINGS = JSON.parse(__get_scraper_settings());
             if (typeof TMDB_API_KEY === 'undefined') {
-                globalThis.TMDB_API_KEY = "${BuildConfig.TMDB_API_KEY}";
+                globalThis.TMDB_API_KEY = __get_tmdb_api_key();
             }
             if (typeof globalThis.global === 'undefined') {
                 globalThis.global = globalThis;
@@ -1178,8 +1340,11 @@ class PluginRuntime @Inject constructor() {
                     return cheerio;
                 }
                 if (moduleName === 'crypto-js') {
+                    if (!globalThis.CryptoJS) {
+                        __load_crypto_js();
+                    }
                     if (globalThis.CryptoJS) return globalThis.CryptoJS;
-                    throw new Error("Module 'crypto-js' is not loaded");
+                    throw new Error("Module 'crypto-js' failed to load");
                 }
                 throw new Error("Module '" + moduleName + "' is not available");
             };
