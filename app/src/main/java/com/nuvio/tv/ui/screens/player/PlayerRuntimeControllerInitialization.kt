@@ -1515,6 +1515,78 @@ private class SubtitleOffsetRenderersFactory(
         return playbackSpeedAwareAudioSink
     }
 
+    override fun buildVideoRenderers(
+        context: Context,
+        extensionRendererMode: Int,
+        mediaCodecSelector: MediaCodecSelector,
+        enableDecoderFallback: Boolean,
+        eventHandler: Handler,
+        eventListener: VideoRendererEventListener,
+        allowedVideoJoiningTimeMs: Long,
+        out: ArrayList<Renderer>
+    ) {
+        val tempOut = ArrayList<Renderer>()
+        super.buildVideoRenderers(
+            context,
+            extensionRendererMode,
+            mediaCodecSelector,
+            enableDecoderFallback,
+            eventHandler,
+            eventListener,
+            allowedVideoJoiningTimeMs,
+            tempOut
+        )
+
+        val originalVideoRendererIndex = tempOut.indexOfFirst { it is MediaCodecVideoRenderer && it !is NuvioMediaCodecVideoRenderer }
+        if (originalVideoRendererIndex != -1) {
+            val parseAv1SampleDependencies = runCatching {
+                val field = DefaultRenderersFactory::class.java.getDeclaredField("parseAv1SampleDependencies")
+                field.isAccessible = true
+                field.get(this) as Boolean
+            }.getOrDefault(false)
+
+            val lateThresholdToDropDecoderInputUs = runCatching {
+                val field = DefaultRenderersFactory::class.java.getDeclaredField("lateThresholdToDropDecoderInputUs")
+                field.isAccessible = true
+                field.get(this) as Long
+            }.getOrDefault(C.TIME_UNSET)
+
+            val enableMediaCodecBufferDecodeOnlyFlag = runCatching {
+                val field = DefaultRenderersFactory::class.java.getDeclaredField("enableMediaCodecBufferDecodeOnlyFlag")
+                field.isAccessible = true
+                field.get(this) as Boolean
+            }.getOrDefault(false)
+
+            val mapDV7ToHevc = runCatching {
+                val field = DefaultRenderersFactory::class.java.getDeclaredField("mapDV7ToHevc")
+                field.isAccessible = true
+                field.get(this) as Boolean
+            }.getOrDefault(false)
+
+            val videoRendererBuilder = MediaCodecVideoRenderer.Builder(context)
+                .setCodecAdapterFactory(codecAdapterFactory)
+                .setMediaCodecSelector(mediaCodecSelector)
+                .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
+                .setEnableDecoderFallback(enableDecoderFallback)
+                .setEventHandler(eventHandler)
+                .setEventListener(eventListener)
+                .setMaxDroppedFramesToNotify(MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY)
+                .experimentalSetParseAv1SampleDependencies(parseAv1SampleDependencies)
+                .experimentalSetLateThresholdToDropDecoderInputUs(lateThresholdToDropDecoderInputUs)
+                .setMapDV7ToHevc(mapDV7ToHevc)
+
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                videoRendererBuilder.experimentalSetEnableMediaCodecBufferDecodeOnlyFlag(
+                    enableMediaCodecBufferDecodeOnlyFlag
+                )
+            }
+
+            tempOut[originalVideoRendererIndex] = NuvioMediaCodecVideoRenderer(videoRendererBuilder)
+        }
+
+        out.addAll(tempOut)
+    }
+
     override fun buildAudioRenderers(
         context: Context,
         extensionRendererMode: Int,
