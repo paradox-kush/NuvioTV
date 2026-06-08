@@ -37,8 +37,12 @@ import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.RendererCapabilities
+import androidx.media3.exoplayer.RendererConfiguration
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector.MappedTrackInfo
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
@@ -509,7 +513,57 @@ internal fun PlayerRuntimeController.initializePlayer(
                 AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
                 AdaptiveTrackSelection.DEFAULT_BANDWIDTH_FRACTION
             )
-            trackSelector = DefaultTrackSelector(context, adaptiveTrackSelectionFactory).apply {
+            val isHls = currentStreamMimeType == MimeTypes.APPLICATION_M3U8
+            trackSelector = object : DefaultTrackSelector(context, adaptiveTrackSelectionFactory) {
+                override fun selectAllTracks(
+                    mappedTrackInfo: MappedTrackInfo,
+                    rendererFormatSupports: Array<out Array<out IntArray>>,
+                    rendererMixedMimeTypeAdaptationSupports: IntArray,
+                    params: Parameters
+                ): Array<ExoTrackSelection.Definition?> {
+                    if (isHls) {
+                        for (rendererIndex in 0 until mappedTrackInfo.rendererCount) {
+                            if (mappedTrackInfo.getRendererType(rendererIndex) == C.TRACK_TYPE_VIDEO) {
+                                val trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex)
+                                for (groupIndex in 0 until trackGroups.length) {
+                                    val group = trackGroups[groupIndex]
+                                    for (trackIndex in 0 until group.length) {
+                                        val format = group.getFormat(trackIndex)
+                                        val support = rendererFormatSupports[rendererIndex][groupIndex][trackIndex]
+                                        val formatSupport = RendererCapabilities.getFormatSupport(support)
+                                        if (formatSupport == C.FORMAT_EXCEEDS_CAPABILITIES) {
+                                            val mime = format.sampleMimeType
+                                            val isAvcOrHevc = mime == MimeTypes.VIDEO_H264 || mime == MimeTypes.VIDEO_H265
+                                            val isAtMost1080p = format.width in 1..1920 && format.height in 1..1080
+                                            val codecs = format.codecs?.lowercase() ?: ""
+                                            val is10Bit = codecs.contains("main10") || codecs.contains("hevc.2") || codecs.contains("hev2")
+                                            val isHdr = format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084
+                                            val isStandard8Bit = !is10Bit && !isHdr
+
+                                            if (isAvcOrHevc && isAtMost1080p && isStandard8Bit) {
+                                                rendererFormatSupports[rendererIndex][groupIndex][trackIndex] =
+                                                    RendererCapabilities.create(
+                                                        C.FORMAT_HANDLED,
+                                                        RendererCapabilities.getAdaptiveSupport(support),
+                                                        RendererCapabilities.getTunnelingSupport(support),
+                                                        RendererCapabilities.getHardwareAccelerationSupport(support),
+                                                        RendererCapabilities.getDecoderSupport(support)
+                                                    )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return super.selectAllTracks(
+                        mappedTrackInfo,
+                        rendererFormatSupports,
+                        rendererMixedMimeTypeAdaptationSupports,
+                        params
+                    )
+                }
+            }.apply {
                 setParameters(buildUponParameters().setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true))
                 if (playerSettings.tunnelingEnabled && !safeAudioModeEnabled) {
                     setParameters(buildUponParameters().setTunnelingEnabled(true))
@@ -1513,78 +1567,6 @@ private class SubtitleOffsetRenderersFactory(
         playbackSpeedAwareAudioSink.setInitialPlaybackSpeed(playbackSpeedProvider())
         onPlaybackSpeedAwareAudioSinkCreated(playbackSpeedAwareAudioSink)
         return playbackSpeedAwareAudioSink
-    }
-
-    override fun buildVideoRenderers(
-        context: Context,
-        extensionRendererMode: Int,
-        mediaCodecSelector: MediaCodecSelector,
-        enableDecoderFallback: Boolean,
-        eventHandler: Handler,
-        eventListener: VideoRendererEventListener,
-        allowedVideoJoiningTimeMs: Long,
-        out: ArrayList<Renderer>
-    ) {
-        val tempOut = ArrayList<Renderer>()
-        super.buildVideoRenderers(
-            context,
-            extensionRendererMode,
-            mediaCodecSelector,
-            enableDecoderFallback,
-            eventHandler,
-            eventListener,
-            allowedVideoJoiningTimeMs,
-            tempOut
-        )
-
-        val originalVideoRendererIndex = tempOut.indexOfFirst { it is MediaCodecVideoRenderer && it !is NuvioMediaCodecVideoRenderer }
-        if (originalVideoRendererIndex != -1) {
-            val parseAv1SampleDependencies = runCatching {
-                val field = DefaultRenderersFactory::class.java.getDeclaredField("parseAv1SampleDependencies")
-                field.isAccessible = true
-                field.get(this) as Boolean
-            }.getOrDefault(false)
-
-            val lateThresholdToDropDecoderInputUs = runCatching {
-                val field = DefaultRenderersFactory::class.java.getDeclaredField("lateThresholdToDropDecoderInputUs")
-                field.isAccessible = true
-                field.get(this) as Long
-            }.getOrDefault(C.TIME_UNSET)
-
-            val enableMediaCodecBufferDecodeOnlyFlag = runCatching {
-                val field = DefaultRenderersFactory::class.java.getDeclaredField("enableMediaCodecBufferDecodeOnlyFlag")
-                field.isAccessible = true
-                field.get(this) as Boolean
-            }.getOrDefault(false)
-
-            val mapDV7ToHevc = runCatching {
-                val field = DefaultRenderersFactory::class.java.getDeclaredField("mapDV7ToHevc")
-                field.isAccessible = true
-                field.get(this) as Boolean
-            }.getOrDefault(false)
-
-            val videoRendererBuilder = MediaCodecVideoRenderer.Builder(context)
-                .setCodecAdapterFactory(codecAdapterFactory)
-                .setMediaCodecSelector(mediaCodecSelector)
-                .setAllowedJoiningTimeMs(allowedVideoJoiningTimeMs)
-                .setEnableDecoderFallback(enableDecoderFallback)
-                .setEventHandler(eventHandler)
-                .setEventListener(eventListener)
-                .setMaxDroppedFramesToNotify(MAX_DROPPED_VIDEO_FRAME_COUNT_TO_NOTIFY)
-                .experimentalSetParseAv1SampleDependencies(parseAv1SampleDependencies)
-                .experimentalSetLateThresholdToDropDecoderInputUs(lateThresholdToDropDecoderInputUs)
-                .setMapDV7ToHevc(mapDV7ToHevc)
-
-            if (android.os.Build.VERSION.SDK_INT >= 34) {
-                videoRendererBuilder.experimentalSetEnableMediaCodecBufferDecodeOnlyFlag(
-                    enableMediaCodecBufferDecodeOnlyFlag
-                )
-            }
-
-            tempOut[originalVideoRendererIndex] = NuvioMediaCodecVideoRenderer(videoRendererBuilder)
-        }
-
-        out.addAll(tempOut)
     }
 
     override fun buildAudioRenderers(

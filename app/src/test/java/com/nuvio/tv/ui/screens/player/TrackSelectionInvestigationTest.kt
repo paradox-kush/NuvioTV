@@ -19,6 +19,12 @@ import io.mockk.spyk
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecInfo.VideoCapabilities
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector.MappedTrackInfo
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.RendererConfiguration
+import androidx.media3.exoplayer.source.TrackGroupArray
+import androidx.media3.common.MimeTypes
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.net.URL
@@ -355,117 +361,105 @@ class TrackSelectionInvestigationTest {
     }
 
     @Test
-    fun testNuvioMediaCodecVideoRendererSupport() {
+    fun testTrackSelectorHlsResolutionBypass() {
         mockkStatic(android.util.Log::class)
         every { android.util.Log.d(any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.w(any(), any<Throwable>()) } returns 0
-        every { android.util.Log.w(any(), any(), any()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
-        every { android.util.Log.v(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
 
-        mockkStatic(TextUtils::class)
-        every { TextUtils.isEmpty(any()) } answers {
-            val seq = firstArg<CharSequence?>()
-            seq == null || seq.isEmpty()
-        }
-
-        fun createAndroidPair(first: Int, second: Int): android.util.Pair<Int, Int> {
-            val pair = android.util.Pair(first, second)
-            try {
-                val firstField = android.util.Pair::class.java.getField("first")
-                firstField.isAccessible = true
-                firstField.set(pair, first)
-
-                val secondField = android.util.Pair::class.java.getField("second")
-                secondField.isAccessible = true
-                secondField.set(pair, second)
-            } catch (e: Exception) {
-                println("Failed to set fields on Pair: ${e.message}")
-            }
-            return pair
-        }
-
-        mockkStatic(androidx.media3.exoplayer.mediacodec.MediaCodecUtil::class)
-        every { androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getCodecProfileAndLevel(any()) } answers {
-            val format = firstArg<Format>()
-            val codecs = format.codecs ?: ""
-            val profileLevel = when {
-                codecs.contains("640028") -> 100 to 40  // High Profile @ Level 4.0
-                else -> null
-            }
-            if (profileLevel != null) {
-                createAndroidPair(profileLevel.first, profileLevel.second)
-            } else {
-                null
-            }
-        }
-
-        // 1080p format demanding High Profile L4.0 (avc1.640028)
-        val format1080p = Format.Builder()
-            .setId("1080p")
+        val format1080pAvc8Bit = Format.Builder()
+            .setId("1080p-avc")
             .setSampleMimeType("video/avc")
             .setCodecs("avc1.640028")
             .setWidth(1920)
             .setHeight(1080)
-            .setFrameRate(30.0f)
             .build()
 
-        // High Profile Level 3.1 Decoder capability: High Profile = 100, Level = 31
-        val profileLevels = arrayOf(
-            androidx.media3.exoplayer.mediacodec.MediaCodecUtil.createCodecProfileLevel(100, 31)
+        val format1080pHevc10Bit = Format.Builder()
+            .setId("1080p-hevc-10bit")
+            .setSampleMimeType("video/hevc")
+            .setCodecs("hev1.2.4.L150.B0.main10")
+            .setWidth(1920)
+            .setHeight(1080)
+            .build()
+
+        val mappedTrackInfo = mockk<MappedTrackInfo>()
+        every { mappedTrackInfo.rendererCount } returns 1
+        every { mappedTrackInfo.getRendererType(0) } returns C.TRACK_TYPE_VIDEO
+        
+        val trackGroupAvc = TrackGroup(format1080pAvc8Bit)
+        val trackGroupHevc10 = TrackGroup(format1080pHevc10Bit)
+        val trackGroups = TrackGroupArray(trackGroupAvc, trackGroupHevc10)
+        every { mappedTrackInfo.getTrackGroups(0) } returns trackGroups
+
+        val capabilitiesAvc = RendererCapabilities.create(C.FORMAT_EXCEEDS_CAPABILITIES)
+        val capabilitiesHevc10 = RendererCapabilities.create(C.FORMAT_EXCEEDS_CAPABILITIES)
+        val rendererFormatSupports = arrayOf(
+            arrayOf(
+                intArrayOf(capabilitiesAvc),
+                intArrayOf(capabilitiesHevc10)
+            )
         )
-
-        val videoCaps = mockk<android.media.MediaCodecInfo.VideoCapabilities>()
-        every { videoCaps.isSizeSupported(any(), any()) } returns true
-        every { videoCaps.areSizeAndRateSupported(any(), any(), any()) } returns true
-        every { videoCaps.getWidthAlignment() } returns 2
-        every { videoCaps.getHeightAlignment() } returns 2
-
-        val capabilities = mockk<CodecCapabilities>(relaxed = true)
-        every { capabilities.getVideoCapabilities() } returns videoCaps
-        val field = CodecCapabilities::class.java.getField("profileLevels")
-        field.set(capabilities, profileLevels)
-
-        val codecInfo = androidx.media3.exoplayer.mediacodec.MediaCodecInfo.newInstance(
-            "test-h264-decoder",
-            "video/avc",
-            "video/avc",
-            capabilities,
-            true,
-            false,
-            true,
-            false,
-            false
-        )
-
-        val mediaCodecSelector = mockk<MediaCodecSelector>()
-        every { mediaCodecSelector.getDecoderInfos(any(), any(), any()) } returns listOf(codecInfo)
-
-        // Statically mock MediaCodecUtil.getDecoderInfosSoftMatch to return our codecInfo list
-        every {
-            androidx.media3.exoplayer.mediacodec.MediaCodecUtil.getDecoderInfosSoftMatch(any(), any(), any(), any())
-        } returns listOf(codecInfo)
 
         val context = mockk<Context>(relaxed = true)
-        val displayManager = mockk<android.hardware.display.DisplayManager>(relaxed = true)
-        every { context.getSystemService(Context.DISPLAY_SERVICE) } returns displayManager
-        every { context.applicationContext } returns context
-        val builder = MediaCodecVideoRenderer.Builder(context)
-            .setMediaCodecSelector(mediaCodecSelector)
+        val adaptiveTrackSelectionFactory = mockk<AdaptiveTrackSelection.Factory>(relaxed = true)
+        
+        val isHls = true
+        val selector = object : DefaultTrackSelector(context, adaptiveTrackSelectionFactory) {
+            public override fun selectAllTracks(
+                mappedTrackInfo: MappedTrackInfo,
+                rendererFormatSupports: Array<out Array<out IntArray>>,
+                rendererMixedMimeTypeAdaptationSupports: IntArray,
+                params: Parameters
+            ): Array<ExoTrackSelection.Definition?> {
+                if (isHls) {
+                    for (rendererIndex in 0 until mappedTrackInfo.rendererCount) {
+                        if (mappedTrackInfo.getRendererType(rendererIndex) == C.TRACK_TYPE_VIDEO) {
+                            val trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex)
+                            for (groupIndex in 0 until trackGroups.length) {
+                                val group = trackGroups[groupIndex]
+                                  for (trackIndex in 0 until group.length) {
+                                      val format = group.getFormat(trackIndex)
+                                      val support = rendererFormatSupports[rendererIndex][groupIndex][trackIndex]
+                                      val formatSupport = RendererCapabilities.getFormatSupport(support)
+                                      if (formatSupport == C.FORMAT_EXCEEDS_CAPABILITIES) {
+                                          val mime = format.sampleMimeType
+                                          val isAvcOrHevc = mime == MimeTypes.VIDEO_H264 || mime == MimeTypes.VIDEO_H265
+                                          val isAtMost1080p = format.width in 1..1920 && format.height in 1..1080
+                                          val codecs = format.codecs?.lowercase() ?: ""
+                                          val is10Bit = codecs.contains("main10") || codecs.contains("hevc.2") || codecs.contains("hev2")
+                                          val isHdr = format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084
+                                          val isStandard8Bit = !is10Bit && !isHdr
 
-        val renderer = NuvioMediaCodecVideoRenderer(builder)
+                                          if (isAvcOrHevc && isAtMost1080p && isStandard8Bit) {
+                                              rendererFormatSupports[rendererIndex][groupIndex][trackIndex] =
+                                                  RendererCapabilities.create(
+                                                      C.FORMAT_HANDLED,
+                                                      RendererCapabilities.getAdaptiveSupport(support),
+                                                      RendererCapabilities.getTunnelingSupport(support),
+                                                      RendererCapabilities.getHardwareAccelerationSupport(support),
+                                                      RendererCapabilities.getDecoderSupport(support)
+                                                  )
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }
+                  return arrayOfNulls(mappedTrackInfo.rendererCount)
+              }
+          }
 
-        val rendererCapabilities = renderer.supportsFormat(mediaCodecSelector, format1080p)
-        val formatSupport = RendererCapabilities.getFormatSupport(rendererCapabilities)
+        selector.selectAllTracks(
+            mappedTrackInfo,
+            rendererFormatSupports,
+            intArrayOf(),
+            DefaultTrackSelector.Parameters.DEFAULT_WITHOUT_CONTEXT
+        )
 
-        println("--- NuvioMediaCodecVideoRenderer Unit Test ---")
-        println("Format Support for 1080p High Profile @ Level 4.0 stream on a Level 3.1 Decoder:")
-        println("Original ExoPlayer evaluation: FORMAT_EXCEEDS_CAPABILITIES")
-        println("NuvioMediaCodecVideoRenderer evaluation: $formatSupport (C.FORMAT_HANDLED = ${C.FORMAT_HANDLED})")
+        val finalSupportAvc = RendererCapabilities.getFormatSupport(rendererFormatSupports[0][0][0])
+        assertEquals(C.FORMAT_HANDLED, finalSupportAvc)
 
-        assertEquals(C.FORMAT_HANDLED, formatSupport)
+        val finalSupportHevc10 = RendererCapabilities.getFormatSupport(rendererFormatSupports[0][1][0])
+        assertEquals(C.FORMAT_EXCEEDS_CAPABILITIES, finalSupportHevc10)
     }
 }
