@@ -9,9 +9,7 @@ import com.google.gson.GsonBuilder
 import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.domain.model.LocalScraperResult
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.ContinuationInterceptor
 import kotlin.coroutines.coroutineContext
@@ -40,8 +38,8 @@ import javax.inject.Singleton
 
 private const val TAG = "PluginRuntime"
 private const val PLUGIN_TIMEOUT_MS = 60_000L
-private const val MAX_FETCH_RESPONSE_BYTES = 256 * 1024
-private const val MAX_FETCH_BODY_CHARS = 256 * 1024
+private const val MAX_FETCH_RESPONSE_BYTES = 1024 * 1024
+private const val MAX_FETCH_BODY_CHARS = 1024 * 1024
 private const val MAX_FETCH_HEADER_VALUE_CHARS = 8 * 1024
 private const val FETCH_TRUNCATION_SUFFIX = "\n...[truncated]"
 
@@ -73,36 +71,6 @@ class PluginRuntime @Inject constructor() {
     // Pre-compiled regex for :contains() selector conversion
     private val containsRegex = Regex(""":contains\(["']([^"']+)["']\)""")
 
-    init {
-        // Pre-compile static JS bytecodes (polyfill, call code, crypto-js) on a background thread
-        // during runtime initialization to avoid thread contention and runtime compilation overhead.
-        CoroutineScope(Dispatchers.Default).launch {
-            precompileStaticBytecode()
-        }
-    }
-
-    private suspend fun precompileStaticBytecode() {
-        try {
-            com.dokar.quickjs.quickJs {
-                // Compile polyfill
-                val polyfillCode = getStaticPolyfillCode()
-                compiledPolyfillBytecode = compile(polyfillCode, "polyfill.js", false)
-
-                // Compile call
-                val callCode = getStaticCallCode()
-                compiledCallBytecode = compile(callCode, "call.js", false)
-
-                // Compile crypto-js if available
-                loadCryptoJsSourceOrNull()?.let { source ->
-                    compiledCryptoJsBytecode = compile(source, "crypto-js.js", false)
-                }
-            }
-            Log.i(TAG, "Successfully pre-compiled static JS bytecodes (polyfill, call, crypto-js)")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to pre-compile static JS bytecodes during init: ${e.message}", e)
-        }
-    }
-
     @Volatile
     private var cachedCryptoJsSource: String? = null
 
@@ -114,8 +82,6 @@ class PluginRuntime @Inject constructor() {
 
     @Volatile
     private var compiledCallBytecode: ByteArray? = null
-
-    private val compiledScrapers = ConcurrentHashMap<String, ByteArray>()
 
     private fun getCompiledCryptoJsBytecode(qjs: com.dokar.quickjs.QuickJs): ByteArray? {
         compiledCryptoJsBytecode?.let { return it }
@@ -161,31 +127,6 @@ class PluginRuntime @Inject constructor() {
                 throw e
             }
         }
-    }
-
-    private fun getCompiledScraperBytecode(
-        qjs: com.dokar.quickjs.QuickJs,
-        scraperId: String,
-        wrappedCode: String
-    ): ByteArray {
-        val hash = sha256(wrappedCode)
-        val cacheKey = "$scraperId:$hash"
-        val cached = compiledScrapers[cacheKey]
-        if (cached != null) return cached
-
-        try {
-            val bytecode = qjs.compile(wrappedCode, "$scraperId.js", false)
-            compiledScrapers[cacheKey] = bytecode
-            return bytecode
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to compile scraper $scraperId to bytecode: ${e.message}", e)
-            throw e
-        }
-    }
-
-    private fun sha256(text: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
-        return bytesToHex(digest)
     }
 
     private fun getStaticCallCode(): String {
@@ -513,19 +454,13 @@ class PluginRuntime @Inject constructor() {
                 function("__get_scraper_settings") { settingsJson }
                 function("__get_tmdb_api_key") { BuildConfig.TMDB_API_KEY }
 
-                val qjs = this
-                function("__load_crypto_js") {
-                    val cryptoJsBytecode = getCompiledCryptoJsBytecode(qjs)
-                    if (cryptoJsBytecode != null) {
-                        kotlinx.coroutines.runBlocking {
-                            qjs.evaluate<Any?>(cryptoJsBytecode)
-                        }
-                    }
-                    null
-                }
-
                 val polyfillBytecode = getCompiledPolyfillBytecode(this)
                 evaluate<Any?>(polyfillBytecode)
+
+                // Eagerly load crypto-js bytecode into this instance
+                getCompiledCryptoJsBytecode(this)?.let { cryptoJsBytecode ->
+                    evaluate<Any?>(cryptoJsBytecode)
+                }
 
                 // Execute plugin code with module wrapper - wrapped in IIFE to avoid
                 // redeclaration conflicts with polyfill vars (e.g. cheerio, URL, fetch).
@@ -536,8 +471,7 @@ class PluginRuntime @Inject constructor() {
                         $code
                     })();
                 """.trimIndent()
-                val wrappedScraperBytecode = getCompiledScraperBytecode(this, scraperId, wrappedCode)
-                evaluate<Any?>(wrappedScraperBytecode)
+                evaluate<Any?>(wrappedCode)
 
                 // Call getStreams and capture result
                 function("__get_call_args") {
@@ -1340,9 +1274,6 @@ class PluginRuntime @Inject constructor() {
                     return cheerio;
                 }
                 if (moduleName === 'crypto-js') {
-                    if (!globalThis.CryptoJS) {
-                        __load_crypto_js();
-                    }
                     if (globalThis.CryptoJS) return globalThis.CryptoJS;
                     throw new Error("Module 'crypto-js' failed to load");
                 }
