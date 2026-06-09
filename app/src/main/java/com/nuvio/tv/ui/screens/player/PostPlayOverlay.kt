@@ -49,11 +49,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.tv.ui.util.localizeEpisodeTitle
 import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
@@ -400,10 +402,12 @@ private fun NextEpisodeStatusLine(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun nextEpisodeDisplayLabel(nextEpisode: NextEpisodeInfo): String {
     if (nextEpisode.isOtherType) return nextEpisode.title
+    val context = LocalContext.current
     val code = stringResource(
         R.string.season_episode_format,
         nextEpisode.season,
         nextEpisode.episode,
     )
-    return "$code • ${nextEpisode.title}"
+    val localizedTitle = nextEpisode.title.localizeEpisodeTitle(context)
+    return "$code • $localizedTitle"
 }
