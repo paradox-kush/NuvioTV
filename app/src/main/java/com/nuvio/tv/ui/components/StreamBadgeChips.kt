@@ -64,11 +64,11 @@ fun StreamBadgeChips(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)
     ) {
-        if (sizeBytes != null) {
-            StreamFileSizeBadge(bytes = sizeBytes)
-        }
         imageBadges.forEach { badge ->
             StreamImportedBadgeChip(badge = badge)
+        }
+        if (sizeBytes != null) {
+            StreamFileSizeBadge(bytes = sizeBytes)
         }
     }
 }
