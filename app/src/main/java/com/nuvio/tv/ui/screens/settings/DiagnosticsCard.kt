@@ -2,6 +2,8 @@
 
 package com.nuvio.tv.ui.screens.settings
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Border
@@ -26,9 +29,9 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.nuvio.tv.R
 import com.nuvio.tv.core.player.DolbyVisionCodecFallback
 import com.nuvio.tv.core.player.LastPlaybackDiagnostics
-import com.nuvio.tv.ui.theme.NuvioColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,15 +50,15 @@ internal fun LazyListScope.diagnosticsCardItems(
         item(key = "diagnostics_empty_intro") {
             DiagnosticsSectionCard {
                 Text(
-                    text = "Last Playback Diagnostics",
+                    text = stringResource(R.string.diag_last_playback_title),
                     style = MaterialTheme.typography.labelMedium,
-                    color = NuvioColors.Primary
+                    color = NuvioTheme.colors.Primary
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
                 Text(
-                    text = "No playback data yet. Play a stream and return here to see DV decision details for that playback.",
+                    text = stringResource(R.string.diag_no_data),
                     style = MaterialTheme.typography.bodySmall,
-                    color = NuvioColors.TextSecondary
+                    color = NuvioTheme.colors.TextSecondary
                 )
             }
         }
@@ -79,13 +82,17 @@ internal fun LazyListScope.diagnosticsCardItems(
 
     // Card 1: Source + Display + Decoder + Bridge (the input side)
     item(key = "diag_card_input") {
+        val unknownLabel = stringResource(R.string.type_unknown)
         DiagnosticsSectionCard {
-            SectionHeader("Source & Hardware", "Take a photo of this card if reporting an issue.")
-            DiagnosticRow("Host", diagnostics.host)
-            DiagnosticRow("When", formatTimestamp(diagnostics.timestampMs))
-            DiagnosticRow("Device", deviceName())
+            SectionHeader(
+                stringResource(R.string.diag_section_source_hardware),
+                stringResource(R.string.diag_section_source_hardware_sub)
+            )
+            DiagnosticRow(stringResource(R.string.diag_label_host), diagnostics.host)
+            DiagnosticRow(stringResource(R.string.diag_label_when), formatTimestamp(diagnostics.timestampMs))
+            DiagnosticRow(stringResource(R.string.diag_label_device), deviceName(unknownLabel))
             DiagnosticRow(
-                "Display",
+                stringResource(R.string.diag_label_display),
                 dv(
                     if (diagnostics.hdrCapsKnown) {
                         buildString {
@@ -93,31 +100,37 @@ internal fun LazyListScope.diagnosticsCardItems(
                             if (diagnostics.displayHdr10Plus) append("HDR10+ ")
                             else if (diagnostics.displayHdr10) append("HDR10 ")
                             if (!diagnostics.displayDv && !diagnostics.displayHdr10) append("SDR")
-                        }.trim().ifBlank { "Unknown" }
+                        }.trim().ifBlank { unknownLabel }
                     } else {
-                        "Unknown"
+                        unknownLabel
                     }
                 )
             )
             DiagnosticRow(
-                "DV7 Decoder",
-                dv(if (diagnostics.codecDv7Supported) "Available" else "Not available")
-            )
-            DiagnosticRow(
-                "DV Decoder",
+                stringResource(R.string.diag_label_dv7_decoder),
                 dv(
-                    diagnostics.dv81DecoderName
-                        ?: findAnyDvDecoderName()?.let { "$it (hidden)" }
-                        ?: "None"
+                    if (diagnostics.codecDv7Supported) stringResource(R.string.diag_value_available)
+                    else stringResource(R.string.diag_value_not_available)
                 )
             )
             DiagnosticRow(
-                "DV Bridge",
-                dv(if (diagnostics.bridgeReady) "Ready" else "Not ready")
+                stringResource(R.string.diag_label_dv_decoder),
+                dv(
+                    diagnostics.dv81DecoderName
+                        ?: findAnyDvDecoderName()?.let { stringResource(R.string.diag_value_decoder_hidden, it) }
+                        ?: stringResource(R.string.diag_value_none)
+                )
+            )
+            DiagnosticRow(
+                stringResource(R.string.diag_label_dv_bridge),
+                dv(
+                    if (diagnostics.bridgeReady) stringResource(R.string.diag_value_ready)
+                    else stringResource(R.string.diag_value_not_ready)
+                )
             )
             if (dvEngaged) {
-                diagnostics.bridgeVersion?.let { DiagnosticRow("Bridge Version", it) }
-                diagnostics.bridgeReason?.let { DiagnosticRow("Bridge Reason", it) }
+                diagnostics.bridgeVersion?.let { DiagnosticRow(stringResource(R.string.diag_label_bridge_version), it) }
+                diagnostics.bridgeReason?.let { DiagnosticRow(stringResource(R.string.diag_label_bridge_reason), it) }
             }
         }
     }
@@ -125,31 +138,37 @@ internal fun LazyListScope.diagnosticsCardItems(
     // Card 2: Decision + Settings (the configured/effective behaviour)
     item(key = "diag_card_decision") {
         DiagnosticsSectionCard {
-            SectionHeader("Decision & Settings")
-            DiagnosticRow("DV Mode (requested)", dv(diagnostics.dv7ModeRequested))
+            SectionHeader(stringResource(R.string.diag_section_decision_settings))
+            DiagnosticRow(stringResource(R.string.diag_label_dv_mode_requested), dv(diagnostics.dv7ModeRequested))
             if (dvEngaged && diagnostics.dv7ModeRequested != diagnostics.dv7ModeEffective) {
-                DiagnosticRow("DV Mode (effective)", dv(diagnostics.dv7ModeEffective))
+                DiagnosticRow(stringResource(R.string.diag_label_dv_mode_effective), dv(diagnostics.dv7ModeEffective))
             }
-            DiagnosticRow("AUTO Decision", dv(diagnostics.dv7AutoDecision))
+            DiagnosticRow(stringResource(R.string.diag_label_auto_decision), dv(diagnostics.dv7AutoDecision))
             if (dvEngaged) {
-                diagnostics.dvSourceProfile?.let { DiagnosticRow("Source Profile", it) }
+                diagnostics.dvSourceProfile?.let { DiagnosticRow(stringResource(R.string.diag_label_source_profile), it) }
                 if (diagnostics.dv7DoviCalls > 0) {
                     DiagnosticRow(
-                        "Conversions",
-                        "${diagnostics.dv7DoviSuccess} of ${diagnostics.dv7DoviCalls} successful"
+                        stringResource(R.string.diag_label_conversions),
+                        stringResource(
+                            R.string.diag_value_conversions_fmt,
+                            diagnostics.dv7DoviSuccess,
+                            diagnostics.dv7DoviCalls
+                        )
                     )
                 }
                 if (diagnostics.dv7DoviSignalRewrites > 0) {
-                    DiagnosticRow("Signal Rewrites", diagnostics.dv7DoviSignalRewrites.toString())
+                    DiagnosticRow(stringResource(R.string.diag_label_signal_rewrites), diagnostics.dv7DoviSignalRewrites.toString())
                 }
             }
             DiagnosticRow(
-                "Custom Buffers",
-                if (diagnostics.bufferEngineEnabled) "On" else "Off"
+                stringResource(R.string.diag_label_custom_buffers),
+                if (diagnostics.bufferEngineEnabled) stringResource(R.string.diag_value_on)
+                else stringResource(R.string.diag_value_off)
             )
             DiagnosticRow(
-                "Custom Network/Cache",
-                if (diagnostics.parallelNetworkEnabled) "On" else "Off"
+                stringResource(R.string.diag_label_custom_network_cache),
+                if (diagnostics.parallelNetworkEnabled) stringResource(R.string.diag_value_on)
+                else stringResource(R.string.diag_value_off)
             )
         }
     }
@@ -157,25 +176,26 @@ internal fun LazyListScope.diagnosticsCardItems(
     // Card 3: Outcome
     item(key = "diag_card_outcome") {
         DiagnosticsSectionCard {
-            SectionHeader("Outcome")
-            DiagnosticRow("HDR Format (intended)", diagnostics.videoHdrType?.takeIf { it.isNotBlank() } ?: "-")
+            SectionHeader(stringResource(R.string.diag_section_outcome))
+            DiagnosticRow(stringResource(R.string.diag_label_hdr_format_intended), diagnostics.videoHdrType?.takeIf { it.isNotBlank() } ?: "-")
             DiagnosticRow(
-                "First Frame",
-                if (diagnostics.firstFrameMs >= 0) "${diagnostics.firstFrameMs} ms" else "Never rendered"
+                stringResource(R.string.diag_label_first_frame),
+                if (diagnostics.firstFrameMs >= 0) "${diagnostics.firstFrameMs} ms"
+                else stringResource(R.string.diag_value_never_rendered)
             )
             DiagnosticRow(
-                "Rebuffers",
+                stringResource(R.string.diag_label_rebuffers),
                 if (diagnostics.rebufferCount > 0)
                     "${diagnostics.rebufferCount} (${diagnostics.rebufferTotalMs} ms)"
                 else "0"
             )
             DiagnosticRow(
-                "Result",
+                stringResource(R.string.diag_label_result),
                 diagnostics.result,
                 valueColor = when {
                     diagnostics.result.startsWith("Error", ignoreCase = true) -> Color(0xFFF44336)
                     diagnostics.result == "Played" -> Color(0xFF4CAF50)
-                    else -> NuvioColors.TextPrimary
+                    else -> NuvioTheme.colors.TextPrimary
                 }
             )
         }
@@ -190,12 +210,12 @@ private fun DiagnosticsSectionCard(
         onClick = { /* read-only */ },
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.colors(
-            containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.FocusBackground
+            containerColor = NuvioTheme.colors.BackgroundCard,
+            focusedContainerColor = NuvioTheme.colors.FocusBackground
         ),
         border = CardDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(2.dp, NuvioColors.FocusRing.copy(alpha = 0.5f)),
+                border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(10.dp)
             )
         ),
@@ -205,8 +225,8 @@ private fun DiagnosticsSectionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+                .padding(horizontal = 14.dp, vertical = NuvioTheme.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xxs)
         ) {
             content()
         }
@@ -218,24 +238,24 @@ private fun SectionHeader(label: String, subtitle: String? = null) {
     Text(
         text = label.uppercase(),
         style = MaterialTheme.typography.labelSmall,
-        color = NuvioColors.Primary
+        color = NuvioTheme.colors.Primary
     )
     if (subtitle != null) {
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodySmall,
-            color = NuvioColors.TextSecondary,
+            color = NuvioTheme.colors.TextSecondary,
             fontSize = 11.sp
         )
     }
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
 }
 
 @Composable
 private fun DiagnosticRow(
     label: String,
     value: String,
-    valueColor: Color = NuvioColors.TextPrimary
+    valueColor: Color = NuvioTheme.colors.TextPrimary
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -244,7 +264,7 @@ private fun DiagnosticRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = NuvioColors.TextSecondary,
+            color = NuvioTheme.colors.TextSecondary,
             modifier = Modifier.width(170.dp)
         )
         Spacer(modifier = Modifier.width(10.dp))
@@ -263,11 +283,11 @@ private fun formatTimestamp(ms: Long): String {
 }
 
 /** "Manufacturer Model", de-duplicated (e.g. avoids "Xiaomi Xiaomi ..."). */
-private fun deviceName(): String {
+private fun deviceName(unknownLabel: String): String {
     val manufacturer = android.os.Build.MANUFACTURER?.trim().orEmpty()
     val model = android.os.Build.MODEL?.trim().orEmpty()
     return when {
-        model.isBlank() -> manufacturer.ifBlank { "Unknown" }
+        model.isBlank() -> manufacturer.ifBlank { unknownLabel }
         manufacturer.isBlank() -> model
         model.startsWith(manufacturer, ignoreCase = true) -> model
         else -> "$manufacturer $model"

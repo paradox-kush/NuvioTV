@@ -84,6 +84,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import com.nuvio.tv.core.player.ExternalPlayerLauncher
+import com.nuvio.tv.core.streams.StreamBadgePlacement
 import com.nuvio.tv.core.streams.StreamBadgeSettings
 import com.nuvio.tv.data.local.PlayerPreference
 import com.nuvio.tv.domain.model.Stream
@@ -92,7 +93,6 @@ import com.nuvio.tv.ui.components.SourceChipStatus
 import com.nuvio.tv.ui.components.SourceStatusFilterChip
 import com.nuvio.tv.ui.components.P2pConsentDialog
 import com.nuvio.tv.ui.components.StreamBadgeChips
-import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.components.StreamsSkeletonList
 import com.nuvio.tv.ui.screens.player.LoadingOverlay
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -267,6 +267,14 @@ fun StreamScreen(
         viewModel.onPlaybackErrorShown()
     }
 
+    // Once streams are resolved, release the MainActivity auto-next loader so it doesn't
+    // mask this screen (whether it auto-launches a player or shows the manual list).
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) {
+            viewModel.dismissExternalAutoNextOverlay()
+        }
+    }
+
     LaunchedEffect(uiState.autoPlayPlaybackInfo) {
         val playbackInfo = uiState.autoPlayPlaybackInfo ?: return@LaunchedEffect
         if (playbackInfo.url != null || (playbackInfo.isTorrent && playbackInfo.infoHash != null)) {
@@ -337,7 +345,10 @@ fun StreamScreen(
         )
 
         val showOverlay = uiState.showDirectAutoPlayOverlay || uiState.externalPlayerOverlayVisible
-        if (showOverlay) {
+        if (!uiState.autoPlayDecided) {
+            // Don't render overlay or stream list until ViewModel decides
+            // whether direct autoplay is active — prevents single-frame flash.
+        } else if (showOverlay) {
             LoadingOverlay(
                 visible = true,
                 backdropUrl = uiState.backdrop ?: uiState.poster,
@@ -380,6 +391,9 @@ fun StreamScreen(
                     sourceChips = uiState.sourceChips,
                     selectedAddonFilter = uiState.selectedAddonFilter,
                     showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                    showAddonLogo = streamBadgeSettings.showAddonLogo,
+                    badgePlacement = streamBadgeSettings.badgePlacement,
+                    hasBadgeRules = streamBadgeSettings.rules.hasImport,
                     onAddonFilterSelected = { viewModel.onEvent(StreamScreenEvent.OnAddonFilterSelected(it)) },
                     onStreamSelected = { stream ->
                         val currentIndex = uiState.filteredStreams.indexOfFirst {
@@ -462,7 +476,7 @@ private fun StreamBackdrop(
     isLoading: Boolean
 ) {
     val context = LocalContext.current
-    val backgroundColor = NuvioColors.Background
+    val backgroundColor = NuvioTheme.colors.Background
     val backdropModel = remember(context, backdrop) {
         backdrop?.let { image ->
             ImageRequest.Builder(context)
@@ -554,7 +568,7 @@ private fun LeftContentSection(
         listOfNotNull(genres, year).joinToString(" • ")
     }
     Box(
-        modifier = modifier.padding(start = 48.dp, end = 24.dp),
+        modifier = modifier.padding(start = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xl),
         contentAlignment = Alignment.CenterStart
     ) {
         Column(
@@ -577,7 +591,7 @@ private fun LeftContentSection(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.displaySmall,
-                    color = NuvioColors.TextPrimary,
+                    color = NuvioTheme.colors.TextPrimary,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center
@@ -587,7 +601,7 @@ private fun LeftContentSection(
             // Show episode info or movie info
             if (isEpisode && season != null && episode != null) {
                 // Episode info
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                 Text(
                     text = stringResource(R.string.stream_episode_label, season, episode),
                     style = MaterialTheme.typography.titleLarge,
@@ -595,18 +609,18 @@ private fun LeftContentSection(
                     textAlign = TextAlign.Center
                 )
                 if (episodeName != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
                     Text(
                         text = episodeName.localizeEpisodeTitle(LocalContext.current),
                         style = MaterialTheme.typography.bodyLarge,
-                        color = NuvioColors.TextPrimary,
+                        color = NuvioTheme.colors.TextPrimary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center
                     )
                 }
                 if (runtime != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
                     val runtimeText = if (runtime >= 60) {
                         val hours = runtime / 60
                         val mins = runtime % 60
@@ -623,7 +637,7 @@ private fun LeftContentSection(
                 }
             } else {
                 // Movie info - genres and year
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                 if (infoText.isNotEmpty()) {
                     Text(
                         text = infoText,
@@ -647,6 +661,9 @@ private fun RightStreamSection(
     sourceChips: List<SourceChipItem>,
     selectedAddonFilter: String?,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
+    badgePlacement: StreamBadgePlacement,
+    hasBadgeRules: Boolean = false,
     onAddonFilterSelected: (String?) -> Unit,
     onStreamSelected: (Stream) -> Unit,
     focusedStreamIndex: Int,
@@ -695,9 +712,9 @@ private fun RightStreamSection(
 
     Column(
         modifier = modifier
-            .padding(top = 48.dp, end = 48.dp, bottom = 48.dp)
+            .padding(top = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.xxxl)
     ) {
-        val chipRowHeight = 56.dp
+        val chipRowHeight = NuvioTheme.spacing.huge
 
         // Addon filter chips
         Box(modifier = Modifier.height(chipRowHeight)) {
@@ -717,7 +734,7 @@ private fun RightStreamSection(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
 
         androidx.compose.animation.AnimatedVisibility(
             visible = enter,
@@ -732,13 +749,13 @@ private fun RightStreamSection(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(NuvioColors.BackgroundCard.copy(alpha = 0.5f)),
+                    .clip(RoundedCornerShape(NuvioTheme.radii.xl))
+                    .background(NuvioTheme.colors.BackgroundCard.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
                 when {
                     isLoading -> {
-                        LoadingState()
+                        LoadingState(showAddonLogo = showAddonLogo)
                     }
                     error != null -> {
                         ErrorState(
@@ -761,6 +778,9 @@ private fun RightStreamSection(
                             availableAddons = availableAddons,
                             selectedAddonFilter = selectedAddonFilter,
                             showFileSizeBadges = showFileSizeBadges,
+                            showAddonLogo = showAddonLogo,
+                            badgePlacement = badgePlacement,
+                            hasBadgeRules = hasBadgeRules,
                             onAddonFilterSelected = { onAddonFilterSelectedGuarded(it) },
                             chipFocusRequesters = chipFocusRequesters,
                             orderedAddonNames = orderedAddonNames,
@@ -798,8 +818,8 @@ private fun AddonFilterChips(
     val scope = rememberCoroutineScope()
     val lastKeyRepeatDispatchRef = remember { java.util.concurrent.atomic.AtomicLong(0L) }
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg),
+        contentPadding = PaddingValues(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs),
         modifier = Modifier
             .onFocusChanged { focusState ->
                 val hasFocus = focusState.hasFocus
@@ -872,8 +892,8 @@ private fun AddonFilterChips(
 }
 
 @Composable
-private fun LoadingState() {
-    StreamsSkeletonList()
+private fun LoadingState(showAddonLogo: Boolean = true) {
+    StreamsSkeletonList(showAddonLogo = showAddonLogo)
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -885,16 +905,16 @@ private fun ErrorState(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(32.dp)
+        modifier = Modifier.padding(NuvioTheme.spacing.xxl)
     ) {
         Icon(
             imageVector = Icons.Default.Warning,
             contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = NuvioColors.Error
+            modifier = Modifier.size(NuvioTheme.spacing.xxxl),
+            tint = NuvioTheme.colors.Error
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
 
         Text(
             text = message,
@@ -903,29 +923,29 @@ private fun ErrorState(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(NuvioTheme.spacing.xl))
 
         var isFocused by remember { mutableStateOf(false) }
         Card(
             onClick = onRetry,
             modifier = Modifier.onFocusChanged { isFocused = it.isFocused },
             colors = CardDefaults.colors(
-                containerColor = NuvioColors.BackgroundCard,
-                focusedContainerColor = NuvioColors.Secondary
+                containerColor = NuvioTheme.colors.BackgroundCard,
+                focusedContainerColor = NuvioTheme.colors.Secondary
             ),
             border = CardDefaults.border(
                 focusedBorder = Border(
-                    border = BorderStroke(2.dp, NuvioColors.FocusRing),
-                    shape = RoundedCornerShape(8.dp)
+                    border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
+                    shape = RoundedCornerShape(NuvioTheme.radii.sm)
                 )
             ),
-            shape = CardDefaults.shape(shape = RoundedCornerShape(8.dp)),
+            shape = CardDefaults.shape(shape = RoundedCornerShape(NuvioTheme.radii.sm)),
             scale = CardDefaults.scale(focusedScale = 1.02f)
         ) {
             Text(
                 text = stringResource(R.string.stream_retry),
                 style = MaterialTheme.typography.labelLarge,
-                color = if (isFocused) NuvioColors.OnSecondary else NuvioColors.TextPrimary,
+                color = if (isFocused) NuvioTheme.colors.OnSecondary else NuvioTheme.colors.TextPrimary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
             )
         }
@@ -937,7 +957,7 @@ private fun EmptyState() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = Modifier.padding(32.dp)
+        modifier = Modifier.padding(NuvioTheme.spacing.xxl)
     ) {
         Text(
             text = stringResource(R.string.stream_no_streams),
@@ -946,7 +966,7 @@ private fun EmptyState() {
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(NuvioTheme.spacing.md))
 
         Text(
             text = stringResource(R.string.stream_no_streams_hint),
@@ -970,6 +990,9 @@ private fun StreamsList(
     availableAddons: List<String> = emptyList(),
     selectedAddonFilter: String? = null,
     showFileSizeBadges: Boolean = true,
+    showAddonLogo: Boolean = true,
+    badgePlacement: StreamBadgePlacement = StreamBadgePlacement.BOTTOM,
+    hasBadgeRules: Boolean = false,
     onAddonFilterSelected: (String?) -> Unit = {},
     chipFocusRequesters: List<FocusRequester> = emptyList(),
     orderedAddonNames: List<String> = emptyList(),
@@ -1010,7 +1033,7 @@ private fun StreamsList(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(NuvioTheme.spacing.lg)
             .onFocusChanged { onFocusChanged(it.hasFocus) }
             .onKeyEvent { event ->
                 if (event.nativeKeyEvent.action != KeyEvent.ACTION_DOWN) return@onKeyEvent false
@@ -1042,16 +1065,19 @@ private fun StreamsList(
                     else -> false
                 }
             },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 32.dp)
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
+        contentPadding = PaddingValues(start = NuvioTheme.spacing.sm, end = NuvioTheme.spacing.sm, top = NuvioTheme.spacing.sm, bottom = NuvioTheme.spacing.xxl)
     ) {
         itemsIndexed(streams, key = { index, stream ->
             stream.stableKey(index)
         }) { index, stream ->
-            Box(modifier = Modifier.padding(vertical = 4.dp)) {
+            Box(modifier = Modifier.padding(vertical = NuvioTheme.spacing.xs)) {
                 StreamCard(
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
+                    showAddonLogo = showAddonLogo,
+                    badgePlacement = badgePlacement,
+                    reserveBadgeSpace = hasBadgeRules && stream.badges.isEmpty(),
                     onClick = { onStreamSelected(stream) },
                     focusRequester = when {
                         shouldRestoreFocusedStream && index == focusedStreamIndex.coerceIn(0, (streams.lastIndex).coerceAtLeast(0)) -> restoreFocusRequester
@@ -1076,17 +1102,36 @@ private fun StreamsList(
 private fun StreamCard(
     stream: Stream,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
+    badgePlacement: StreamBadgePlacement,
+    reserveBadgeSpace: Boolean = false,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
     onUpKey: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val streamName = remember(stream) { stream.getDisplayName() }
+    val density = LocalDensity.current
+    val unknownStreamLabel = stringResource(R.string.stream_unknown)
+    val streamName = remember(stream, unknownStreamLabel) { stream.getDisplayNameOrNull() ?: unknownStreamLabel }
     val streamDescription = remember(stream) { stream.getDisplayDescription() }
-    val addonLogoModel = remember(context, stream.addonLogo) {
+    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null) || reserveBadgeSpace
+
+    // Track whether badges transitioned from empty to non-empty while this
+    // card was composed. If they did, we animate. If the card enters
+    // composition with badges already present (tab switch), no animation.
+    val hadBadgesOnFirstComposition = remember { stream.badges.isNotEmpty() }
+    val shouldAnimateBadges = stream.badges.isNotEmpty() && !hadBadgesOnFirstComposition
+    // Pre-upscale: decode at 2× target pixels so the hardware compositor
+    // has enough pixel data for smooth edges inside Card RenderNodes.
+    val logoDecodeSize = remember(density) {
+        with(density) { NuvioTheme.spacing.xxl.roundToPx() } * 2
+    }
+    val addonLogoModel = remember(context, stream.addonLogo, logoDecodeSize) {
         stream.addonLogo?.let { logo ->
             ImageRequest.Builder(context)
                 .data(logo)
+                .size(width = logoDecodeSize, height = logoDecodeSize)
+                .memoryCacheKey("${logo}_${logoDecodeSize}x${logoDecodeSize}")
                 .crossfade(false)
                 .build()
         }
@@ -1103,27 +1148,41 @@ private fun StreamCard(
                 } else false
             } else Modifier),
         colors = CardDefaults.colors(
-            containerColor = NuvioColors.BackgroundElevated,
-            focusedContainerColor = NuvioColors.BackgroundElevated
+            containerColor = NuvioTheme.colors.BackgroundElevated,
+            focusedContainerColor = NuvioTheme.colors.BackgroundElevated
         ),
-        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+        shape = CardDefaults.shape(shape = RoundedCornerShape(NuvioTheme.radii.md)),
         scale = CardDefaults.scale(focusedScale = 1f)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(NuvioTheme.spacing.lg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg)
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)
             ) {
+                if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                        StreamBadgeChips(
+                            badges = stream.badges,
+                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            showFileSizeBadge = showFileSizeBadges,
+                            animate = shouldAnimateBadges
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+                    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xxs))
+                }
+
                 Text(
                     text = streamName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = NuvioColors.TextPrimary
+                    color = NuvioTheme.colors.TextPrimary
                 )
 
                 streamDescription?.let { description ->
@@ -1136,38 +1195,45 @@ private fun StreamCard(
                     }
                 }
 
-                if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
-                    StreamBadgeChips(
-                        badges = stream.badges,
-                        fileSizeBytes = stream.behaviorHints?.videoSize,
-                        showFileSizeBadge = showFileSizeBadges,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
+                if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                        StreamBadgeChips(
+                            badges = stream.badges,
+                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            showFileSizeBadge = showFileSizeBadges,
+                            animate = shouldAnimateBadges,
+                            modifier = Modifier.padding(top = NuvioTheme.spacing.xxs)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(22.dp))
+                    }
                 }
             }
 
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                if (addonLogoModel != null) {
-                    AsyncImage(
-                        model = addonLogoModel,
-                        contentDescription = stream.addonName,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        contentScale = ContentScale.Fit
+            if (showAddonLogo) {
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    if (addonLogoModel != null) {
+                        AsyncImage(
+                            model = addonLogoModel,
+                            contentDescription = stream.addonName,
+                            modifier = Modifier
+                                .size(NuvioTheme.spacing.xxl)
+                                .clip(RoundedCornerShape(NuvioTheme.radii.xs)),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
+
+                    Text(
+                        text = stream.addonName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NuvioTheme.extendedColors.textTertiary,
+                        maxLines = 1
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = stream.addonName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NuvioTheme.extendedColors.textTertiary,
-                    maxLines = 1
-                )
             }
         }
     }
@@ -1188,26 +1254,26 @@ private fun PlayerChoiceDialog(
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
-                .background(NuvioColors.BackgroundCard)
+                .clip(RoundedCornerShape(NuvioTheme.radii.xl))
+                .background(NuvioTheme.colors.BackgroundCard)
         ) {
             Column(
                 modifier = Modifier
                     .width(400.dp)
-                    .padding(24.dp),
+                    .padding(NuvioTheme.spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = stringResource(R.string.stream_player_picker_title),
                     style = MaterialTheme.typography.headlineSmall,
-                    color = NuvioColors.TextPrimary,
+                    color = NuvioTheme.colors.TextPrimary,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.xl))
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     var internalFocused by remember { mutableStateOf(false) }
@@ -1218,24 +1284,24 @@ private fun PlayerChoiceDialog(
                             .focusRequester(focusRequester)
                             .onFocusChanged { internalFocused = it.isFocused },
                         colors = CardDefaults.colors(
-                            containerColor = NuvioColors.BackgroundElevated,
-                            focusedContainerColor = NuvioColors.Secondary
+                            containerColor = NuvioTheme.colors.BackgroundElevated,
+                            focusedContainerColor = NuvioTheme.colors.Secondary
                         ),
                         border = CardDefaults.border(
                             focusedBorder = Border(
-                                border = BorderStroke(2.dp, NuvioColors.FocusRing),
-                                shape = RoundedCornerShape(12.dp)
+                                border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
+                                shape = RoundedCornerShape(NuvioTheme.radii.md)
                             )
                         ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                        shape = CardDefaults.shape(shape = RoundedCornerShape(NuvioTheme.radii.md)),
                         scale = CardDefaults.scale(focusedScale = 1.05f)
                     ) {
                         Text(
                             text = stringResource(R.string.stream_player_internal),
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (internalFocused) NuvioColors.OnSecondary else NuvioColors.TextPrimary,
+                            color = if (internalFocused) NuvioTheme.colors.OnSecondary else NuvioTheme.colors.TextPrimary,
                             modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .padding(horizontal = NuvioTheme.spacing.lg, vertical = 14.dp)
                                 .fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
@@ -1248,24 +1314,24 @@ private fun PlayerChoiceDialog(
                             .weight(1f)
                             .onFocusChanged { externalFocused = it.isFocused },
                         colors = CardDefaults.colors(
-                            containerColor = NuvioColors.BackgroundElevated,
-                            focusedContainerColor = NuvioColors.Secondary
+                            containerColor = NuvioTheme.colors.BackgroundElevated,
+                            focusedContainerColor = NuvioTheme.colors.Secondary
                         ),
                         border = CardDefaults.border(
                             focusedBorder = Border(
-                                border = BorderStroke(2.dp, NuvioColors.FocusRing),
-                                shape = RoundedCornerShape(12.dp)
+                                border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
+                                shape = RoundedCornerShape(NuvioTheme.radii.md)
                             )
                         ),
-                        shape = CardDefaults.shape(shape = RoundedCornerShape(12.dp)),
+                        shape = CardDefaults.shape(shape = RoundedCornerShape(NuvioTheme.radii.md)),
                         scale = CardDefaults.scale(focusedScale = 1.05f)
                     ) {
                         Text(
                             text = stringResource(R.string.stream_player_external),
                             style = MaterialTheme.typography.titleMedium,
-                            color = if (externalFocused) NuvioColors.OnSecondary else NuvioColors.TextPrimary,
+                            color = if (externalFocused) NuvioTheme.colors.OnSecondary else NuvioTheme.colors.TextPrimary,
                             modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .padding(horizontal = NuvioTheme.spacing.lg, vertical = 14.dp)
                                 .fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )

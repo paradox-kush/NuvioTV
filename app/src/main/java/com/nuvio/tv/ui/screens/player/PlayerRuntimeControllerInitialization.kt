@@ -37,9 +37,14 @@ import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.RendererCapabilities
+import androidx.media3.exoplayer.RendererConfiguration
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector.MappedTrackInfo
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.exoplayer.upstream.BandwidthMeter
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
@@ -304,6 +309,7 @@ internal fun PlayerRuntimeController.initializePlayer(
             } else {
                 val reason = when (effectiveDv7Mode) {
                     Dv7HandlingMode.HDR10_BASE_LAYER -> "hdr10-base-layer-mode"
+                    Dv7HandlingMode.STRIP_DV -> "strip-dv-mode"
                     Dv7HandlingMode.OFF -> "dv7-mode-off"
                     Dv7HandlingMode.AUTO -> "auto-mode-no-dv81"  // unreachable; AUTO is collapsed above
                     Dv7HandlingMode.DV81_LIBDOVI -> "setting-disabled"  // unreachable
@@ -508,7 +514,66 @@ internal fun PlayerRuntimeController.initializePlayer(
                 AdaptiveTrackSelection.DEFAULT_MIN_DURATION_TO_RETAIN_AFTER_DISCARD_MS,
                 AdaptiveTrackSelection.DEFAULT_BANDWIDTH_FRACTION
             )
-            trackSelector = DefaultTrackSelector(context, adaptiveTrackSelectionFactory).apply {
+            trackSelector = object : DefaultTrackSelector(context, adaptiveTrackSelectionFactory) {
+                override fun selectAllTracks(
+                    mappedTrackInfo: MappedTrackInfo,
+                    rendererFormatSupports: Array<out Array<out IntArray>>,
+                    rendererMixedMimeTypeAdaptationSupports: IntArray,
+                    params: Parameters
+                ): Array<ExoTrackSelection.Definition?> {
+                    val streamMime = currentStreamMimeType
+                    val isHls = streamMime != null && (
+                        streamMime.equals(MimeTypes.APPLICATION_M3U8, ignoreCase = true) ||
+                        streamMime.lowercase().contains("mpegurl") ||
+                        streamMime.lowercase().contains("m3u8")
+                    )
+                    Log.d("NuvioTrackSelector", "selectAllTracks run: streamMime=$streamMime, isHls=$isHls")
+                    if (isHls) {
+                        for (rendererIndex in 0 until mappedTrackInfo.rendererCount) {
+                            if (mappedTrackInfo.getRendererType(rendererIndex) == C.TRACK_TYPE_VIDEO) {
+                                val trackGroups = mappedTrackInfo.getTrackGroups(rendererIndex)
+                                for (groupIndex in 0 until trackGroups.length) {
+                                    val group = trackGroups[groupIndex]
+                                    for (trackIndex in 0 until group.length) {
+                                        val format = group.getFormat(trackIndex)
+                                        val support = rendererFormatSupports[rendererIndex][groupIndex][trackIndex]
+                                        val formatSupport = RendererCapabilities.getFormatSupport(support)
+                                        Log.d("NuvioTrackSelector", "Evaluating track: id=${format.id}, res=${format.width}x${format.height}, mime=${format.sampleMimeType}, codecs=${format.codecs}, support=${formatSupport}")
+                                        if (formatSupport == C.FORMAT_EXCEEDS_CAPABILITIES) {
+                                            val mime = format.sampleMimeType
+                                            val isAvcOrHevc = mime == MimeTypes.VIDEO_H264 || mime == MimeTypes.VIDEO_H265
+                                            val isAtMost1080p = format.width <= 1920 && format.height <= 1080
+                                            val codecs = format.codecs?.lowercase() ?: ""
+                                            val is10Bit = codecs.contains("main10") || codecs.contains("hevc.2") || codecs.contains("hev2")
+                                            val isHdr = format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084
+                                            val isStandard8Bit = !is10Bit && !isHdr
+
+                                            Log.d("NuvioTrackSelector", "Conditions for id=${format.id}: isAvcOrHevc=$isAvcOrHevc, isAtMost1080p=$isAtMost1080p, isStandard8Bit=$isStandard8Bit")
+                                            if (isAvcOrHevc && isAtMost1080p && isStandard8Bit) {
+                                                Log.i("NuvioTrackSelector", "Upgraded track support to FORMAT_HANDLED for id=${format.id}")
+                                                rendererFormatSupports[rendererIndex][groupIndex][trackIndex] =
+                                                    RendererCapabilities.create(
+                                                        C.FORMAT_HANDLED,
+                                                        RendererCapabilities.ADAPTIVE_SEAMLESS,
+                                                        RendererCapabilities.getTunnelingSupport(support),
+                                                        RendererCapabilities.getHardwareAccelerationSupport(support),
+                                                        RendererCapabilities.getDecoderSupport(support)
+                                                    )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return super.selectAllTracks(
+                        mappedTrackInfo,
+                        rendererFormatSupports,
+                        rendererMixedMimeTypeAdaptationSupports,
+                        params
+                    )
+                }
+            }.apply {
                 setParameters(buildUponParameters().setAllowInvalidateSelectionsOnRendererCapabilitiesChange(true))
                 if (playerSettings.tunnelingEnabled && !safeAudioModeEnabled) {
                     setParameters(buildUponParameters().setTunnelingEnabled(true))
@@ -633,32 +698,43 @@ internal fun PlayerRuntimeController.initializePlayer(
 
             // The app-level factory performs DV7 conversion for the in-band-RPU containers
             // (MP4/fMP4/TS); MKV goes through the vendored extractor. Pass-through for non-DV.
+            val stripDvRpuEnabled = playerSettings.dv7HandlingMode == Dv7HandlingMode.STRIP_DV
+            if (stripDvRpuEnabled) {
+                Log.i(PlayerRuntimeController.TAG, "DV_RPU_STRIP: enabled — will remove DV RPU NALs")
+            }
+
             val effectiveExtractorsFactory: ExtractorsFactory =
-                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback) {
+                if (isExperimentalDv7ToDv81ActiveForCurrentPlayback || stripDvRpuEnabled) {
                     DolbyVisionExtractorsFactory(
                         delegate = extractorsFactory,
                         config = DolbyVisionConversionConfig(
-                            active = true,
+                            active = isExperimentalDv7ToDv81ActiveForCurrentPlayback,
                             forcedMode = when {
                                 libdoviModeOverrideActive -> libdoviModeOverride
                                 dv7Mode1Forced -> 1
                                 else -> -1
                             },
-                            // Manual-only; in AUTO the mode is auto-picked, so a stored value
-                            // must not override it.
                             preserveMapping = playerSettings.dv7ToDv81PreserveMappingEnabled &&
                                     manualDv81Selected,
                             dv5Enabled = playerSettings.dv5ToDv81Enabled,
                             manualDv81 = manualDv81Selected && !dv7Mode1Forced
-                        )
+                        ),
+                        stripDvRpu = stripDvRpuEnabled
                     )
                 } else {
                     extractorsFactory
                 }
 
-            val bandwidthMeter = DefaultBandwidthMeter.Builder(context)
+            val streamMime = currentStreamMimeType
+            val isHls = streamMime != null && (
+                streamMime.equals(MimeTypes.APPLICATION_M3U8, ignoreCase = true) ||
+                streamMime.lowercase().contains("mpegurl") ||
+                streamMime.lowercase().contains("m3u8")
+            )
+            val rawBandwidthMeter = DefaultBandwidthMeter.Builder(context)
                 .setInitialBitrateEstimate(ADAPTIVE_INITIAL_BITRATE_ESTIMATE_BPS)
                 .build()
+            val bandwidthMeter = SafeBandwidthMeter(rawBandwidthMeter, isHls)
 
             if (showLoadingStatus) _uiState.update { it.copy(loadingMessage = context.getString(R.string.player_loading_building)) }
             // ── Build ExoPlayer ──
@@ -670,7 +746,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 // conversion never runs. (The libass path wires it via buildWithAssSupportCompat.)
                 mediaSourceFactory.configureSubtitleParsing(
                     extractorsFactory =
-                        if (isExperimentalDv7ToDv81ActiveForCurrentPlayback) effectiveExtractorsFactory else null,
+                        if (isExperimentalDv7ToDv81ActiveForCurrentPlayback || stripDvRpuEnabled) effectiveExtractorsFactory else null,
                     subtitleParserFactory = null
                 )
                 val playerDataSourceFactory = PlayerPlaybackNetworking.createDataSourceFactory(context, headers)
@@ -939,6 +1015,14 @@ internal fun PlayerRuntimeController.initializePlayer(
                         updateAvailableTracks(tracks)
                     }
 
+                    override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                        if (videoSize.width > 0 && videoSize.height > 0) {
+                            currentVideoWidth = videoSize.width
+                            currentVideoHeight = videoSize.height
+                            Log.d(PlayerRuntimeController.TAG, "onVideoSizeChanged: updated resolution to ${videoSize.width}x${videoSize.height}")
+                        }
+                    }
+
                     override fun onRenderedFirstFrame() {
                         val isFirstFrame = !hasRenderedFirstFrame  // capture BEFORE flipping
                         hasRenderedFirstFrame = true
@@ -1066,7 +1150,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                         if (isReleasingPlayer && error.errorCode == PlaybackException.ERROR_CODE_TIMEOUT) return
                         cancelFirstFrameWatchdog()
                         val detailedError = buildString {
-                            append(error.message ?: "Playback error")
+                            append(error.message ?: context.getString(R.string.player_error_playback_fallback))
                             val cause = error.cause
                             if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
                                 append(" (HTTP ${cause.responseCode})")
@@ -1437,6 +1521,7 @@ internal fun PlayerRuntimeController.resetLoadingOverlayForNewStream() {
     cancelFirstFrameWatchdog()
     cancelStallWatchdog()
     hasRenderedFirstFrame = false
+    hasMarkedCurrentEpisodeCompleted = false
     shouldEnforceAutoplayOnFirstReady = true
     userPausedManually = false
     timeoutRecoveryAttempts = 0
@@ -1808,8 +1893,10 @@ private fun friendlyVideoHdrType(
         else -> null
     }
     return when {
-        // Stripped to the HDR10 base layer: output is HDR10/SDR, never Dolby Vision.
+        // Ignore DV data: output is HDR10/SDR, never Dolby Vision.
         effectiveModeName == "HDR10_BASE_LAYER" -> fromTransfer() ?: "HDR10"
+        // DV RPU stripped: output is HDR10 base layer, never Dolby Vision.
+        effectiveModeName == "STRIP_DV" -> fromTransfer() ?: "Strip DV"
         // DV8.1 conversion, but only label it DV if a conversion actually ran. AUTO arms
         // this mode for every file on a DV display, so plain SDR/HDR10 lands here too.
         effectiveModeName == "DV81_LIBDOVI" && dvConversionOccurred -> "Dolby Vision"
@@ -1874,4 +1961,29 @@ private fun buildStableAudioCapabilities(context: Context): AudioCapabilities {
         supportedEncodings += C.ENCODING_DTS
     }
     return AudioCapabilities(supportedEncodings.toIntArray(), detected.maxChannelCount)
+}
+
+private class SafeBandwidthMeter(
+    private val delegate: BandwidthMeter,
+    private val isHls: Boolean
+) : BandwidthMeter {
+    override fun getBitrateEstimate(): Long {
+        val raw = delegate.bitrateEstimate
+        return if (isHls) maxOf(raw, 25_000_000L) else raw
+    }
+
+    override fun getTimeToFirstByteEstimateUs(): Long = delegate.timeToFirstByteEstimateUs
+
+    override fun getTransferListener(): androidx.media3.datasource.TransferListener? = delegate.transferListener
+
+    override fun addEventListener(
+        eventHandler: android.os.Handler,
+        eventListener: BandwidthMeter.EventListener
+    ) {
+        delegate.addEventListener(eventHandler, eventListener)
+    }
+
+    override fun removeEventListener(eventListener: BandwidthMeter.EventListener) {
+        delegate.removeEventListener(eventListener)
+    }
 }
