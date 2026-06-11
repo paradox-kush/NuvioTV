@@ -224,10 +224,19 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                     val message = if (statsHidden) {
                         null
                     } else {
-                        val speed = formatTorrentSpeed(_uiState.value.torrentDownloadSpeed)
-                        val peerInfo = "${_uiState.value.torrentSeeds} seeds \u00B7 ${_uiState.value.torrentPeers} peers"
+                        val speed = formatTorrentSpeed(context, _uiState.value.torrentDownloadSpeed)
+                        val peerInfo = context.getString(
+                            R.string.player_torrent_peer_info,
+                            _uiState.value.torrentSeeds,
+                            _uiState.value.torrentPeers
+                        )
                         val bufLabel = String.format("%.0fs", bufferedSec)
-                        "$bufLabel buffered \u00B7 $peerInfo \u00B7 $speed"
+                        context.getString(
+                            R.string.player_torrent_buffered_status,
+                            bufLabel,
+                            peerInfo,
+                            speed
+                        )
                     }
                     val progress = (bufferedSec / 10f).coerceIn(0f, 1f)
                     _uiState.update {
@@ -1296,10 +1305,10 @@ internal fun PlayerRuntimeController.buildStreamInfoData(): StreamInfoData {
     )
 }
 
-private fun formatTorrentSpeed(bytesPerSec: Long): String {
+private fun formatTorrentSpeed(context: android.content.Context, bytesPerSec: Long): String {
     return when {
-        bytesPerSec >= 1_048_576 -> String.format("%.1f MB/s", bytesPerSec / 1_048_576.0)
-        bytesPerSec >= 1_024 -> String.format("%.0f KB/s", bytesPerSec / 1_024.0)
-        else -> "$bytesPerSec B/s"
+        bytesPerSec >= 1_048_576 -> context.getString(R.string.unit_speed_mb_s, String.format("%.1f", bytesPerSec / 1_048_576.0))
+        bytesPerSec >= 1_024 -> context.getString(R.string.unit_speed_kb_s, String.format("%.0f", bytesPerSec / 1_024.0))
+        else -> context.getString(R.string.unit_speed_b_s, bytesPerSec)
     }
 }
