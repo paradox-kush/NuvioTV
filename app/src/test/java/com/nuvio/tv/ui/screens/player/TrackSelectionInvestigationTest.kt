@@ -491,15 +491,10 @@ class TrackSelectionInvestigationTest {
             .setCodecs("avc1.640028")
             .build()
 
-        // Mock currentTracks structure
-        val mockGroup = mockk<Tracks.Group>(relaxed = true)
-        every { mockGroup.type } returns C.TRACK_TYPE_VIDEO
-        every { mockGroup.isSelected } returns true
-        every { mockGroup.length } returns 1
-        every { mockGroup.getTrackFormat(0) } returns manifestFormat
-
-        val mockTracks = mockk<Tracks>(relaxed = true)
-        every { mockTracks.groups } returns listOf(mockGroup)
+        // Construct real currentTracks structure using media3 class constructors
+        val mediaTrackGroup = TrackGroup(manifestFormat)
+        val realGroup = Tracks.Group(mediaTrackGroup, false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true))
+        val mockTracks = Tracks(com.google.common.collect.ImmutableList.of(realGroup))
         
         every { mockExoPlayer.videoFormat } returns activeFormat
         every { mockExoPlayer.currentTracks } returns mockTracks
@@ -533,5 +528,28 @@ class TrackSelectionInvestigationTest {
         assertEquals(1080, streamInfo.videoHeight)
         assertEquals(1800000, streamInfo.videoBitrate)
         assertEquals("AVC", streamInfo.videoCodec)
+    }
+
+    @Test
+    fun testFormatResolution() {
+        // Cropped widescreen / letterboxed resolutions
+        assertEquals("1918 × 802 (1080p)", formatResolution(1918, 802))
+        assertEquals("854 × 357 (480p)", formatResolution(854, 357))
+        assertEquals("1278 × 530 (720p)", formatResolution(1278, 530))
+        assertEquals("3836 × 1600 (4K)", formatResolution(3836, 1600))
+
+        // Standard resolutions
+        assertEquals("1920 × 1080 (1080p)", formatResolution(1920, 1080))
+        assertEquals("1280 × 720 (720p)", formatResolution(1280, 720))
+        assertEquals("854 × 480 (480p)", formatResolution(854, 480))
+        assertEquals("3840 × 2160 (4K)", formatResolution(3840, 2160))
+
+        // Portrait / vertical resolutions
+        assertEquals("1080 × 1920 (1080p)", formatResolution(1080, 1920))
+        assertEquals("720 × 1280 (720p)", formatResolution(720, 1280))
+
+        // Custom / fallback resolutions
+        assertEquals("640 × 360 (360p)", formatResolution(640, 360))
+        assertEquals("720 × 576 (576p)", formatResolution(720, 576))
     }
 }
