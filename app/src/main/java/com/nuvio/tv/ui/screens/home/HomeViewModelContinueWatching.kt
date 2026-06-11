@@ -2430,8 +2430,19 @@ private fun HomeViewModel.persistLocalContinueWatchingMetadata(
         }
         val persistable = localItems.filter { it.hasRenderableMetadata() }
         if (persistable.isEmpty()) return@launch
+        // Only persist metadata for entries still visible in CW. Between the start
+        // of this pipeline cycle and now the user may have removed items — writing
+        // them back would resurrect them on next launch.
+        val visibleContentIds = _uiState.value.continueWatchingItems.mapNotNullTo(mutableSetOf()) { item ->
+            when (item) {
+                is ContinueWatchingItem.InProgress -> item.progress.contentId
+                is ContinueWatchingItem.NextUp -> item.info.contentId
+            }
+        }
+        val stillVisible = persistable.filter { it.contentId in visibleContentIds }
+        if (stillVisible.isEmpty()) return@launch
         runCatching {
-            watchProgressRepository.saveProgressBatch(persistable, syncRemote = false)
+            watchProgressRepository.saveProgressBatch(stillVisible, syncRemote = false)
         }
     }
 }
