@@ -777,7 +777,7 @@ internal fun PlayerRuntimeController.switchToSourceStream(stream: Stream) {
                 player.playWhenReady = true
                 player.prepare()
             } catch (e: Exception) {
-                _uiState.update { it.copy(error = e.message ?: "Failed to play selected stream") }
+                _uiState.update { it.copy(error = e.message ?: context.getString(com.nuvio.tv.R.string.player_error_play_stream_failed)) }
             }
         }
     } ?: run {

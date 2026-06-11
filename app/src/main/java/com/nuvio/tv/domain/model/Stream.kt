@@ -68,9 +68,15 @@ data class Stream(
     fun isExternal(): Boolean = externalUrl != null && url == null && !externalUrl.isMagnetLink()
 
     /**
+     * Returns a display name for the stream, or null when no field is usable.
+     * UI call sites should substitute a localized fallback (R.string.stream_unknown).
+     */
+    fun getDisplayNameOrNull(): String? = name ?: title ?: description
+
+    /**
      * Returns a display name for the stream
      */
-    fun getDisplayName(): String = name ?: title ?: description ?: "Unknown Stream"
+    fun getDisplayName(): String = getDisplayNameOrNull() ?: "Unknown Stream"
 
     /**
      * Returns a display description for the stream
