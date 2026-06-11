@@ -44,6 +44,7 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.trackselection.ExoTrackSelection
 import androidx.media3.exoplayer.trackselection.MappingTrackSelector.MappedTrackInfo
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
+import androidx.media3.exoplayer.upstream.BandwidthMeter
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
@@ -724,9 +725,16 @@ internal fun PlayerRuntimeController.initializePlayer(
                     extractorsFactory
                 }
 
-            val bandwidthMeter = DefaultBandwidthMeter.Builder(context)
+            val streamMime = currentStreamMimeType
+            val isHls = streamMime != null && (
+                streamMime.equals(MimeTypes.APPLICATION_M3U8, ignoreCase = true) ||
+                streamMime.lowercase().contains("mpegurl") ||
+                streamMime.lowercase().contains("m3u8")
+            )
+            val rawBandwidthMeter = DefaultBandwidthMeter.Builder(context)
                 .setInitialBitrateEstimate(ADAPTIVE_INITIAL_BITRATE_ESTIMATE_BPS)
                 .build()
+            val bandwidthMeter = SafeBandwidthMeter(rawBandwidthMeter, isHls)
 
             if (showLoadingStatus) _uiState.update { it.copy(loadingMessage = context.getString(R.string.player_loading_building)) }
             // ── Build ExoPlayer ──
@@ -1953,4 +1961,29 @@ private fun buildStableAudioCapabilities(context: Context): AudioCapabilities {
         supportedEncodings += C.ENCODING_DTS
     }
     return AudioCapabilities(supportedEncodings.toIntArray(), detected.maxChannelCount)
+}
+
+private class SafeBandwidthMeter(
+    private val delegate: BandwidthMeter,
+    private val isHls: Boolean
+) : BandwidthMeter {
+    override fun getBitrateEstimate(): Long {
+        val raw = delegate.bitrateEstimate
+        return if (isHls) maxOf(raw, 25_000_000L) else raw
+    }
+
+    override fun getTimeToFirstByteEstimateUs(): Long = delegate.timeToFirstByteEstimateUs
+
+    override fun getTransferListener(): androidx.media3.datasource.TransferListener? = delegate.transferListener
+
+    override fun addEventListener(
+        eventHandler: android.os.Handler,
+        eventListener: BandwidthMeter.EventListener
+    ) {
+        delegate.addEventListener(eventHandler, eventListener)
+    }
+
+    override fun removeEventListener(eventListener: BandwidthMeter.EventListener) {
+        delegate.removeEventListener(eventListener)
+    }
 }
