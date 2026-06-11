@@ -53,7 +53,6 @@ data class SyncHomeCatalogPayload(
 )
 
 private data class RemoteHomeCatalogSettings(
-    val platform: String,
     val payload: SyncHomeCatalogPayload,
     val updatedAt: String?,
     val hasHideUnreleasedContent: Boolean
@@ -146,12 +145,6 @@ class HomeCatalogSettingsSyncService @Inject constructor(
             }
 
             Log.d(TAG, "Pull apply success profile=$profileId ${remotePayload.summary()}")
-            if (remote.platform != HOME_CATALOG_SHARED_SYNC_PLATFORM) {
-                runCatching { pushPayload(profileId, loadLocalPayload()) }
-                    .onFailure { e ->
-                        Log.e(TAG, "Failed to migrate home catalog settings to shared row", e)
-                    }
-            }
             Result.success(true)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to pull home catalog settings", e)
@@ -228,7 +221,6 @@ class HomeCatalogSettingsSyncService @Inject constructor(
             return null
         }
         return RemoteHomeCatalogSettings(
-            platform = platform,
             payload = payload,
             updatedAt = blob.updatedAt,
             hasHideUnreleasedContent = blob.settingsJson.containsKey(HIDE_UNRELEASED_CONTENT_KEY)
