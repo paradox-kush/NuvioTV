@@ -200,11 +200,15 @@ class HomeCatalogSettingsSyncService @Inject constructor(
                 )
             }
         val rows = listOfNotNull(shared) + legacyRows
-        val selected = rows
-            .filter { it.payload.items.isNotEmpty() }
-            .maxByOrNull { it.updatedAt.orEmpty() }
-            ?: shared
-            ?: legacyRows.maxByOrNull { it.updatedAt.orEmpty() }
+        val selected = if (shared?.payload?.items?.isNotEmpty() == true) {
+            shared
+        } else {
+            legacyRows
+                .filter { it.payload.items.isNotEmpty() }
+                .maxByOrNull { it.updatedAt.orEmpty() }
+                ?: shared
+                ?: legacyRows.maxByOrNull { it.updatedAt.orEmpty() }
+        }
 
         return selected?.withNewestStandaloneSettings(rows)
     }
