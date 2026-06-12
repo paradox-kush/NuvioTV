@@ -1186,7 +1186,7 @@ private fun StreamCard(
                 )
 
                 streamDescription?.let { description ->
-                    if (description != streamName) {
+                    if (description.isNotBlank() && description != streamName) {
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
