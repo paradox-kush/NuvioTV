@@ -13,6 +13,7 @@
     <locale android:name="id"/>
     <locale android:name="it"/>
     <locale android:name="pl"/>
+    <locale android:name="bg"/>
     <locale android:name="pt-PT"/>
     <locale android:name="pt-BR"/>
     <locale android:name="tr"/>
