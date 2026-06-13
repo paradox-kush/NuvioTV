@@ -93,7 +93,6 @@ class HomeViewModel @Inject constructor(
         private const val MAX_CATALOG_LOAD_CONCURRENCY = 3
         internal const val EXTERNAL_META_PREFETCH_FOCUS_DEBOUNCE_MS = 220L
         internal const val EXTERNAL_META_PREFETCH_ADJACENT_DEBOUNCE_MS = 120L
-        internal const val MAX_POSTER_STATUS_OBSERVERS = 8
     }
 
     internal val _uiState = MutableStateFlow(HomeUiState())
@@ -225,14 +224,12 @@ class HomeViewModel @Inject constructor(
     internal var deferredEnrichItem: MetaPreview? = null
     internal var adjacentItemPrefetchJob: Job? = null
     internal var pendingAdjacentPrefetchItemId: String? = null
-    internal val posterLibraryObserverJobs = mutableMapOf<String, Job>()
     internal val movieWatchedObserverJobs = mutableMapOf<String, Job>()
     internal var movieWatchedBatchJob: Job? = null
     internal var lastMovieWatchedItemKeys: Set<String> = emptySet()
     internal var seriesWatchedObserverJob: Job? = null
     internal var libraryTabsObserverJob: Job? = null
     internal var activePosterListPickerInput: LibraryEntryInput? = null
-    internal var posterStatusObservationEnabled: Boolean = false
     @Volatile
     internal var externalMetaPrefetchEnabled: Boolean = false
     @Volatile
@@ -845,9 +842,7 @@ class HomeViewModel @Inject constructor(
         movieWatchedBatchJob?.cancel()
         seriesWatchedObserverJob?.cancel()
         cancelInFlightCatalogLoads()
-        posterLibraryObserverJobs.values.forEach { it.cancel() }
         movieWatchedObserverJobs.values.forEach { it.cancel() }
-        posterLibraryObserverJobs.clear()
         movieWatchedObserverJobs.clear()
         super.onCleared()
     }
