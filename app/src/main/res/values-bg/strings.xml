@@ -136,28 +136,29 @@
 <string name="error_stream_tried_generic">Опитани стрийм добавки: %1$s. Потокът не може да бъде зареден за id=%2$s (type=%3$s).</string>
 <string name="error_stream_tried_issues">Опитани стрийм добавки: %1$s. Потокът не може да бъде зареден за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
 
-    <string name="continue_watching">Continue Watching</string>
-    <string name="cw_upcoming">Upcoming</string>
-    <string name="cw_next_up">Next Up</string>
-    <string name="cw_new_episode">New Episode</string>
-    <string name="cw_new_season">New Season</string>
-    <string name="cw_resume">Resume</string>
-    <string name="cw_percent_watched">%1$d%% Watched</string>
-    <string name="cw_hours_min_left">%1$dh %2$dm left</string>
-    <string name="cw_min_left">%1$dm Left</string>
-    <string name="cw_almost_done">Almost Done</string>
-    <string name="cw_airs_date">Airs %1$s</string>
-    <string name="cw_airs_today">Airs Today</string>
-    <string name="cw_airs_tomorrow">Airs Tomorrow</string>
-    <plurals name="cw_airs_in_days">
-        <item quantity="one">Airs in %d Day</item>
-        <item quantity="other">Airs in %d Days</item>
+ <string name="continue_watching">Продължаване на гледането</string>
+<string name="cw_upcoming">Предстоящи</string>
+<string name="cw_next_up">Следващ епизод</string>
+<string name="cw_new_episode">Нов епизод</string>
+<string name="cw_new_season">Нов сезон</string>
+<string name="cw_resume">Продължи</string>
+<string name="cw_percent_watched">%1$d%% гледано</string>
+<string name="cw_hours_min_left">%1$dh %2$dm остава</string>
+<string name="cw_min_left">%1$dm остава</string>
+<string name="cw_almost_done">Почти готово</string>
+<string name="cw_airs_date">Излиза на %1$s</string>
+<string name="cw_airs_today">Излиза днес</string>
+<string name="cw_airs_tomorrow">Излиза утре</string>
+<plurals name="cw_airs_in_days">
+    <item quantity="one">Излиза след %d ден</item>
+    <item quantity="other">Излиза след %d дни</item>
+</plurals>
     </plurals>
-    <string name="cw_action_go_to_details">Go to details</string>
-    <string name="cw_action_start_from_beginning">Start from beginning</string>
-    <string name="cw_action_remove">Remove</string>
-    <string name="cw_dialog_subtitle">Choose what you want to do with this item.</string>
-    <string name="home_poster_dialog_subtitle">Title actions</string>
+ <string name="cw_action_go_to_details">Отиди към детайлите</string>
+<string name="cw_action_start_from_beginning">Започни от началото</string>
+<string name="cw_action_remove">Премахни</string>
+<string name="cw_dialog_subtitle">Изберете какво искате да направите с този елемент.</string>
+<string name="home_poster_dialog_subtitle">Действия за заглавие</string>
 
     <string name="catalog_from_addon">from %1$s</string>
     <string name="action_see_all">See All</string>
