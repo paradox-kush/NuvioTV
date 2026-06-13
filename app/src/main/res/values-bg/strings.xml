@@ -10,13 +10,13 @@
     <string name="web_manage_addons_title">Управление на добавки</string>
     <string name="web_manage_addons_subtitle">Управление на донавки, каралози, и колекции</string>
     <string name="web_manage_addons_only_subtitle">Инсталирай или премахни добавки</string>
-    <string name="web_add_addon_url"> Добавка от URL</string>
+    <string name="web_add_addon_url">Добавка от URL</string>
     <string name="web_placeholder_url">https://example.com/manifest.json</string>
     <string name="web_btn_add">Добави</string>
     <string name="web_installed_addons">Инсталирани добавкиs</string>
     <string name="web_no_addons">Няма инсталирани добавки</string>
-    <string name="web_home_catalogs">Home Catalogs and Collections</string>
-    <string name="web_no_catalogs">No home catalogs available</string>
+    <string name="web_home_catalogs">Домашни каталози и колекцииs</string>
+    <string name="web_no_catalogs">Няма налични домашни каталози</string>
     <string name="web_btn_save">Запази променитеs</string>
     <string name="web_connection_lost">Загубена връзка с телевизора</string>
     <string name="web_btn_remove">Премахни</string>
@@ -37,104 +37,104 @@
     <string name="web_btn_dismiss">Откажи</string>
     <string name="web_status_timeout">Времето изтече</string>
     <string name="web_status_msg_timeout">Няма отговор от телевизора. Моля, опитайте отново.</string>
-    <string name="web_status_msg_connection_lost">The TV server is no longer reachable. The changes may have been applied.</string>
-    <string name="web_manage_repos_title">Manage Repositories</string>
-    <string name="web_manage_repos_subtitle">Manage your repositories</string>
-    <string name="web_add_repo_url">Add repository by URL</string>
-    <string name="web_installed">Installed</string>
-    <string name="web_no_repos">No repositories installed</string>
-    <string name="web_error_repo_exists">This repository is already in the list</string>
-    <string name="web_manage_collections_title">Manage Collections</string>
-    <string name="web_manage_collections_subtitle">Create and manage your custom collections</string>
-    <string name="web_status_msg_collections_updated">Your collections have been updated on the TV.</string>
-    <string name="web_tab_addons">Addons</string>
-    <string name="web_tab_home_layout">Home Layout</string>
-    <string name="web_tab_collections">Collections</string>
-    <string name="web_btn_enable_all">Enable All</string>
-    <string name="web_btn_disable_all">Disable All</string>
-    <string name="web_btn_show_all">Show All</string>
-    <string name="web_btn_hide_all">Hide All</string>
-    <string name="web_btn_new_collection">+ New Collection</string>
-    <string name="web_btn_export">Export</string>
-    <string name="web_btn_import">Import</string>
-    <string name="web_no_collections">No collections yet</string>
-    <string name="web_badge_collection">Collection</string>
-    <string name="web_import_collections_title">Import Collections</string>
-    <string name="web_import_tab_paste">Paste</string>
-    <string name="web_import_tab_file">File</string>
-    <string name="web_import_tab_url">URL</string>
-    <string name="web_import_paste_placeholder">Paste collections JSON here...</string>
-    <string name="web_import_file_select">Tap to select a .json file</string>
-    <string name="web_order_send_to_top">Send to top</string>
-    <string name="web_order_send_to_bottom">Send to bottom</string>
-    <string name="web_title_show">Show</string>
-    <string name="web_title_hide">Hide</string>
-    <string name="web_issue_singular">issue</string>
-    <string name="web_issue_plural">issues</string>
-    <string name="web_source_singular">source</string>
-    <string name="web_source_plural">sources</string>
-    <string name="web_source_added">Added</string>
-    <string name="web_no_sources_added">No sources added yet</string>
-    <string name="web_import_select_file_first">Select a file first</string>
-    <string name="web_import_enter_url">Enter a URL</string>
-    <string name="web_import_failed_fetch_url">Failed to fetch URL</string>
-    <string name="web_import_no_json">No JSON provided</string>
-    <string name="web_import_expected_array">Expected a JSON array of collections</string>
-    <string name="web_import_empty_array">Empty array: no collections found</string>
-    <string name="web_import_error_collection_invalid_id">Collection {index}: missing or invalid \"id\"</string>
-    <string name="web_import_error_collection_invalid_title">Collection \"{collection}\": missing or invalid \"title\"</string>
-    <string name="web_import_error_collection_folders_array">Collection \"{collection}\": \"folders\" must be an array</string>
-    <string name="web_import_error_folder_invalid_format">Collection \"{collection}\", folder {index}: invalid format</string>
-    <string name="web_import_error_folder_missing_id">Collection \"{collection}\", folder {index}: missing \"id\"</string>
-    <string name="web_import_error_folder_missing_title">Collection \"{collection}\", folder \"{folder}\": missing \"title\"</string>
-    <string name="web_import_error_sources_array">Collection \"{collection}\", folder \"{folder}\": \"sources\" must be an array</string>
-    <string name="web_import_error_invalid_tile_shape">Collection \"{collection}\", folder \"{folder}\": invalid tileShape \"{shape}\"</string>
-    <string name="web_import_error_source_invalid_format">Collection \"{collection}\", folder \"{folder}\", source {index}: invalid format</string>
-    <string name="web_import_error_source_missing_addon_fields">Collection \"{collection}\", folder \"{folder}\", source {index}: missing required fields (addonId, type, catalogId)</string>
-    <string name="web_import_error_source_missing_tmdb_type">Collection \"{collection}\", folder \"{folder}\", source {index}: missing TMDB source type</string>
-    <string name="web_import_error_source_missing_trakt_id">Collection \"{collection}\", folder \"{folder}\", source {index}: missing Trakt list ID</string>
-    <string name="web_import_success">Imported {count} collection(s). Review and hit Save Changes to apply.</string>
-    <string name="web_import_invalid_json">Invalid JSON</string>
+    <string name="web_status_msg_connection_lost">Телевизорът вече не е достъпен. Възможно е промените да са приложени.</string>
+    <string name="web_manage_repos_title">Управление на хранилища</string>
+    <string name="web_manage_repos_subtitle">Управлявайте своите хранилища</string>
+    <string name="web_add_repo_url">Добавяне на хранилище чрез URL</string>
+    <string name="web_installed">Инсталирано</string>
+    <string name="web_no_repos">Няма инсталирани хранилища</string>
+    <string name="web_error_repo_exists">Това хранилище вече е в списъка</string>
+    <string name="web_manage_collections_title">Управление на колекции</string>
+    <string name="web_manage_collections_subtitle">Създавайте и управлявайте свои колекции</string>
+    <string name="web_status_msg_collections_updated">Колекциите ви бяха обновени на телевизора.</string>
+    <string name="web_tab_addons">Добавки</string>
+    <string name="web_tab_home_layout">Начален екран</string>
+    <string name="web_tab_collections">Колекции</string>
+    <string name="web_btn_enable_all">Включи всички</string>
+    <string name="web_btn_disable_all">Изключи всички</string>
+    <string name="web_btn_show_all">Покажи всички</string>
+    <string name="web_btn_hide_all">Скрий всички</string>
+    <string name="web_btn_new_collection">+ Нова колекция</string>
+    <string name="web_btn_export">Експортиране</string>
+    <string name="web_btn_import">Импортиране</string>
+    <string name="web_no_collections">Все още няма колекции</string>
+    <string name="web_badge_collection">Колекция</string>
+<string name="web_import_collections_title">Импортиране на колекции</string>
+<string name="web_import_tab_paste">Поставяне</string>
+<string name="web_import_tab_file">Файл</string>
+<string name="web_import_tab_url">URL</string>
+<string name="web_import_paste_placeholder">Поставете JSON с колекции тук...</string>
+<string name="web_import_file_select">Докоснете, за да изберете .json файл</string>
+<string name="web_order_send_to_top">Премести най-отгоре</string>
+<string name="web_order_send_to_bottom">Премести най-отдолу</string>
+<string name="web_title_show">Показване</string>
+   <string name="web_title_hide">Скриване</string>
+<string name="web_issue_singular">проблем</string>
+<string name="web_issue_plural">проблеми</string>
+<string name="web_source_singular">източник</string>
+<string name="web_source_plural">източници</string>
+<string name="web_source_added">Добавен</string>
+<string name="web_no_sources_added">Все още няма добавени източници</string>
+<string name="web_import_select_file_first">Първо изберете файл</string>
+<string name="web_import_enter_url">Въведете URL адрес</string>
+<string name="web_import_failed_fetch_url">Неуспешно зареждане от URL адреса</string>
+   <string name="web_import_no_json">Не е предоставен JSON</string>
+<string name="web_import_expected_array">Очаква се JSON масив с колекции</string>
+<string name="web_import_empty_array">Празен масив: не са намерени колекции</string>
+<string name="web_import_error_collection_invalid_id">Колекция {index}: липсващ или невалиден \"id\"</string>
+<string name="web_import_error_collection_invalid_title">Колекция \"{collection}\": липсващо или невалидно \"title\"</string>
+<string name="web_import_error_collection_folders_array">Колекция \"{collection}\": \"folders\" трябва да бъде масив</string>
+<string name="web_import_error_folder_invalid_format">Колекция \"{collection}\", папка {index}: невалиден формат</string>
+<string name="web_import_error_folder_missing_id">Колекция \"{collection}\", папка {index}: липсва \"id\"</string>
+<string name="web_import_error_folder_missing_title">Колекция \"{collection}\", папка \"{folder}\": липсва \"title\"</string>
+<string name="web_import_error_sources_array">Колекция \"{collection}\", папка \"{folder}\": \"sources\" трябва да бъде масив</string>
+   <string name="web_import_error_invalid_tile_shape">Колекция \"{collection}\", папка \"{folder}\": невалидна форма на плочка \"{shape}\"</string>
+<string name="web_import_error_source_invalid_format">Колекция \"{collection}\", папка \"{folder}\", източник {index}: невалиден формат</string>
+<string name="web_import_error_source_missing_addon_fields">Колекция \"{collection}\", папка \"{folder}\", източник {index}: липсват задължителни полета (addonId, type, catalogId)</string>
+<string name="web_import_error_source_missing_tmdb_type">Колекция \"{collection}\", папка \"{folder}\", източник {index}: липсва TMDB тип източник</string>
+<string name="web_import_error_source_missing_trakt_id">Колекция \"{collection}\", папка \"{folder}\", източник {index}: липсва Trakt ID на списък</string>
+<string name="web_import_success">Импортирани са {count} колекции. Прегледайте и натиснете „Запази промените“, за да ги приложите.</string>
+<string name="web_import_invalid_json">Невалиден JSON</string>
 
-    <string name="home_no_addons">No addons installed. Add one to get started.</string>
-    <string name="home_no_catalog_addons">No catalog addons installed. Install a catalog addon to see content.</string>
-    <string name="auth_notice_nuvio_logged_out">You have been signed out of Nuvio. Please sign in again.</string>
-    <string name="auth_notice_trakt_logged_out">You have been signed out of Trakt. Please reconnect.</string>
-    <string name="error_generic">An error occurred</string>
+   <string name="home_no_addons">Няма инсталирани добавки. Добавете една, за да започнете.</string>
+<string name="home_no_catalog_addons">Няма инсталирани каталожни добавки. Инсталирайте каталожна добавка, за да виждате съдържание.</string>
+<string name="auth_notice_nuvio_logged_out">Излезли сте от Nuvio. Моля, влезте отново.</string>
+<string name="auth_notice_trakt_logged_out">Излезли сте от Trakt. Моля, свържете отново акаунта си.</string>
+<string name="error_generic">Възникна грешка</string>
 
-    <string name="action_retry">Retry</string>
-    <string name="error_state_generic_issue">Something went wrong.</string>
-    <string name="error_state_possible_fix">Possible fix: %1$s</string>
-    <string name="error_state_fix_retry_soon">retry in a moment.</string>
-    <string name="error_state_issue_no_metadata_any_addon">This id could not load details because none of the installed addons returned metadata.</string>
-    <string name="error_state_fix_no_metadata_any_addon">try another addon, disable \"Prefer external meta addon\" in Layout settings, or confirm an installed addon supports this id.</string>
-    <string name="error_state_prefix_no_supported_metadata">No installed addon supports metadata for </string>
-    <string name="error_state_prefix_no_addon_for_id">No installed addon could provide metadata for id=</string>
-    <string name="error_state_fix_no_supported_metadata">install or update an addon that supports this content type, then retry.</string>
-    <string name="error_state_prefix_tried_meta_addons">Tried meta addons:</string>
-    <string name="error_state_fix_tried_meta_addons">install an addon that supports this id, or reconfigure/update the addon and retry.</string>
-    <string name="error_state_issue_missing_metadata_for_id">does not have metadata for this id</string>
-    <string name="error_state_fix_missing_metadata_for_id">open this id from a different addon, disable \"Prefer external meta addon\", or check that the addon supports this id.</string>
-    <string name="error_state_issue_addon_unreachable">could not be reached</string>
-    <string name="error_state_fix_addon_unreachable">check your internet connection, verify the addon URL still works, then retry.</string>
-    <string name="error_state_issue_addon_connection_failed">rejected the connection</string>
-    <string name="error_state_fix_addon_connection_failed">make sure the addon server is online and reachable, then retry.</string>
-    <string name="error_state_issue_addon_timeout">took too long to respond</string>
-    <string name="error_state_fix_addon_timeout">retry in a moment, or try a different addon if this keeps happening.</string>
-    <string name="error_state_issue_addon_cleartext">uses an insecure HTTP connection that Android blocked</string>
-    <string name="error_state_fix_addon_cleartext">switch the addon URL to HTTPS or update the addon configuration.</string>
-    <string name="error_state_fix_addon_generic">retry, update or reinstall the addon, or try a different addon.</string>
-    <string name="error_state_addon_issue_template">%1$s: %2$s.</string>
-    <string name="error_meta_not_found">Meta not found</string>
-    <string name="error_meta_no_supported_addon">No installed addon supports metadata for \"%1$s\".</string>
-    <string name="error_meta_no_addon_for_id">No installed addon could provide metadata for id=%1$s (type=%2$s).</string>
-    <string name="error_meta_tried_none">Tried meta addons: %1$s. None of them provided metadata for id=%2$s (type=%3$s).</string>
-    <string name="error_meta_tried_generic">Tried meta addons: %1$s. Metadata could not be loaded for id=%2$s (type=%3$s).</string>
-    <string name="error_meta_tried_issues">Tried meta addons: %1$s. Metadata could not be loaded for id=%2$s (type=%3$s). Issues: %4$s.</string>
-    <string name="error_stream_no_supported_addon">No installed addon supports streams for \"%1$s\".</string>
-    <string name="error_stream_tried_none">Tried stream addons: %1$s. None of them returned streams for id=%2$s (type=%3$s).</string>
-    <string name="error_stream_tried_generic">Tried stream addons: %1$s. Streams could not be loaded for id=%2$s (type=%3$s).</string>
-    <string name="error_stream_tried_issues">Tried stream addons: %1$s. Streams could not be loaded for id=%2$s (type=%3$s). Issues: %4$s.</string>
+    <string name="action_retry">Опитай отново</string>
+<string name="error_state_generic_issue">Нещо се обърка.</string>
+<string name="error_state_possible_fix">Възможно решение: %1$s</string>
+<string name="error_state_fix_retry_soon">опитайте отново след малко.</string>
+<string name="error_state_issue_no_metadata_any_addon">Този ID не може да зареди детайли, защото нито една от инсталираните добавки не върна метаданни.</string>
+<string name="error_state_fix_no_metadata_any_addon">опитайте друга добавка, изключете „Предпочитай външна мета добавка“ в настройките на оформлението или проверете дали инсталирана добавка поддържа този ID.</string>
+<string name="error_state_prefix_no_supported_metadata">Няма инсталирана добавка, която да поддържа метаданни за </string>
+<string name="error_state_prefix_no_addon_for_id">Няма инсталирана добавка, която да предостави метаданни за id=</string>
+<string name="error_state_fix_no_supported_metadata">инсталирайте или обновете добавка, която поддържа този тип съдържание, след което опитайте отново.</string>
+<string name="error_state_prefix_tried_meta_addons">Опитани мета добавки:</string>
+<string name="error_state_fix_tried_meta_addons">инсталирайте добавка, която поддържа този ID, или преконфигурирайте/обновете добавката и опитайте отново.</string>
+<string name="error_state_issue_missing_metadata_for_id">няма метаданни за този ID</string>
+<string name="error_state_fix_missing_metadata_for_id">отворете този ID от друга добавка, изключете „Предпочитай външна мета добавка“ или проверете дали добавката го поддържа.</string>
+<string name="error_state_issue_addon_unreachable">не може да бъде достигната</string>
+<string name="error_state_fix_addon_unreachable">проверете интернет връзката, уверете се че URL адресът на добавката работи и опитайте отново.</string>
+<string name="error_state_issue_addon_connection_failed">отказа връзката</string>
+   <string name="error_state_fix_addon_connection_failed">уверете се, че сървърът на добавката е онлайн и достъпен, след което опитайте отново.</string>
+<string name="error_state_issue_addon_timeout">отне твърде много време за отговор</string>
+<string name="error_state_fix_addon_timeout">опитайте отново след малко или използвайте друга добавка, ако това продължава.</string>
+<string name="error_state_issue_addon_cleartext">използва несигурна HTTP връзка, която Android блокира</string>
+<string name="error_state_fix_addon_cleartext">сменете URL адреса на добавката на HTTPS или обновете конфигурацията ѝ.</string>
+<string name="error_state_fix_addon_generic">опитайте отново, обновете или преинсталирайте добавката, или използвайте друга добавка.</string>
+<string name="error_state_addon_issue_template">%1$s: %2$s.</string>
+<string name="error_meta_not_found">Метаданните не са намерени</string>
+<string name="error_meta_no_supported_addon">Нито една инсталирана добавка не поддържа метаданни за „%1$s“.</string>
+<string name="error_meta_no_addon_for_id">Нито една инсталирана добавка не може да предостави метаданни за id=%1$s (type=%2$s).</string>
+<string name="error_meta_tried_none">Опитани мета добавки: %1$s. Нито една не предостави метаданни за id=%2$s (type=%3$s).</string>
+<string name="error_meta_tried_generic">Опитани мета добавки: %1$s. Метаданните не могат да бъдат заредени за id=%2$s (type=%3$s).</string>
+<string name="error_meta_tried_issues">Опитани мета добавки: %1$s. Метаданните не могат да бъдат заредени за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
+<string name="error_stream_no_supported_addon">Нито една инсталирана добавка не поддържа потоци за „%1$s“.</string>
+<string name="error_stream_tried_none">Опитани стрийм добавки: %1$s. Нито една не върна потоци за id=%2$s (type=%3$s).</string>
+<string name="error_stream_tried_generic">Опитани стрийм добавки: %1$s. Потокът не може да бъде зареден за id=%2$s (type=%3$s).</string>
+<string name="error_stream_tried_issues">Опитани стрийм добавки: %1$s. Потокът не може да бъде зареден за id=%2$s (type=%3$s). Проблеми: %4$s.</string>
 
     <string name="continue_watching">Continue Watching</string>
     <string name="cw_upcoming">Upcoming</string>
