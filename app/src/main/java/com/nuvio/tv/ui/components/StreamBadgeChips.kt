@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,38 +39,52 @@ fun StreamBadgeChips(
     badges: List<StreamBadge>,
     fileSizeBytes: Long? = null,
     showFileSizeBadge: Boolean = false,
+    animate: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val imageBadges = remember(badges) { badges.filter { it.imageURL.isNotBlank() } }
     val sizeBytes = fileSizeBytes.takeIf { showFileSizeBadge }
     if (imageBadges.isEmpty() && sizeBytes == null) return
 
+    val chipAlpha = if (animate) {
+        val alpha = remember { androidx.compose.animation.core.Animatable(0f) }
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            alpha.animateTo(1f, animationSpec = androidx.compose.animation.core.tween(200))
+        }
+        alpha.value
+    } else {
+        1f
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clipToBounds(),
+            .clipToBounds()
+            .then(if (chipAlpha < 1f) Modifier.alpha(chipAlpha) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)
     ) {
-        if (sizeBytes != null) {
-            StreamFileSizeBadge(bytes = sizeBytes)
-        }
         imageBadges.forEach { badge ->
             StreamImportedBadgeChip(badge = badge)
+        }
+        if (sizeBytes != null) {
+            StreamFileSizeBadge(bytes = sizeBytes)
         }
     }
 }
 
 @Composable
 private fun StreamFileSizeBadge(bytes: Long) {
-    val label = remember(bytes) {
+    val gbTemplate = stringResource(R.string.unit_size_gb)
+    val mbTemplate = stringResource(R.string.unit_size_mb)
+    val label = remember(bytes, gbTemplate, mbTemplate) {
         val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
         if (gib >= 1.0) {
             val roundedGiB = round(gib * 10.0) / 10.0
-            "$roundedGiB GB"
+            gbTemplate.format(roundedGiB.toString())
         } else {
             val mib = bytes.toDouble() / (1024.0 * 1024.0)
-            "${round(mib).toInt()} MB"
+            mbTemplate.format(round(mib).toInt().toString())
         }
     }
     val shape = RoundedCornerShape(6.dp)
@@ -91,7 +106,7 @@ private fun StreamFileSizeBadge(bytes: Long) {
 }
 
 @Composable
-private fun StreamImportedBadgeChip(badge: StreamBadge) {
+private fun StreamImportedBadgeChip(badge: StreamBadge, crossfade: Boolean = false) {
     val shape = RoundedCornerShape(6.dp)
     val context = LocalContext.current
     val density = LocalDensity.current

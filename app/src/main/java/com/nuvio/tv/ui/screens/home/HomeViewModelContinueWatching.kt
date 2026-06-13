@@ -542,6 +542,8 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                             state
                         } else if (state.continueWatchingItems == initialItems) {
                             state
+                        } else if (!snapshot.hasLoadedRemoteProgress && state.continueWatchingItems.isNotEmpty() && initialItems.size < state.continueWatchingItems.size) {
+                            state
                         } else {
                             state.copy(continueWatchingItems = initialItems)
                         }
@@ -1047,7 +1049,15 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
 
                 _uiState.update { state ->
                     // Don't overwrite cached CW with empty data while sources are still loading.
-                    if (normalItems.isEmpty() && state.continueWatchingItems.isNotEmpty()) {
+                    // Once remote progress is confirmed loaded (Nuvio Sync completed or Trakt
+                    // responded), trust the empty result — items may have been deleted remotely.
+                    val shouldProtectCache = normalItems.isEmpty() &&
+                        state.continueWatchingItems.isNotEmpty() &&
+                        !snapshot.hasLoadedRemoteProgress
+                    val shouldPreventShrink = !snapshot.hasLoadedRemoteProgress &&
+                        state.continueWatchingItems.isNotEmpty() &&
+                        normalItems.size < state.continueWatchingItems.size
+                    if (shouldProtectCache || shouldPreventShrink) {
                         state
                     } else if (state.continueWatchingItems == normalItems) {
                         state
@@ -1774,8 +1784,11 @@ private suspend fun HomeViewModel.enrichInProgressItem(
         ),
         episodeDescription = if (settings.useEpisodes) tmdbData?.overview
             ?: video?.overview?.takeIf { it.isNotBlank() }
+            ?: meta.description?.takeIf { it.isNotBlank() }
             ?: item.episodeDescription
-        else video?.overview?.takeIf { it.isNotBlank() } ?: item.episodeDescription,
+        else video?.overview?.takeIf { it.isNotBlank() }
+            ?: meta.description?.takeIf { it.isNotBlank() }
+            ?: item.episodeDescription,
         episodeThumbnail = if (settings.useEpisodes) tmdbData?.thumbnail ?: video?.thumbnail.normalizeImageUrl() ?: item.episodeThumbnail else video?.thumbnail.normalizeImageUrl() ?: item.episodeThumbnail,
         episodeImdbRating = if (settings.useBasicInfo) imdbRating else meta.imdbRating,
         genres = genres,
@@ -2201,6 +2214,23 @@ private suspend fun HomeViewModel.resolveMetaForProgress(
             }
             if (summary != null) break
         }
+        // Fallback: if primary addon failed, try all addons before giving up.
+        if (summary == null && !useAllAddons) {
+            for (type in typeCandidates) {
+                for (candidateId in idCandidates) {
+                    attempts += 1
+                    val fallbackResult = withTimeoutOrNull(6_000L) {
+                        metaRepository.getMetaFromAllAddons(
+                            type = type,
+                            id = candidateId
+                        ).first { it !is NetworkResult.Loading }
+                    }
+                    summary = ((fallbackResult as? NetworkResult.Success<*>)?.data as? Meta)?.toCwSummary()
+                    if (summary != null) break
+                }
+                if (summary != null) break
+            }
+        }
         debug?.recordMetaResolveFinished(
             progress = progress,
             elapsedMs = SystemClock.elapsedRealtime() - startedAtMs,
@@ -2410,8 +2440,19 @@ private fun HomeViewModel.persistLocalContinueWatchingMetadata(
         }
         val persistable = localItems.filter { it.hasRenderableMetadata() }
         if (persistable.isEmpty()) return@launch
+        // Only persist metadata for entries still visible in CW. Between the start
+        // of this pipeline cycle and now the user may have removed items — writing
+        // them back would resurrect them on next launch.
+        val visibleContentIds = _uiState.value.continueWatchingItems.mapNotNullTo(mutableSetOf()) { item ->
+            when (item) {
+                is ContinueWatchingItem.InProgress -> item.progress.contentId
+                is ContinueWatchingItem.NextUp -> item.info.contentId
+            }
+        }
+        val stillVisible = persistable.filter { it.contentId in visibleContentIds }
+        if (stillVisible.isEmpty()) return@launch
         runCatching {
-            watchProgressRepository.saveProgressBatch(persistable, syncRemote = false)
+            watchProgressRepository.saveProgressBatch(stillVisible, syncRemote = false)
         }
     }
 }

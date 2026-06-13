@@ -391,7 +391,9 @@ fun StreamScreen(
                     sourceChips = uiState.sourceChips,
                     selectedAddonFilter = uiState.selectedAddonFilter,
                     showFileSizeBadges = streamBadgeSettings.showFileSizeBadges,
+                    showAddonLogo = streamBadgeSettings.showAddonLogo,
                     badgePlacement = streamBadgeSettings.badgePlacement,
+                    hasBadgeRules = streamBadgeSettings.rules.hasImport,
                     onAddonFilterSelected = { viewModel.onEvent(StreamScreenEvent.OnAddonFilterSelected(it)) },
                     onStreamSelected = { stream ->
                         val currentIndex = uiState.filteredStreams.indexOfFirst {
@@ -659,7 +661,9 @@ private fun RightStreamSection(
     sourceChips: List<SourceChipItem>,
     selectedAddonFilter: String?,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
     badgePlacement: StreamBadgePlacement,
+    hasBadgeRules: Boolean = false,
     onAddonFilterSelected: (String?) -> Unit,
     onStreamSelected: (Stream) -> Unit,
     focusedStreamIndex: Int,
@@ -751,7 +755,7 @@ private fun RightStreamSection(
             ) {
                 when {
                     isLoading -> {
-                        LoadingState()
+                        LoadingState(showAddonLogo = showAddonLogo)
                     }
                     error != null -> {
                         ErrorState(
@@ -774,7 +778,9 @@ private fun RightStreamSection(
                             availableAddons = availableAddons,
                             selectedAddonFilter = selectedAddonFilter,
                             showFileSizeBadges = showFileSizeBadges,
+                            showAddonLogo = showAddonLogo,
                             badgePlacement = badgePlacement,
+                            hasBadgeRules = hasBadgeRules,
                             onAddonFilterSelected = { onAddonFilterSelectedGuarded(it) },
                             chipFocusRequesters = chipFocusRequesters,
                             orderedAddonNames = orderedAddonNames,
@@ -886,8 +892,8 @@ private fun AddonFilterChips(
 }
 
 @Composable
-private fun LoadingState() {
-    StreamsSkeletonList()
+private fun LoadingState(showAddonLogo: Boolean = true) {
+    StreamsSkeletonList(showAddonLogo = showAddonLogo)
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -984,7 +990,9 @@ private fun StreamsList(
     availableAddons: List<String> = emptyList(),
     selectedAddonFilter: String? = null,
     showFileSizeBadges: Boolean = true,
+    showAddonLogo: Boolean = true,
     badgePlacement: StreamBadgePlacement = StreamBadgePlacement.BOTTOM,
+    hasBadgeRules: Boolean = false,
     onAddonFilterSelected: (String?) -> Unit = {},
     chipFocusRequesters: List<FocusRequester> = emptyList(),
     orderedAddonNames: List<String> = emptyList(),
@@ -1067,7 +1075,9 @@ private fun StreamsList(
                 StreamCard(
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
+                    showAddonLogo = showAddonLogo,
                     badgePlacement = badgePlacement,
+                    reserveBadgeSpace = hasBadgeRules && stream.badges.isEmpty(),
                     onClick = { onStreamSelected(stream) },
                     focusRequester = when {
                         shouldRestoreFocusedStream && index == focusedStreamIndex.coerceIn(0, (streams.lastIndex).coerceAtLeast(0)) -> restoreFocusRequester
@@ -1092,16 +1102,25 @@ private fun StreamsList(
 private fun StreamCard(
     stream: Stream,
     showFileSizeBadges: Boolean,
+    showAddonLogo: Boolean,
     badgePlacement: StreamBadgePlacement,
+    reserveBadgeSpace: Boolean = false,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
     onUpKey: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val streamName = remember(stream) { stream.getDisplayName() }
+    val unknownStreamLabel = stringResource(R.string.stream_unknown)
+    val streamName = remember(stream, unknownStreamLabel) { stream.getDisplayNameOrNull() ?: unknownStreamLabel }
     val streamDescription = remember(stream) { stream.getDisplayDescription() }
-    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)
+    val hasBadges = stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null) || reserveBadgeSpace
+
+    // Track whether badges transitioned from empty to non-empty while this
+    // card was composed. If they did, we animate. If the card enters
+    // composition with badges already present (tab switch), no animation.
+    val hadBadgesOnFirstComposition = remember { stream.badges.isNotEmpty() }
+    val shouldAnimateBadges = stream.badges.isNotEmpty() && !hadBadgesOnFirstComposition
     // Pre-upscale: decode at 2× target pixels so the hardware compositor
     // has enough pixel data for smooth edges inside Card RenderNodes.
     val logoDecodeSize = remember(density) {
@@ -1147,11 +1166,16 @@ private fun StreamCard(
                 verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.xs)
             ) {
                 if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
-                    StreamBadgeChips(
-                        badges = stream.badges,
-                        fileSizeBytes = stream.behaviorHints?.videoSize,
-                        showFileSizeBadge = showFileSizeBadges
-                    )
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                        StreamBadgeChips(
+                            badges = stream.badges,
+                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            showFileSizeBadge = showFileSizeBadges,
+                            animate = shouldAnimateBadges
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
                     Spacer(modifier = Modifier.height(NuvioTheme.spacing.xxs))
                 }
 
@@ -1162,7 +1186,7 @@ private fun StreamCard(
                 )
 
                 streamDescription?.let { description ->
-                    if (description != streamName) {
+                    if (description.isNotBlank() && description != streamName) {
                         Text(
                             text = description,
                             style = MaterialTheme.typography.bodySmall,
@@ -1172,37 +1196,44 @@ private fun StreamCard(
                 }
 
                 if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
-                    StreamBadgeChips(
-                        badges = stream.badges,
-                        fileSizeBytes = stream.behaviorHints?.videoSize,
-                        showFileSizeBadge = showFileSizeBadges,
-                        modifier = Modifier.padding(top = NuvioTheme.spacing.xxs)
-                    )
+                    if (stream.badges.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints?.videoSize != null)) {
+                        StreamBadgeChips(
+                            badges = stream.badges,
+                            fileSizeBytes = stream.behaviorHints?.videoSize,
+                            showFileSizeBadge = showFileSizeBadges,
+                            animate = shouldAnimateBadges,
+                            modifier = Modifier.padding(top = NuvioTheme.spacing.xxs)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.height(22.dp))
+                    }
                 }
             }
 
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                if (addonLogoModel != null) {
-                    AsyncImage(
-                        model = addonLogoModel,
-                        contentDescription = stream.addonName,
-                        modifier = Modifier
-                            .size(NuvioTheme.spacing.xxl)
-                            .clip(RoundedCornerShape(NuvioTheme.radii.xs)),
-                        contentScale = ContentScale.Fit
+            if (showAddonLogo) {
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    if (addonLogoModel != null) {
+                        AsyncImage(
+                            model = addonLogoModel,
+                            contentDescription = stream.addonName,
+                            modifier = Modifier
+                                .size(NuvioTheme.spacing.xxl)
+                                .clip(RoundedCornerShape(NuvioTheme.radii.xs)),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
+
+                    Text(
+                        text = stream.addonName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = NuvioTheme.extendedColors.textTertiary,
+                        maxLines = 1
                     )
                 }
-
-                Spacer(modifier = Modifier.height(NuvioTheme.spacing.xs))
-
-                Text(
-                    text = stream.addonName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NuvioTheme.extendedColors.textTertiary,
-                    maxLines = 1
-                )
             }
         }
     }
