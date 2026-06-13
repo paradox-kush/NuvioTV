@@ -294,10 +294,10 @@ class ExternalPlaybackTracker @Inject constructor(
         }
     }
 
-    /**
-     * Called when ActivityResult is received from external player.
-     * Processes the result and saves progress.
-     */
+    // ===================== External-player result handling =====================
+
+    /** Entry point for the player's ActivityResult: recover metadata, backfill a missing
+     *  duration if needed, save progress, and auto-advance on completion. */
     fun onActivityResult(result: ExternalPlayerResult?) {
         // If the player killed our process, pendingMetadata is null after recreation —
         // fall back to the persisted copy so we still save progress and auto-advance.
@@ -321,9 +321,8 @@ class ExternalPlaybackTracker @Inject constructor(
             return
         }
 
-        // Raise the auto-next loader now (covers the process-recreated case, where onStart had
-        // no in-memory metadata to raise from). Kept for a completion; dismissed in processResult
-        // if this turns out not to be one.
+        // Raise the loader here too (covers the process-recreated case, where onStart had no
+        // in-memory metadata). Kept for a completion; dismissed below otherwise.
         raiseAutoNextOverlay(metadata)
 
         Log.d(TAG, "External player returned: pos=${result.positionMs}ms, dur=${result.durationMs}ms, endedByUser=${result.endedByUser}")
@@ -370,6 +369,10 @@ class ExternalPlaybackTracker @Inject constructor(
         clearPersistedMetadata()
         stopTracking()
     }
+
+    // --- Duration backfill: for players that report a position but no usable duration (VLC) ---
+    // NOTE: meta runtime is approximate, so the 90% completion check / saved % can be slightly
+    // off — still far better than saving 0% and losing resume + watched entirely.
 
     /**
      * Best-effort duration (ms) for a player that returned a position but no usable duration.
@@ -460,8 +463,10 @@ class ExternalPlaybackTracker @Inject constructor(
         persistedPrefs.edit().clear().apply()
     }
 
-    // True on a natural end (end_by != "user") or, for players that don't report
-    // end_by, when position reached COMPLETED_THRESHOLD (90%).
+    // ===================== Completion + auto-next =====================
+
+    // True on a natural end (end_by != "user"), or for players without end_by once the
+    // position reaches COMPLETED_THRESHOLD (90%).
     private fun isPlaybackCompleted(result: ExternalPlayerResult): Boolean {
         if (!result.endedByUser) return true
         val duration = result.durationMs ?: 0L
@@ -566,8 +571,15 @@ class ExternalPlaybackTracker @Inject constructor(
         }
     }
 
-    /** Hide the auto-advance loader and cancel the pending auto-next, so backing out of the
-     *  "Loading next episode" loader actually stops it instead of advancing anyway. */
+    // ===================== "Loading next episode" loader =====================
+    // WARNING: autoNextOverlay is the ONLY cover for the player->Nuvio transition. To hide the
+    // episode-list flash, raise THIS loader early (raiseAutoNextOverlayOnReturn). Do NOT add a
+    // second full-screen cover to mask the gap — a competing overlay caused flicker and hid this
+    // loader's text. Cancellation: backing out sets autoNextCancelled (reset per launch in
+    // startTracking) so neither the loader nor the advance re-fires for the current return.
+
+    /** Hide the loader and cancel the pending auto-next, so backing out actually stops it
+     *  instead of advancing anyway. Progress is still saved; only the advance is canceled. */
     fun dismissAutoNextOverlay() {
         autoNextCancelled = true
         autoNextJob?.cancel()
@@ -575,13 +587,9 @@ class ExternalPlaybackTracker @Inject constructor(
         _autoNextOverlay.value = null
     }
 
-    /**
-     * Raise the auto-advance loader the instant we return from an external player, before the
-     * result is even parsed, so the transition shows the loader with no episode-list flash.
-     * Called from MainActivity.onStart (earliest point on return) and onActivityResult. No-op
-     * for movies / non-episodes, and idempotent (won't replace an already-shown loader).
-     * Kept if the playback turns out completed; dismissed by onActivityResult otherwise.
-     */
+    /** Raise the loader the instant we return (from MainActivity.onStart, before the result is
+     *  parsed and the window repaints) so there's no episode-list flash. No-op for non-episodes;
+     *  idempotent. Kept for a completion, dismissed by onActivityResult otherwise. */
     fun raiseAutoNextOverlayOnReturn() {
         raiseAutoNextOverlay(pendingMetadata ?: return)
     }
@@ -598,9 +606,9 @@ class ExternalPlaybackTracker @Inject constructor(
         )
     }
 
-    /**
-     * Stop tracking and clean up resources.
-     */
+    // ===================== Tracking lifecycle + Zidoo =====================
+
+    /** Stop tracking and clean up resources. */
     fun stopTracking() {
         zidooMonitorJob?.cancel()
         zidooMonitorJob = null
@@ -650,6 +658,8 @@ class ExternalPlaybackTracker @Inject constructor(
             wp.position
         }
     }
+
+    // ===================== Progress save + Trakt scrobble =====================
 
     private fun saveProgress(
         metadata: ExternalPlaybackMetadata,

@@ -1219,12 +1219,10 @@ class StreamScreenViewModel @Inject constructor(
                 directAutoPlayMessage = null
             )
         }
-        // Keep the loading cover up for a short grace window after returning, so the tracker's
-        // auto-next loader (or its navigation) can take over seamlessly. Without this the
-        // episode list paints for a frame between this overlay hiding and the auto-next overlay
-        // appearing — the "episodes flash then loading screen" on the way back to Nuvio. If
-        // auto-next fires, navigation replaces this screen before the hide runs; on a plain
-        // user exit the cover simply lingers ~0.7s before the episode list shows.
+        // Secondary cover. The primary flash fix is the tracker's auto-next loader (raised in
+        // MainActivity.onStart on return); this just keeps the stream-screen loader up ~0.7s so
+        // the episode list can't paint underneath during the handoff. On auto-next, navigation
+        // replaces this screen first; on a plain exit the cover lingers ~0.7s then the list shows.
         externalOverlayHideJob?.cancel()
         externalOverlayHideJob = viewModelScope.launch {
             kotlinx.coroutines.delay(700L)

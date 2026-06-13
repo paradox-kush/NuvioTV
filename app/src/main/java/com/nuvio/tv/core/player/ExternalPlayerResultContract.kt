@@ -37,14 +37,17 @@ data class ExternalPlayerResult(
 )
 
 /**
- * ActivityResultContract that launches an external video player via ACTION_VIEW
- * and parses the playback position returned by the player (if supported).
- *
- * Supported players:
- * - MX Player: returns "position" (Int, ms), "duration" (Int, ms), "end_by" (String)
- * - VLC: returns "extra_position" (Long, ms), "extra_duration" (Long, ms)
- * - Just Player: returns "position" (Int, ms), "duration" (Int, ms)
- * - mpv-android: returns "position" (Int, ms), "duration" (Int, ms)
+ * ActivityResultContract that launches an external video player via ACTION_VIEW and parses the
+ * playback result. Players disagree wildly on what they return, so [parseResult] is deliberately
+ * lenient. Observed contracts (verified on-device):
+ * - MX Player / mpvNova: position + duration (Int ms) + end_by.
+ * - Just Player: on completion returns ONLY end_by=playback_completion (no position/duration).
+ * - mpv-android (vanilla is.xyz.mpv): position/duration (Int) only on a back-press; at EOF returns
+ *   RESULT_OK with NO extras and no end_by (handled by the heuristic in [parseResult]).
+ * - VLC: extra_position/extra_duration (Long ms), no end_by; duration is <= 0 for network streams
+ *   (the tracker backfills it). Ignores our launch resume extras, so resume into VLC won't take.
+ * - Vimu: position.
+ * - NovaPlayer: returns nothing usable (RESULT_CANCELED + null intent) — cannot be supported here.
  */
 class ExternalPlayerResultContract : ActivityResultContract<ExternalPlayerInput, ExternalPlayerResult?>() {
 
@@ -134,11 +137,12 @@ class ExternalPlayerResultContract : ActivityResultContract<ExternalPlayerInput,
         val endBy = data.getStringExtra("end_by")
         val completedByEndReason = endBy == "playback_completion"
 
-        // Vanilla mpv-android (is.xyz.mpv) includes a position only on a back-press exit; when a
-        // started playback reaches EOF it returns its result action with RESULT_OK and NO extras
-        // at all (no position, duration, or end_by). Treat that exact shape as a completion so it
-        // still auto-advances + marks watched. mpvNova (the fork) sends full data and never hits
-        // this branch.
+        // Vanilla mpv-android (is.xyz.mpv) includes a position only on a back-press; at EOF it
+        // returns its result action with RESULT_OK and NO extras (no position/duration/end_by).
+        // Treat that exact shape as a completion so it still auto-advances + marks watched.
+        // mpvNova (the fork) sends full data and never hits this branch.
+        // WARNING: heuristic — if a future mpv-android build returned this shape for a non-EOF
+        // exit, it would be mis-counted as completed.
         val mpvFinishedWithNoData = resultCode == android.app.Activity.RESULT_OK &&
             data.action == "is.xyz.mpv.MPVActivity.result" &&
             position == null && duration == null && endBy == null
