@@ -370,7 +370,7 @@
     <string name="settings_about_subtitle">Versão e políticas</string>
     <string name="settings_network">Velocidade da rede</string>
     <string name="settings_network_subtitle">Diagnóstico de latência e transferências</string>
-    <string name="settings_advanced">Avançado</string>
+    <string name="settings_advanced">Avançadas</string>
     <string name="settings_advanced_subtitle">Desempenho, navegação, cache e diagnósticos</string>
     <string name="experience_mode_essential">Essencial</string>
     <string name="experience_mode_advanced">Avançado</string>
