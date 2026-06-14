@@ -473,7 +473,8 @@ fun NuvioNavHost(
                                     addonBaseUrl = null,
                                     returnFocusSeason = season,
                                     returnFocusEpisode = episode,
-                                    returnToHomeOnBack = returnToHomeOnBack
+                                    returnToHomeOnBack = returnToHomeOnBack,
+                                    heroBackdropUrl = streamArgs?.getString("backdrop")
                                 )
                             ) {
                                 popUpTo(Screen.Stream.route) { inclusive = true }
@@ -744,7 +745,8 @@ fun NuvioNavHost(
                                     addonBaseUrl = null,
                                     returnFocusSeason = focusSeason,
                                     returnFocusEpisode = focusEpisode,
-                                    returnToHomeOnBack = returnToHomeOnBack
+                                    returnToHomeOnBack = returnToHomeOnBack,
+                                    heroBackdropUrl = args?.getString("backdrop")
                                 )
                             ) {
                                 popUpTo(Screen.Player.route) { inclusive = true }
@@ -860,7 +862,8 @@ fun NuvioNavHost(
                                             itemId = contentId,
                                             itemType = contentType,
                                             addonBaseUrl = null,
-                                            returnToHomeOnBack = returnToHomeOnBack
+                                            returnToHomeOnBack = returnToHomeOnBack,
+                                            heroBackdropUrl = args?.getString("backdrop")
                                         )
                                     ) {
                                         popUpTo(Screen.Player.route) { inclusive = true }
@@ -901,7 +904,8 @@ fun NuvioNavHost(
                                             addonBaseUrl = null,
                                             returnFocusSeason = focusSeason,
                                             returnFocusEpisode = focusEpisode,
-                                            returnToHomeOnBack = returnToHomeOnBack
+                                            returnToHomeOnBack = returnToHomeOnBack,
+                                            heroBackdropUrl = args?.getString("backdrop")
                                         )
                                     ) {
                                         popUpTo(Screen.Player.route) { inclusive = true }
