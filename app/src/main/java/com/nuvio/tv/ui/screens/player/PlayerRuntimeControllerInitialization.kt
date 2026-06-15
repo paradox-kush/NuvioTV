@@ -1211,7 +1211,12 @@ internal fun PlayerRuntimeController.initializePlayer(
                             }
                         }
 
-                        if (error.isAudioTrackInitializationFailure()) {
+                        // AudioTrack init (5001) or write (5002, e.g. ERROR_DEAD_OBJECT on an
+                        // E-AC-3/AC-3 passthrough or offload track) failure: re-select audio with
+                        // passthrough/tunneling off and the channel count constrained to the
+                        // device's capabilities, then fall back to disabling audio so video keeps
+                        // playing — instead of surfacing the fatal error screen.
+                        if (error.isAudioTrackFailure()) {
                             if (!isSafeAudioModeActiveForCurrentPlayback) {
                                 safeAudioForcedStreamUrls.add(currentStreamUrl)
                                 retryCurrentStreamWithSafeAudioFallback(currentPosition)
@@ -1830,8 +1835,7 @@ private fun PlaybackException.isUnexpectedLoaderNullPointer(): Boolean {
             (details.contains("nullpointerexception", ignoreCase = true) && details.contains("matroskaextractor", ignoreCase = true))
 }
 
-private fun PlaybackException.isAudioTrackInitializationFailure(): Boolean {
-    if (errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED) return true
+private fun PlaybackException.isAudioTrackFailure(): Boolean {
     val details = buildString {
         append(message ?: "")
         append(' ')
@@ -1839,7 +1843,7 @@ private fun PlaybackException.isAudioTrackInitializationFailure(): Boolean {
         append(' ')
         append(cause?.cause?.message ?: "")
     }
-    return details.contains("audiotrack init failed", ignoreCase = true)
+    return isAudioTrackFailure(errorCode, details)
 }
 
 private fun PlaybackException.isStuckPlayingNoProgress(): Boolean {
