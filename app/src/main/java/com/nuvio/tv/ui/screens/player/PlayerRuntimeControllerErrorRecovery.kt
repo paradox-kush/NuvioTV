@@ -123,9 +123,8 @@ internal fun isRetryablePlaybackError(error: PlaybackException): Boolean {
 internal fun isAudioTrackFailure(errorCode: Int, combinedMessage: String): Boolean {
     if (errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED) return true
     if (errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED) return true
-    val haystack = combinedMessage.lowercase()
-    return haystack.contains("audiotrack init failed") ||
-        haystack.contains("audiotrack write failed")
+    return combinedMessage.contains("audiotrack init failed", ignoreCase = true) ||
+        combinedMessage.contains("audiotrack write failed", ignoreCase = true)
 }
 
 internal fun PlaybackException.findInvalidResponseCodeException(): HttpDataSource.InvalidResponseCodeException? {
