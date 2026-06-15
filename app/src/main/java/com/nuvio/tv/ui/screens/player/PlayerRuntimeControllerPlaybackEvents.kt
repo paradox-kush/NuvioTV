@@ -608,11 +608,7 @@ internal fun PlayerRuntimeController.adjustSubtitleDelay(deltaMs: Int, showOverl
         }
     }
 
-    _exoPlayer?.let { player ->
-        player.trackSelectionParameters = player.trackSelectionParameters
-            .buildUpon()
-            .build()
-    }
+    refreshActiveSubtitleTrackAfterTimingChange()
     // Remember the delay so it survives to the next session (issue #1063).
     persistTrackPreference()
 
