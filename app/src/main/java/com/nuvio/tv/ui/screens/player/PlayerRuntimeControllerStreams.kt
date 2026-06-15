@@ -1593,16 +1593,10 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                             lastSuccessData = result.data
                             if (!autoSelectTriggered) {
                                 val candidate = when {
-                                    // After the timeout: full select (binge group + mode fallback).
                                     timeoutElapsed -> trySelectStream(result.data)
-                                    // Before the timeout with binge preference on: only an exact
-                                    // binge group match wins; the mode fallback waits for the timeout.
                                     playerSettings.streamAutoPlayPreferBingeGroupForNextEpisode ->
                                         tryBingeGroupOnly(result.data)
-                                    // Before the timeout with binge preference off: the configured
-                                    // mode is the primary selector, so take the first match now
-                                    // instead of waiting the full timeout (#2144).
-                                    else -> trySelectStream(result.data)
+                                    else -> null
                                 }
                                 if (candidate != null) recordSelection(candidate)
                             }
@@ -1640,11 +1634,14 @@ internal fun PlayerRuntimeController.playNextEpisode(userInitiated: Boolean = fa
                     }
                 }
                 innerJob.cancel()
-            } else {
-                // Instant (0) or unlimited: timeoutElapsed immediately so each addon
-                // response triggers a full select attempt in the collect. Resume on
-                // the first match, bounded by the hard ceiling so we never hang.
+            } else if (timeoutSeconds == 0) {
                 timeoutElapsed = true
+                withTimeoutOrNull(NEXT_EPISODE_HARD_TIMEOUT_MS) { searchSettled.await() }
+                if (!autoSelectTriggered) {
+                    lastSuccessData?.let { data -> trySelectStream(data)?.let { recordSelection(it) } }
+                }
+                innerJob.cancel()
+            } else {
                 withTimeoutOrNull(NEXT_EPISODE_HARD_TIMEOUT_MS) { searchSettled.await() }
                 if (!autoSelectTriggered) {
                     lastSuccessData?.let { data -> trySelectStream(data)?.let { recordSelection(it) } }
