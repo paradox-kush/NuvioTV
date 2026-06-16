@@ -445,9 +445,10 @@ internal fun PlayerRuntimeController.initializePlayer(
             }
 
             // VOD cache sits under the buffer master in the UI, so gate it the same way at
-            // runtime (and off during conversion). Set explicitly every time so a stale
-            // value can't leave it running once the master is off.
-            val bufferEngineEffective = playerSettings.bufferEngineEnabled && !libdoviConversionActive
+            // runtime. The low-RAM + confirmed DV7 case is handled dynamically at first frame
+            // (back buffer shrink + budget reduction) rather than blanket-disabling user
+            // settings at init, since the stream content isn't known yet at this point.
+            val bufferEngineEffective = playerSettings.bufferEngineEnabled
             if (bufferEngineEffective) {
                 mediaSourceFactory.vodCacheEnabled = playerSettings.vodCacheEnabled
                 mediaSourceFactory.vodCacheSizeMode = playerSettings.vodCacheSizeMode
@@ -456,13 +457,12 @@ internal fun PlayerRuntimeController.initializePlayer(
                 mediaSourceFactory.vodCacheEnabled = false
             }
 
-            if (playerSettings.parallelNetworkEnabled && !libdoviConversionActive) {
+            if (playerSettings.parallelNetworkEnabled) {
                 mediaSourceFactory.useParallelConnections = playerSettings.useParallelConnections
                 mediaSourceFactory.parallelConnectionCount = playerSettings.parallelConnectionCount
                 mediaSourceFactory.parallelChunkSizeMb = playerSettings.parallelChunkSizeMb
             } else {
-                // Reset each playback so the factory doesn't keep last stream's state; also
-                // off during conversion to avoid piling network buffers on the native cost.
+                // Reset each playback so the factory doesn't keep last stream's state.
                 mediaSourceFactory.useParallelConnections = false
             }
 
@@ -477,8 +477,8 @@ internal fun PlayerRuntimeController.initializePlayer(
             )
 
             currentDiagnostics = currentDiagnostics.copy(
-                bufferEngineEnabled = playerSettings.bufferEngineEnabled && !libdoviConversionActive,
-                parallelNetworkEnabled = playerSettings.parallelNetworkEnabled && !libdoviConversionActive
+                bufferEngineEnabled = playerSettings.bufferEngineEnabled,
+                parallelNetworkEnabled = playerSettings.parallelNetworkEnabled
             )
 
             val safeAudioModeEnabled = safeAudioForcedStreamUrls.contains(url)
