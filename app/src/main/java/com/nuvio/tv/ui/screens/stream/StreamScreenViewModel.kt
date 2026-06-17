@@ -49,6 +49,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1443,6 +1444,8 @@ class StreamScreenViewModel @Inject constructor(
                 }
             }
 
+            var call: okhttp3.Call? = null
+            var fetchJob: kotlinx.coroutines.Job? = null
             try {
                 val trackers = playbackInfo.sources
                     ?.filter { it.startsWith("tracker:") }
@@ -1456,6 +1459,33 @@ class StreamScreenViewModel @Inject constructor(
                 )
                 playUrl = localUrl
                 isTorrentStreamStarted = true
+
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val request = okhttp3.Request.Builder()
+                    .url(localUrl)
+                    .build()
+                val activeCall = client.newCall(request)
+                call = activeCall
+
+                fetchJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    try {
+                        activeCall.execute().use { response ->
+                            if (response.isSuccessful) {
+                                val byteStream = response.body?.byteStream()
+                                val buffer = ByteArray(16384)
+                                while (this@launch.isActive) {
+                                    val read = byteStream?.read(buffer) ?: -1
+                                    if (read == -1) break
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Preload background HTTP request cancelled or failed: ${e.message}")
+                    }
+                }
                 
                 // Wait for TorrServer to preload (or timeout after 60 seconds)
                 val preloaded = kotlinx.coroutines.withTimeoutOrNull(60_000L) {
@@ -1482,6 +1512,8 @@ class StreamScreenViewModel @Inject constructor(
                 }
                 return
             } finally {
+                call?.cancel()
+                fetchJob?.cancel()
                 statsJob.cancel()
                 if (!externalPlayerLaunched && isTorrentStreamStarted) {
                     torrentService.stopStream()
