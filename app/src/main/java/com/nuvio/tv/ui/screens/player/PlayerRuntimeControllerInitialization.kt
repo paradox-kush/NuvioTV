@@ -1365,8 +1365,8 @@ internal fun resolvePreferredAudioLanguages(
         return when (normalized) {
             AudioLanguageOption.DEFAULT,
             AudioLanguageOption.DEVICE,
-            AudioLanguageOption.ORIGINAL,
             SUBTITLE_LANGUAGE_FORCED -> null
+            AudioLanguageOption.ORIGINAL -> contentOriginalLanguage?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
             else -> normalized
         }
     }
