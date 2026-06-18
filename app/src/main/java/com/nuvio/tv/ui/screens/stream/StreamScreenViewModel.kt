@@ -1208,9 +1208,10 @@ class StreamScreenViewModel @Inject constructor(
 
     fun consumeAbortedAutoNextContinuation() = externalPlaybackTracker.consumeAbortedAutoNextContinuation()
 
-    /** Release the MainActivity auto-next loader once this Stream screen has settled. */
+    /** Release the MainActivity auto-next loader once this Stream screen has settled. Hides the
+     *  overlay only; it must not abort the chain, or a fast settle would suppress the next advance. */
     fun dismissExternalAutoNextOverlay() {
-        externalPlaybackTracker.dismissAutoNextOverlay()
+        externalPlaybackTracker.releaseAutoNextOverlay()
     }
 
     /** Set to true when external player is launched, reset on stop. */

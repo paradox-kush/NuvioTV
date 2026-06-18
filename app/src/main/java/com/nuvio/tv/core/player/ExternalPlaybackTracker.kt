@@ -150,6 +150,9 @@ class ExternalPlaybackTracker @Inject constructor(
     // Using a time window instead of a sticky flag means the abort can never get permanently stuck
     // if a continuation never actually launches (e.g. user backed out before it auto-played).
     private var lastAutoNextEmitMs = 0L
+    // Set when the loader is released on a routine screen settle, so a later onStart can't re-raise a
+    // loader that no longer has a job behind it (which would leave it stuck). Reset on a fresh launch.
+    private var autoNextOverlaySuppressed = false
 
     // Fires on external-episode completion; collected by MainActivity to navigate to
     // the next episode's Stream route. replay = 1 so the event still reaches the
@@ -201,6 +204,7 @@ class ExternalPlaybackTracker @Inject constructor(
         if (System.currentTimeMillis() - lastAutoNextEmitMs >= CONTINUATION_WINDOW_MS) {
             autoNextChainAborted = false
         }
+        autoNextOverlaySuppressed = false
         // Next player is launching and will cover the screen — drop the loader.
         _autoNextOverlay.value = null
         // Persist so progress-save + auto-next survive the player killing our process.
@@ -516,11 +520,13 @@ class ExternalPlaybackTracker @Inject constructor(
         val episode = metadata.episode
         val type = metadata.contentType.lowercase()
         if (season == null || episode == null || type !in listOf("series", "tv")) {
+            Log.d(AUTO_NEXT_TAG, "Auto-next skipped: season=$season episode=$episode type=$type")
             return
         }
         // User backed out of the loader — for this return (autoNextCancelled) or to stop a
         // runaway chain (autoNextChainAborted). Don't re-raise the loader or advance.
         if (autoNextCancelled || autoNextChainAborted) {
+            Log.d(AUTO_NEXT_TAG, "Auto-next suppressed (cancelled=$autoNextCancelled, chainAborted=$autoNextChainAborted)")
             _autoNextOverlay.value = null
             return
         }
@@ -623,6 +629,16 @@ class ExternalPlaybackTracker @Inject constructor(
         _autoNextOverlay.value = null
     }
 
+    /** Hide the loader overlay when the Stream screen settles, without aborting the chain, so a
+     *  routine return to the screen never suppresses the next auto-advance. Suppresses re-raising so
+     *  a later onStart can't bring back a loader that no longer has a job behind it. */
+    fun releaseAutoNextOverlay() {
+        autoNextOverlaySuppressed = true
+        autoNextJob?.cancel()
+        autoNextJob = null
+        _autoNextOverlay.value = null
+    }
+
     /** The next-episode auto-play was navigated to but the user has aborted the chain — the Stream
      *  screen calls this to skip the auto-launch and fall back to the source list. Only within the
      *  continuation window, so it can't suppress a fresh first auto-play of an unrelated title. */
@@ -643,7 +659,7 @@ class ExternalPlaybackTracker @Inject constructor(
     }
 
     private fun raiseAutoNextOverlay(metadata: ExternalPlaybackMetadata) {
-        if (autoNextCancelled || autoNextChainAborted) return
+        if (autoNextCancelled || autoNextChainAborted || autoNextOverlaySuppressed) return
         if (metadata.season == null || metadata.episode == null) return
         if (metadata.contentType.lowercase() !in listOf("series", "tv")) return
         if (_autoNextOverlay.value != null) return
