@@ -49,9 +49,10 @@ class SyncBackendRepository @Inject constructor(
             }
 
         val backend = storedSelection
-            ?.backend
-            ?.normalized()
-            ?.takeIf { storedBackend -> SyncBackendDefaults.byId(storedBackend.id) != null }
+            ?.let { selection ->
+                selection.backendId.ifBlank { selection.backend?.id.orEmpty() }
+            }
+            ?.let(SyncBackendDefaults::byId)
             ?: SyncBackendDefaults.hosted()
 
         _state.value = SyncBackendState(
@@ -118,7 +119,7 @@ class SyncBackendRepository @Inject constructor(
         val normalizedBackend = backend.normalized()
         val payload = json.encodeToString(
             StoredSyncBackendSelection(
-                backend = normalizedBackend,
+                backendId = normalizedBackend.id,
                 appliedRevision = revision,
             ),
         )
