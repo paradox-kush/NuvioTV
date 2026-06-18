@@ -1,7 +1,9 @@
 package com.nuvio.tv.data.local
 
 import android.util.Log
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.nuvio.tv.core.profile.ProfileManager
 import com.google.gson.Gson
@@ -33,7 +35,9 @@ class WatchProgressPreferences @Inject constructor(
 
     private val gson = Gson()
     private val watchProgressKey = stringPreferencesKey("watch_progress_map")
-    private val lastSuccessfulPushMsKey = androidx.datastore.preferences.core.longPreferencesKey("last_successful_push_ms")
+    private val lastSuccessfulPushMsKey = longPreferencesKey("last_successful_push_ms")
+    private val deltaCursorKey = longPreferencesKey("watch_progress_delta_cursor")
+    private val deltaInitializedKey = booleanPreferencesKey("watch_progress_delta_initialized")
 
     /** Persisted timestamp of the last successful push to remote. */
     suspend fun getLastSuccessfulPushMs(): Long {
@@ -47,16 +51,45 @@ class WatchProgressPreferences @Inject constructor(
         }
     }
 
+    suspend fun getDeltaCursor(profileId: Int = profileManager.activeProfileId.value): Long {
+        val prefs = store(profileId).data.first()
+        return prefs[deltaCursorKey] ?: 0L
+    }
+
+    suspend fun isDeltaInitialized(profileId: Int = profileManager.activeProfileId.value): Boolean {
+        val prefs = store(profileId).data.first()
+        return prefs[deltaInitializedKey] ?: false
+    }
+
+    suspend fun setDeltaState(cursor: Long, initialized: Boolean = true, profileId: Int = profileManager.activeProfileId.value) {
+        store(profileId).edit { prefs ->
+            prefs[deltaCursorKey] = cursor.coerceAtLeast(0L)
+            prefs[deltaInitializedKey] = initialized
+        }
+        Log.d(TAG, "setDeltaState: profile=$profileId cursor=${cursor.coerceAtLeast(0L)} initialized=$initialized")
+    }
+
     /**
      * Get all watch progress items, sorted by last watched (most recent first)
      * For series, only returns the series-level entry (not individual episode entries)
      * to avoid duplicates in continue watching.
      *
      * JSON parsing, grouping, and sorting are performed off the main thread.
+     * Results are cached — re-parsing only happens when the raw JSON actually changes.
      */
+    @Volatile private var cachedProgressJson: String? = null
+    @Volatile private var cachedProgressResult: List<WatchProgress>? = null
+
     val allProgress: Flow<List<WatchProgress>> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { preferences ->
             val json = preferences[watchProgressKey] ?: "{}"
+
+            // Fast path: if JSON hasn't changed, return cached result immediately.
+            val cached = cachedProgressResult
+            if (json == cachedProgressJson && cached != null) {
+                return@map cached
+            }
+
             val allItems = parseProgressMap(json)
 
             // Group all entries by contentId and pick the most recently watched.
@@ -73,16 +106,34 @@ class WatchProgressPreferences @Inject constructor(
                 .values
                 .filterNotNull()
 
-            latestByContent.sortedByDescending { it.lastWatched }
+            val result = latestByContent.sortedByDescending { it.lastWatched }
+
+            // Cache for next emission
+            cachedProgressJson = json
+            cachedProgressResult = result
+            result
         }.flowOn(Dispatchers.Default)
     }
+
+    @Volatile private var cachedRawProgressJson: String? = null
+    @Volatile private var cachedRawProgressResult: List<WatchProgress>? = null
 
     val allRawProgress: Flow<List<WatchProgress>> = profileManager.activeProfileId.flatMapLatest { pid ->
         factory.get(pid, FEATURE).data.map { preferences ->
             val json = preferences[watchProgressKey] ?: "{}"
-            parseProgressMap(json)
+
+            val cached = cachedRawProgressResult
+            if (json == cachedRawProgressJson && cached != null) {
+                return@map cached
+            }
+
+            val result = parseProgressMap(json)
                 .values
                 .sortedByDescending { it.lastWatched }
+
+            cachedRawProgressJson = json
+            cachedRawProgressResult = result
+            result
         }.flowOn(Dispatchers.Default)
     }
 
@@ -278,7 +329,8 @@ class WatchProgressPreferences @Inject constructor(
         remoteEntries: Map<String, WatchProgress>,
         lastSuccessfulPushMs: Long = 0L,
         profileId: Int = profileManager.activeProfileId.value,
-        removeMissingRemoteEntries: Boolean = true
+        removeMissingRemoteEntries: Boolean = true,
+        isNonTraktId: ((String) -> Boolean)? = null
     ): Boolean {
         var preservedLocalItems = false
         Log.d("WatchProgressPrefs", "mergeRemoteEntries: ${remoteEntries.size} remote entries, lastPushMs=$lastSuccessfulPushMs, profile=$profileId, removeMissing=$removeMissingRemoteEntries")
@@ -290,11 +342,19 @@ class WatchProgressPreferences @Inject constructor(
             // Remove local entries that no longer exist on remote - but protect
             // entries created after the last successful push (they haven't reached
             // remote yet, so their absence doesn't mean deletion on another device).
+            // When isNonTraktId is provided, also protect entries with non-Trakt-
+            // compatible IDs — these can never appear in a Trakt remote response,
+            // so their absence does NOT indicate deletion on another device.
+            // (Nuvio Sync does support these IDs, so callers using Nuvio Sync
+            // should NOT pass isNonTraktId.)
             if (removeMissingRemoteEntries && remoteEntries.isNotEmpty()) {
                 val removedKeys = local.keys - remoteEntries.keys
                 removedKeys.forEach { key ->
                     val localEntry = local[key]
-                    if (localEntry != null && localEntry.lastWatched > lastSuccessfulPushMs) {
+                    if (localEntry != null && isNonTraktId != null && isNonTraktId(localEntry.contentId)) {
+                        Log.d("WatchProgressPrefs", "  preserved key=$key (non-Trakt ID: ${localEntry.contentId})")
+                        preservedLocalItems = true
+                    } else if (localEntry != null && localEntry.lastWatched > lastSuccessfulPushMs) {
                         Log.d("WatchProgressPrefs", "  preserved key=$key (lastWatched=${localEntry.lastWatched} > lastPush=$lastSuccessfulPushMs)")
                         preservedLocalItems = true
                     } else {
@@ -309,9 +369,11 @@ class WatchProgressPreferences @Inject constructor(
                 if (existing == null || remote.lastWatched > existing.lastWatched) {
                     local[key] = mergeDisplayMetadata(remote, existing)
                     Log.d("WatchProgressPrefs", "  merged key=$key (existing=${existing != null})")
-                } else {
+                } else if (existing.lastWatched > remote.lastWatched && existing.lastWatched > lastSuccessfulPushMs) {
                     Log.d("WatchProgressPrefs", "  skipped key=$key (local is newer)")
                     preservedLocalItems = true
+                } else {
+                    Log.d("WatchProgressPrefs", "  skipped key=$key (already synced)")
                 }
             }
 
@@ -319,6 +381,45 @@ class WatchProgressPreferences @Inject constructor(
             Log.d("WatchProgressPrefs", "mergeRemoteEntries: ${pruned.size} entries after prune, writing to DataStore")
             preferences[watchProgressKey] = gson.toJson(pruned)
         }
+        return preservedLocalItems
+    }
+
+    suspend fun applyRemoteChanges(
+        upserts: Map<String, WatchProgress>,
+        deletes: Collection<String>,
+        lastSuccessfulPushMs: Long = 0L,
+        profileId: Int = profileManager.activeProfileId.value
+    ): Boolean {
+        if (upserts.isEmpty() && deletes.isEmpty()) {
+            Log.d(TAG, "applyRemoteChanges: no changes for profile $profileId")
+            return false
+        }
+        var preservedLocalItems = false
+        var beforeCount = 0
+        var afterCount = 0
+        store(profileId).edit { preferences ->
+            val json = preferences[watchProgressKey] ?: "{}"
+            val local = parseProgressMap(json).toMutableMap()
+            beforeCount = local.size
+
+            deletes.forEach { key ->
+                local.remove(key)
+            }
+
+            upserts.forEach { (key, remote) ->
+                val existing = local[key]
+                if (existing == null || remote.lastWatched > existing.lastWatched) {
+                    local[key] = mergeDisplayMetadata(remote, existing)
+                } else if (existing.lastWatched > remote.lastWatched && existing.lastWatched > lastSuccessfulPushMs) {
+                    preservedLocalItems = true
+                }
+            }
+
+            val pruned = pruneOldItems(local)
+            afterCount = pruned.size
+            preferences[watchProgressKey] = gson.toJson(pruned)
+        }
+        Log.d(TAG, "applyRemoteChanges: profile=$profileId before=$beforeCount after=$afterCount upserts=${upserts.size} deletes=${deletes.size} preservedLocal=$preservedLocalItems")
         return preservedLocalItems
     }
 
@@ -349,6 +450,29 @@ class WatchProgressPreferences @Inject constructor(
     suspend fun clearAll() {
         store().edit { preferences ->
             preferences.remove(watchProgressKey)
+            preferences.remove(deltaCursorKey)
+            preferences.remove(deltaInitializedKey)
+        }
+    }
+
+    /**
+     * Clear all watch progress entries EXCEPT those with non-Trakt-compatible IDs
+     */
+    suspend fun clearAllPreservingNonTraktIds(
+        isNonTraktId: (String) -> Boolean
+    ) {
+        store().edit { preferences ->
+            val json = preferences[watchProgressKey] ?: "{}"
+            val map = parseProgressMap(json)
+            val preserved = map.filter { (_, progress) -> isNonTraktId(progress.contentId) }
+            if (preserved.isEmpty()) {
+                preferences.remove(watchProgressKey)
+            } else {
+                preferences[watchProgressKey] = gson.toJson(preserved)
+                Log.d(TAG, "clearAllPreservingNonTraktIds: preserved ${preserved.size} non-Trakt entries")
+            }
+            preferences.remove(deltaCursorKey)
+            preferences.remove(deltaInitializedKey)
         }
     }
 

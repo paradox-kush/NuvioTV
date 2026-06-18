@@ -67,6 +67,20 @@ class DirectDebridStreamFilterTest {
     }
 
     @Test
+    fun `preserves original order by default`() {
+        val low = stream(name = "Low", resolve = resolve(resolution = "720p", size = 4))
+        val large = stream(name = "Large", resolve = resolve(resolution = "2160p", size = 40))
+        val mid = stream(name = "Mid", resolve = resolve(resolution = "1080p", size = 10))
+
+        val result = DirectDebridStreamFilter.filterInstant(
+            listOf(low, large, mid),
+            DebridSettings()
+        )
+
+        assertEquals(listOf("Low", "Large", "Mid"), result.map { it.name })
+    }
+
+    @Test
     fun `limits and sorts streams by quality and size`() {
         val streams = listOf(
             stream(resolve = resolve(resolution = "1080p", size = 20)),
@@ -383,7 +397,7 @@ class DirectDebridStreamFilterTest {
             DebridSettings(streamPreferences = DebridStreamPreferences(requiredVisualTags = listOf(DebridStreamVisualTag.HDR_DV)))
         )
 
-        assertEquals(listOf(92_910_562_472L, 87_052_038_851L, 96_867_354_460L, 89_079_717_868L), hdrDvOnly.map { it.streamSize() })
+        assertEquals(listOf(92_910_562_472L, 96_867_354_460L, 87_052_038_851L, 89_079_717_868L), hdrDvOnly.map { it.streamSize() })
 
         val dvOnly = DirectDebridStreamFilter.filterInstant(
             streams,
@@ -439,7 +453,7 @@ class DirectDebridStreamFilterTest {
             DebridSettings(streamPreferences = DebridStreamPreferences(requiredLanguages = listOf(DebridStreamLanguage.PL)))
         )
 
-        assertEquals(listOf(96_867_354_460L, 48_286_797_994L, 51_056_367_324L, 1_468_475_610L), polishOnly.map { it.streamSize() })
+        assertEquals(listOf(96_867_354_460L, 51_056_367_324L, 48_286_797_994L, 1_468_475_610L), polishOnly.map { it.streamSize() })
 
         val latinoOnly = DirectDebridStreamFilter.filterInstant(
             streams,

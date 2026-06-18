@@ -5,6 +5,7 @@ import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.local.StreamAutoPlaySource
 import com.nuvio.tv.domain.model.AddonStreams
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.StreamDebridCacheState
 
 object StreamAutoPlaySelector {
     fun orderAddonStreams(
@@ -29,8 +30,18 @@ object StreamAutoPlaySelector {
         return directDebridEntries + orderedAddons + pluginEntries
     }
 
-    private fun isPlayable(stream: Stream): Boolean =
-        stream.getStreamUrl() != null || stream.isTorrent() || stream.isDirectDebrid()
+    private fun isPlayable(stream: Stream): Boolean {
+        // External URL streams (e.g. error pages, web links) are not playable.
+        if (stream.isExternal()) return false
+        when (stream.debridCacheStatus?.state) {
+            StreamDebridCacheState.CHECKING,
+            StreamDebridCacheState.NOT_CACHED,
+            StreamDebridCacheState.UNKNOWN -> return false
+            StreamDebridCacheState.CACHED,
+            null -> Unit
+        }
+        return stream.getStreamUrl() != null || stream.isTorrent() || stream.isDirectDebrid()
+    }
 
 
 
@@ -69,6 +80,8 @@ object StreamAutoPlaySelector {
         }
         if (candidateStreams.isEmpty()) return null
 
+        // Binge group matching takes priority over mode — even in MANUAL mode,
+        // a persisted binge group should auto-play without showing the picker.
         val targetBingeGroup = preferredBingeGroup?.trim().orEmpty()
         if (preferBingeGroupInSelection && targetBingeGroup.isNotEmpty()) {
             val bingeGroupMatch = candidateStreams.firstOrNull { stream ->

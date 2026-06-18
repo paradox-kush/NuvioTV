@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.detail
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
@@ -109,7 +111,6 @@ import com.nuvio.tv.ui.components.ErrorState
 import com.nuvio.tv.ui.components.MetaDetailsSkeleton
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.components.TrailerPlayer
-import com.nuvio.tv.ui.theme.NuvioColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.window.Dialog
@@ -223,6 +224,22 @@ fun MetaDetailsScreen(
         contentLanguage: String?
     ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
     onPlayManuallyClick: (
+        videoId: String,
+        contentType: String,
+        contentId: String,
+        title: String,
+        poster: String?,
+        backdrop: String?,
+        logo: String?,
+        season: Int?,
+        episode: Int?,
+        episodeName: String?,
+        genres: String?,
+        year: String?,
+        runtime: Int?,
+        contentLanguage: String?
+    ) -> Unit = { _, _, _, _, _, _, _, _, _, _, _, _, _, _ -> },
+    onPlayStartFromBeginningClick: (
         videoId: String,
         contentType: String,
         contentId: String,
@@ -542,6 +559,42 @@ fun MetaDetailsScreen(
                             meta.resolveContentLanguage()
                         )
                     },
+                    onEpisodeStartFromBeginningClick = { video ->
+                        onPlayStartFromBeginningClick(
+                            video.id,
+                            meta.apiType,
+                            meta.id,
+                            meta.name,
+                            video.thumbnail ?: meta.poster,
+                            meta.backdropUrl,
+                            meta.logo,
+                            video.season,
+                            video.episode,
+                            video.title,
+                            null,
+                            null,
+                            video.runtime,
+                            meta.resolveContentLanguage()
+                        )
+                    },
+                    onPlayStartFromBeginningClick = { videoId ->
+                        onPlayStartFromBeginningClick(
+                            videoId,
+                            meta.apiType,
+                            meta.id,
+                            meta.name,
+                            meta.poster,
+                            meta.backdropUrl,
+                            meta.logo,
+                            null,
+                            null,
+                            null,
+                            genresString,
+                            yearString,
+                            null,
+                            meta.resolveContentLanguage()
+                        )
+                    },
                     showManualPlayOption = effectiveAutoplayEnabled,
                     onPlayButtonFocused = { viewModel.onEvent(MetaDetailsEvent.OnPlayButtonFocused) },
                     onToggleLibrary = { viewModel.onEvent(MetaDetailsEvent.OnToggleLibrary) },
@@ -700,12 +753,12 @@ fun MetaDetailsScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
+                    .padding(top = NuvioTheme.spacing.xl)
                     .background(
                         color = if (uiState.userMessageIsError) {
                             Color(0xFF5A1C1C)
                         } else {
-                            NuvioColors.BackgroundElevated
+                            NuvioTheme.colors.BackgroundElevated
                         },
                         shape = RoundedCornerShape(10.dp)
                     )
@@ -714,7 +767,7 @@ fun MetaDetailsScreen(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NuvioColors.TextPrimary
+                    color = NuvioTheme.colors.TextPrimary
                 )
             }
         }
@@ -794,8 +847,10 @@ private fun MetaDetailsContent(
     onSeasonSelected: (Int) -> Unit,
     onEpisodeClick: (Video) -> Unit,
     onEpisodeManualPlayClick: (Video) -> Unit,
+    onEpisodeStartFromBeginningClick: (Video) -> Unit = {},
     onPlayClick: (String) -> Unit,
     onPlayManuallyClick: (String) -> Unit,
+    onPlayStartFromBeginningClick: (String) -> Unit = {},
     showManualPlayOption: Boolean,
     onPlayButtonFocused: () -> Unit,
     onToggleLibrary: () -> Unit,
@@ -1302,7 +1357,7 @@ private fun MetaDetailsContent(
     }
 
     // Backdrop alpha for crossfade
-    val backgroundColor = NuvioColors.Background
+    val backgroundColor = NuvioTheme.colors.Background
 
     // Pre-compute gradient brushes once
 
@@ -1324,6 +1379,16 @@ private fun MetaDetailsContent(
                 onEpisodeManualPlayClick(heroVideo)
             } else {
                 onPlayManuallyClick(meta.id)
+            }
+        }
+    }
+    val heroPlayStartFromBeginningClick = remember(heroVideo, meta.id, onEpisodeStartFromBeginningClick, onPlayStartFromBeginningClick) {
+        {
+            markHeroRestore()
+            if (heroVideo != null) {
+                onEpisodeStartFromBeginningClick(heroVideo)
+            } else {
+                onPlayStartFromBeginningClick(meta.id)
             }
         }
     }
@@ -1546,7 +1611,7 @@ private fun MetaDetailsContent(
                         nextEpisode = nextEpisode,
                         nextToWatch = nextToWatch,
                         onPlayClick = heroPlayClick,
-                        onPlayLongPress = if (showManualPlayOption) {
+                        onPlayLongPress = if (showManualPlayOption || nextToWatch?.isResume == true) {
                             { showHeroPlayOptionsDialog = true }
                         } else {
                             null
@@ -1617,6 +1682,10 @@ private fun MetaDetailsContent(
                             blurUnwatchedEpisodes = blurUnwatchedEpisodes,
                             onEpisodeClick = episodeClick,
                             onEpisodeManualPlayClick = episodeManualClick,
+                            onEpisodeStartFromBeginningClick = { video ->
+                                markEpisodeRestore(video.id)
+                                onEpisodeStartFromBeginningClick(video)
+                            },
                             showManualPlayOption = showManualPlayOption,
                             onToggleEpisodeWatched = onToggleEpisodeWatched,
                             onMarkSeasonWatched = onMarkSeasonWatched,
@@ -1795,7 +1864,7 @@ private fun MetaDetailsContent(
                                     downFocusRequester = if (shouldShowCommentsSection && canToggleEpisodeComments) commentsSelectedModeFocusRequester else null,
                                     firstItemFocusRequester = ratingsContentFocusRequester,
                                     ratingsGridFocusRequester = ratingsGridFocusRequester,
-                                    modifier = Modifier.heightIn(min = if (!hasItemsBelow) castSectionHeight else 0.dp)
+                                    modifier = Modifier.heightIn(min = if (!hasItemsBelow) castSectionHeight else NuvioTheme.spacing.none)
                                 )
                             }
                         }
@@ -1972,9 +2041,15 @@ private fun MetaDetailsContent(
                 title = meta.name,
                 subtitle = nextToWatch?.displayText ?: stringResource(R.string.hero_play),
                 onDismiss = { showHeroPlayOptionsDialog = false },
+                showPlayManually = showManualPlayOption,
                 onPlayManually = {
                     showHeroPlayOptionsDialog = false
                     heroPlayManualClick()
+                },
+                showStartFromBeginning = nextToWatch?.isResume == true,
+                onStartFromBeginning = {
+                    showHeroPlayOptionsDialog = false
+                    heroPlayStartFromBeginningClick()
                 }
             )
         }
@@ -2017,7 +2092,10 @@ private fun PlayManualOverrideDialog(
     title: String,
     subtitle: String?,
     onDismiss: () -> Unit,
-    onPlayManually: () -> Unit
+    showPlayManually: Boolean = true,
+    onPlayManually: () -> Unit,
+    showStartFromBeginning: Boolean = false,
+    onStartFromBeginning: () -> Unit = {}
 ) {
     val primaryFocusRequester = remember { FocusRequester() }
 
@@ -2030,17 +2108,34 @@ private fun PlayManualOverrideDialog(
         title = title,
         subtitle = subtitle
     ) {
-        Button(
-            onClick = onPlayManually,
-            modifier = Modifier
-                .fillMaxWidth()
-                .focusRequester(primaryFocusRequester),
-            colors = ButtonDefaults.colors(
-                containerColor = NuvioColors.BackgroundCard,
-                contentColor = NuvioColors.TextPrimary
-            )
-        ) {
-            Text(stringResource(R.string.play_manually))
+        if (showPlayManually) {
+            Button(
+                onClick = onPlayManually,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(primaryFocusRequester),
+                colors = ButtonDefaults.colors(
+                    containerColor = NuvioTheme.colors.BackgroundCard,
+                    contentColor = NuvioTheme.colors.TextPrimary
+                )
+            ) {
+                Text(stringResource(R.string.play_manually))
+            }
+        }
+
+        if (showStartFromBeginning) {
+            Button(
+                onClick = onStartFromBeginning,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (!showPlayManually) Modifier.focusRequester(primaryFocusRequester) else Modifier),
+                colors = ButtonDefaults.colors(
+                    containerColor = NuvioTheme.colors.BackgroundCard,
+                    contentColor = NuvioTheme.colors.TextPrimary
+                )
+            ) {
+                Text(stringResource(R.string.cw_action_start_from_beginning))
+            }
         }
     }
 }
@@ -2144,9 +2239,9 @@ private fun PeopleSectionTabs(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 20.dp, start = 48.dp, end = 48.dp)
+            .padding(top = 20.dp, start = NuvioTheme.spacing.xxxl, end = NuvioTheme.spacing.xxxl)
             .focusRestorer(restorerRequester),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         @Composable
         fun androidx.compose.foundation.layout.RowScope.renderTabs(items: List<PeopleTabItem>) {
@@ -2155,7 +2250,7 @@ private fun PeopleSectionTabs(
                     Text(
                         text = "|",
                         style = MaterialTheme.typography.titleLarge,
-                        color = NuvioColors.TextPrimary.copy(alpha = 0.45f),
+                        color = NuvioTheme.colors.TextPrimary.copy(alpha = 0.45f),
                         modifier = Modifier.padding(horizontal = 10.dp)
                     )
                 }
@@ -2212,8 +2307,8 @@ private fun PeopleSectionTabButton(
         ),
         border = CardDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(0.dp, Color.Transparent),
-                shape = RoundedCornerShape(16.dp)
+                border = BorderStroke(NuvioTheme.spacing.none, Color.Transparent),
+                shape = RoundedCornerShape(NuvioTheme.radii.xl)
             )
         ),
         scale = CardDefaults.scale(focusedScale = 1.03f)
@@ -2222,11 +2317,11 @@ private fun PeopleSectionTabButton(
             text = label,
             style = MaterialTheme.typography.titleLarge,
             color = when {
-                isFocused -> NuvioColors.TextPrimary
-                selected -> NuvioColors.TextPrimary.copy(alpha = 0.92f)
-                else -> NuvioColors.TextPrimary.copy(alpha = 0.55f)
+                isFocused -> NuvioTheme.colors.TextPrimary
+                selected -> NuvioTheme.colors.TextPrimary.copy(alpha = 0.92f)
+                else -> NuvioTheme.colors.TextPrimary.copy(alpha = 0.55f)
             },
-            modifier = Modifier.padding(horizontal = 2.dp, vertical = 2.dp)
+            modifier = Modifier.padding(horizontal = NuvioTheme.spacing.xxs, vertical = NuvioTheme.spacing.xxs)
         )
     }
 }
@@ -2283,8 +2378,8 @@ private fun LibraryListPickerDialog(
                         Modifier.fillMaxWidth()
                     },
                     colors = ButtonDefaults.colors(
-                        containerColor = if (selected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                        contentColor = NuvioColors.TextPrimary
+                        containerColor = if (selected) NuvioTheme.colors.FocusBackground else NuvioTheme.colors.BackgroundCard,
+                        contentColor = NuvioTheme.colors.TextPrimary
                     )
                 ) {
                     Text(
@@ -2296,15 +2391,15 @@ private fun LibraryListPickerDialog(
             }
         }
 
-        HorizontalDivider(color = NuvioColors.Border, thickness = 1.dp)
+        HorizontalDivider(color = NuvioTheme.colors.Border, thickness = NuvioTheme.spacing.hairline)
 
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Button(
                 onClick = onSave,
                 enabled = !isPending,
                 colors = ButtonDefaults.colors(
-                    containerColor = NuvioColors.BackgroundCard,
-                    contentColor = NuvioColors.TextPrimary
+                    containerColor = NuvioTheme.colors.BackgroundCard,
+                    contentColor = NuvioTheme.colors.TextPrimary
                 )
             ) {
                 Text(if (isPending) stringResource(R.string.action_saving) else stringResource(R.string.action_save))

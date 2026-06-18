@@ -11,6 +11,7 @@ import com.nuvio.tv.domain.model.CollectionFolder
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.ui.util.localizeEpisodeTitle
+import com.nuvio.tv.ui.util.localizedContentType
 import com.nuvio.tv.ui.util.computeAirDateBadgeText
 import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.R
@@ -316,7 +317,7 @@ internal fun buildContinueWatchingItem(
                 isSeries && episodeCode != null && episodeTitle != null -> "$episodeCode · $episodeTitle"
                 isSeries && episodeCode != null -> episodeCode
                 isSeries && episodeTitle != null -> episodeTitle
-                else -> item.progress.contentType.replaceFirstChar { ch -> ch.uppercase() }
+                else -> localizedContentType(context, item.progress.contentType)
             }
             HeroPreview(
                 title = item.progress.name,
@@ -610,7 +611,7 @@ internal fun extractYearOrRange(releaseInfo: String?): String? {
 @Volatile
 private var cachedDateFormatLocale: java.util.Locale? = null
 @Volatile
-private var cachedDateFormat: java.text.SimpleDateFormat? = null
+private var cachedDateFormatPattern: String? = null
 
 internal fun extractYearText(type: ContentType, releaseInfo: String?, released: String?, showFullDate: Boolean = true): String? {
     if (showFullDate && type == ContentType.MOVIE) {
@@ -618,18 +619,15 @@ internal fun extractYearText(type: ContentType, releaseInfo: String?, released: 
             ?.let { runCatching { java.time.OffsetDateTime.parse(it).toLocalDate() }.getOrNull() }
             ?.let {
                 val locale = java.util.Locale.getDefault()
-                val fmt = if (locale == cachedDateFormatLocale && cachedDateFormat != null) {
-                    cachedDateFormat!!
+                val pattern = if (locale == cachedDateFormatLocale && cachedDateFormatPattern != null) {
+                    cachedDateFormatPattern!!
                 } else {
-                    val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "dMMMMy")
-                    java.text.SimpleDateFormat(pattern, locale).also {
-                        cachedDateFormat = it
+                    android.text.format.DateFormat.getBestDateTimePattern(locale, "dMMMMy").also { p ->
+                        cachedDateFormatPattern = p
                         cachedDateFormatLocale = locale
                     }
                 }
-                fmt.format(
-                    java.util.Date(it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())
-                )
+                java.time.format.DateTimeFormatter.ofPattern(pattern, locale).format(it)
             }
         if (full != null) return full
     }
@@ -639,7 +637,7 @@ internal fun extractYearText(type: ContentType, releaseInfo: String?, released: 
 private val HOURS_REGEX = "(\\d+)\\s*h".toRegex()
 private val MINUTES_REGEX = "(\\d+)\\s*m(?:in)?".toRegex()
 
-private fun formatHeroRuntime(runtime: String?): String? {
+internal fun formatHeroRuntime(runtime: String?): String? {
     val normalized = runtime?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
     val hours = HOURS_REGEX.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()
     val minutes = MINUTES_REGEX.find(normalized)?.groupValues?.getOrNull(1)?.toIntOrNull()

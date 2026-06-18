@@ -7,11 +7,10 @@
     <string name="type_series_plural">Series</string>
     <string name="type_unknown">Desconocido</string>
 
-    <!-- WebConfigServers -->
-    <string name="web_manage_addons_title">Gestionar addons</string>
-    <string name="web_manage_addons_subtitle">Gestiona addons, catálogos y colecciones</string>
-    <string name="web_manage_addons_only_subtitle">Instalar o eliminar add-ons</string>
-    <string name="web_add_addon_url">Añadir addon mediante URL</string>
+    <string name="web_manage_addons_title">Administrar addons</string>
+    <string name="web_manage_addons_subtitle">Administrar addons, catálogos y colecciones</string>
+    <string name="web_manage_addons_only_subtitle">Instalar o eliminar addons</string>
+    <string name="web_add_addon_url">Agregar addon mediante URL</string>
     <string name="web_placeholder_url">https://example.com/manifest.json</string>
     <string name="web_btn_add">Añadir</string>
     <string name="web_installed_addons">Addons instalados</string>
@@ -97,14 +96,12 @@
     <string name="web_import_success">Se importaron {count} colección(es). Revísalas y presiona Guardar cambios para aplicar.</string>
     <string name="web_import_invalid_json">JSON inválido</string>
 
-    <!-- HomeScreen -->
     <string name="home_no_addons">No hay addons instalados. Agrega uno para empezar.</string>
     <string name="home_no_catalog_addons">No hay addons de catálogo instalados. Instala un addon de catálogo para ver contenido.</string>
     <string name="auth_notice_nuvio_logged_out">Se cerró tu sesión de Nuvio. Por favor, vuelve a iniciar sesión.</string>
     <string name="auth_notice_trakt_logged_out">Se cerró tu sesión de Trakt. Por favor, vuelve a conectarla.</string>
     <string name="error_generic">Ocurrió un error</string>
 
-    <!-- ErrorState -->
     <string name="action_retry">Reintentar</string>
     <string name="error_state_generic_issue">Algo salió mal.</string>
     <string name="error_state_possible_fix">Posible solución: %1$s</string>
@@ -139,7 +136,6 @@
     <string name="error_stream_tried_generic">Addons de stream probados: %1$s. No se pudieron cargar los streams para el id=%2$s (tipo=%3$s).</string>
     <string name="error_stream_tried_issues">Addons de stream probados: %1$s. No se pudieron cargar los streams para el id=%2$s (tipo=%3$s). Problemas: %4$s.</string>
     
-    <!-- ContinueWatchingSection -->
     <string name="continue_watching">Seguir Viendo</string>
     <string name="cw_upcoming">Próximos</string>
     <string name="cw_next_up">Siguiente</string>
@@ -155,7 +151,6 @@
     <string name="cw_airs_tomorrow">Se emite mañana</string>
     <plurals name="cw_airs_in_days">
         <item quantity="one">Se emite en %d día</item>
-        <item quantity="many">Se emite en %d días</item>
         <item quantity="other">Se emite en %d días</item>
     </plurals>
     <string name="cw_action_go_to_details">Ir a los detalles</string>
@@ -164,12 +159,10 @@
     <string name="cw_dialog_subtitle">Elige qué quieres hacer con este elemento.</string>
     <string name="home_poster_dialog_subtitle">Acciones del título</string>
 
-    <!-- CatalogRowSection -->
     <string name="catalog_from_addon">de %1$s</string>
     <string name="action_see_all">Ver todo</string>
     <string name="action_load_more">Cargar más</string>
 
-    <!-- HeroSection -->
     <string name="hero_creator">Creador: %1$s</string>
     <string name="hero_director">Director: %1$s</string>
     <string name="hero_writer">Escritor: %1$s</string>
@@ -183,7 +176,6 @@
     <string name="hero_press_back_trailer">Presiona atrás para salir del tráiler</string>
     <string name="cd_rating">Calificación</string>
 
-    <!-- EpisodesSection -->
     <string name="episodes_season">Temporada %1$d</string>
     <string name="episodes_specials">Especiales</string>
     <string name="episodes_episode">Episodio</string>
@@ -200,7 +192,6 @@
     <string name="play_manually">Reproducir manualmente</string>
     <string name="episodes_season_actions">Acciones de la temporada</string>
 
-    <!-- MetaDetailsViewModel -->
     <string name="detail_added_to_library">Agregado a la biblioteca</string>
     <string name="detail_removed_from_library">Eliminado de la biblioteca</string>
     <string name="detail_episode_marked_watched">Episodio marcado como visto</string>
@@ -216,7 +207,6 @@
     <string name="detail_marked_episodes_unwatched">Episodios marcados como no vistos: %1$d</string>
     <string name="detail_marked_previous_watched">Episodios anteriores marcados como vistos: %1$d</string>
 
-    <!-- MetaDetailsScreen -->
     <string name="detail_btn_play">Reproducir</string>
     <string name="detail_btn_resume">Continuar</string>
     <string name="detail_btn_play_episode">Reproducir T%1$d E%2$d</string>
@@ -305,19 +295,16 @@
     <string name="action_save">Guardar</string>
     <string name="action_saving">Guardando…</string>
 
-    <!-- AppLanguage -->
     <string name="appearance_language">Idioma de la App</string>
     <string name="appearance_language_subtitle">Anular el idioma del sistema</string>
     <string name="appearance_language_system">Predeterminado del sistema</string>
     <string name="appearance_language_dialog_title">Elegir Idioma</string>
     <string name="appearance_language_restart_hint">Reinicia la app para aplicar el cambio de idioma.</string>
 
-    <!-- Font -->
     <string name="appearance_font">Fuente de la App</string>
     <string name="appearance_font_subtitle">Elige tu fuente preferida</string>
     <string name="appearance_font_dialog_title">Elegir Fuente</string>
 
-    <!-- ThemeSettingsScreen -->
     <string name="appearance_title">Apariencia</string>
     <string name="appearance_subtitle">Elige tu tema de color e idioma</string>
     <string name="appearance_color_theme">Tema de color</string>
@@ -337,7 +324,6 @@
     <string name="appearance_font_and_language_subtitle">Elige la tipografía y región usadas en toda la app</string>
     <string name="cd_selected">Seleccionado</string>
 
-    <!-- AboutScreen -->
     <string name="about_title">Acerca de</string>
     <string name="about_subtitle">Información de la app, actualizaciones y enlaces legales</string>
     <string name="about_made_with_love">Hecho con ❤️ por Tapframe y amigos</string>
@@ -361,6 +347,10 @@
     <string name="licenses_attributions_tmdb_body">Nuvio utiliza la API de TMDB para metadatos de películas y series, imágenes, tráilers, reparto, detalles de producción, colecciones y recomendaciones. Este producto utiliza la API de TMDB, pero no está respaldado ni certificado por TMDB.</string>
     <string name="licenses_attributions_trakt_title">Trakt</string>
     <string name="licenses_attributions_trakt_body">Nuvio se conecta a Trakt para autenticación de cuentas, historial de visualización, sincronización de progreso, datos de biblioteca, calificaciones, listas y comentarios. Nuvio no está afiliado ni respaldado por Trakt.</string>
+    <string name="licenses_attributions_premiumize_title">Premiumize</string>
+    <string name="licenses_attributions_premiumize_body">Nuvio se conecta a Premiumize para autenticación de cuenta, acceso a la biblioteca en la nube, verificación de caché y funciones de reproducción en la nube. Nuvio no está afiliado ni respaldado por Premiumize.</string>
+    <string name="licenses_attributions_torbox_title">TorBox</string>
+    <string name="licenses_attributions_torbox_body">Nuvio se conecta a TorBox para autenticación de cuenta, acceso a la biblioteca en la nube, verificación de caché y funciones de reproducción en la nube. Nuvio no está afiliado ni respaldado por TorBox.</string>
     <string name="licenses_attributions_mdblist_title">MDBList</string>
     <string name="licenses_attributions_mdblist_body">Nuvio utiliza MDBList para calificaciones y datos de proveedores de puntuaciones externas. Nuvio no está afiliado ni respaldado por MDBList.</string>
     <string name="licenses_attributions_introdb_title">IntroDB</string>
@@ -381,6 +371,10 @@
     <string name="settings_profiles_subtitle">Administrar perfiles de usuario</string>
     <string name="settings_layout">Diseño</string>
     <string name="settings_layout_subtitle">Estructura de inicio y estilos de pósteres</string>
+    <string name="settings_content_discovery">Contenido y descubrimiento</string>
+    <string name="settings_content_discovery_subtitle">Add-ons, plugins, catálogos y fuentes de descubrimiento</string>
+    <string name="settings_content_discovery_addons_subtitle">Administrar add-ons, el orden de los catálogos y las colecciones</string>
+    <string name="settings_content_discovery_plugins_subtitle">Administrar repositorios y proveedores de streaming</string>
     <string name="settings_plugins">Plugins</string>
     <string name="settings_plugins_subtitle">Repositorios y proveedores</string>
     <string name="settings_integration">Integraciones</string>
@@ -414,6 +408,7 @@
     <string name="essential_stream_selection_subtitle">Elige manualmente o reproduce automáticamente el primer stream disponible.</string>
     <string name="essential_autoplay_next_episode">Reproducción automática del siguiente episodio</string>
     <string name="essential_autoplay_next_episode_subtitle">Continúa al siguiente episodio cuando termine un stream.</string>
+    <string name="external_auto_next_loading">Cargando el siguiente episodio…</string>
     <string name="essential_p2p_streams">Streams P2P</string>
     <string name="essential_p2p_streams_subtitle">Permitir fuentes de stream peer-to-peer.</string>
     <string name="essential_subtitle_language_subtitle">Idioma preferido de subtítulos.</string>
@@ -472,6 +467,7 @@
     <string name="advanced_section_performance">Rendimiento y navegación</string>
     <string name="advanced_section_diagnostics">Diagnósticos</string>
     <string name="advanced_section_cache">Caché</string>
+    <string name="advanced_section_dv_diagnostics" translatable="false">Diagnóstico de Dolby Vision</string>
     <string name="advanced_fast_horizontal_navigation">Navegación horizontal rápida</string>
     <string name="advanced_fast_horizontal_navigation_subtitle">Aumenta la velocidad de repetición del D-pad en filas manteniendo habilitada la limitación de repetición.</string>
     <string name="advanced_nuvio_focus_scroll">Desplazamiento de enfoque de Nuvio</string>
@@ -501,7 +497,6 @@
     <string name="settings_animeskip_subtitle">Marcas de tiempo para omitir intros/outros de anime</string>
     <string name="settings_debrid_subtitle">Fuentes experimentales de cuentas en la nube</string>
 
-    <!-- PlaybackSettingsScreen -->
     <string name="playback_title">Ajustes de Reproducción</string>
     <string name="playback_subtitle">Configurar reproducción de video y opciones de subtítulos</string>
     <string name="cd_decrease">Disminuir</string>
@@ -512,7 +507,6 @@
     <string name="action_none">Ninguno</string>
     <string name="action_close">Cerrar</string>
 
-    <!-- SupportersContributorsScreen -->
     <string name="supporters_contributors_title">Patrocinadores y colaboradores</string>
     <string name="supporters_contributors_subtitle">Las personas que respaldan Nuvio y los colaboradores que lo desarrollan en TV y dispositivos móviles.</string>
     <string name="supporters_contributors_supporters_copy">Los patrocinadores y donantes ayudan a mantener el proyecto en marcha, financian la infraestructura y permiten desarrollar funciones más ambiciosas.</string>
@@ -545,7 +539,6 @@
     <string name="contributors_hide_kofi_qr">Ocultar QR de Ko-fi</string>
     <string name="contributors_profile_unavailable">Enlace al perfil de GitHub no disponible.</string>
 
-    <!-- PlaybackSettingsSections -->
     <string name="playback_section_general">General</string>
     <string name="playback_section_general_desc">Comportamiento principal de reproducción.</string>
     <string name="playback_loading_overlay">Pantalla de Carga</string>
@@ -578,8 +571,10 @@
     <string name="playback_engine_mvplayer">Libmpv (Beta)</string>
     <string name="playback_auto_switch_internal_player_on_error">Cambiar automáticamente de motor en caso de error al iniciar</string>
     <string name="playback_auto_switch_internal_player_on_error_sub">Si falla el inicio del stream, alterna automáticamente entre ExoPlayer y libmpv.</string>
-    <string name="playback_section_audio">Audio y Tráiler</string>
-    <string name="playback_section_audio_desc">Comportamiento del tráiler y controles de audio.</string>
+    <string name="playback_external_forward_subtitles">Enviar subtítulos al reproductor externo</string>
+    <string name="playback_external_forward_subtitles_sub">Obtén subtítulos en tu idioma preferido desde los addons y envíalos al reproductor externo.</string>
+    <string name="playback_section_audio">Audio y video</string>
+    <string name="playback_section_audio_desc">Controles de audio y compatibilidad de video.</string>
     <string name="playback_section_subtitles">Subtítulos</string>
     <string name="playback_section_subtitles_desc">Idioma, estilo y modo de renderizado.</string>
     <string name="playback_afr_open">Abrir</string>
@@ -607,7 +602,7 @@
     <string name="playback_engine_exoplayer_desc">Mejor compatibilidad con las funciones actuales de Nuvio.</string>
     <string name="playback_engine_mvplayer_desc">Usa libmpv con controles OSD de Nuvio. Experimental.</string>
 
-    <!-- PlaybackAudioSettings -->
+    <string name="video_section">Video</string>
     <string name="audio_trailer_section">Tráiler</string>
     <string name="audio_autoplay_trailers">Auto-reproducir Tráileres</string>
     <string name="audio_autoplay_trailers_sub">Reproducir automáticamente los tráileres en la pantalla de detalles tras un periodo de inactividad</string>
@@ -630,13 +625,47 @@
     <string name="audio_decoder_prefer_device">Preferir decodificadores del dispositivo</string>
     <string name="audio_decoder_prefer_app">Preferir decodificadores de la app (FFmpeg)</string>
     <string name="audio_decoder_priority">Prioridad de Decodificación</string>
-    <string name="audio_enable_downmix_title">Habilitar mezcla descendente</string>
-    <string name="audio_enable_downmix_subtitle">Usa la ruta de mezcla descendente de FFmpeg. Cuando está deshabilitado, el audio sigue la ruta anterior de Android/dispositivo.</string>
+    <string name="audio_enable_downmix_title">Activar downmix</string>
+    <string name="audio_enable_downmix_subtitle">Utiliza la ruta de downmix de FFmpeg. Cuando está desactivado, el audio utiliza la ruta anterior de Android/dispositivo.</string>
     <string name="audio_tunneled">Reproducción en túnel</string>
-    <string name="audio_tunneled_sub">Sincronización de audio/video a nivel de hardware. Puede mejorar la reproducción en algunos dispositivos Android TV</string>
-    <string name="audio_dv_sub">Mapear el perfil 7 de Dolby Vision a HEVC estándar para dispositivos sin soporte de hardware DV</string>
+    <string name="audio_tunneled_sub">Sincronización de audio y video a nivel de hardware. Puede mejorar la reproducción en algunos dispositivos Android TV.</string>
+    <string name="audio_force_optical_passthrough">Forzar transcodificación AC-3 (Óptico/SPDIF)</string>
+    <string name="audio_force_optical_passthrough_sub">Transcodifica formatos multicanal (TrueHD, DTS, AAC, etc.) a Dolby Digital 5.1 en tiempo real para conexiones ópticas/SPDIF.</string>
+    <!-- DV7 Handling Mode -->   
+    <string name="dv7_handling_title">Gestión de Dolby Vision Perfil 7</string>
+    <string name="dv7_handling_dialog_subtitle">Elige cómo se procesan los streams Dolby Vision Perfil 7 durante la reproducción.</string>
+    <string name="dv7_mode_auto">Automático (recomendado)</string>
+    <string name="dv7_mode_auto_desc">Detecta tu pantalla y selecciona el mejor modo. Si se producen problemas de reproducción, prueba con la capa base HDR10.</string>
+    <string name="dv7_mode_hdr10_base_layer">Capa base HDR10</string>
+    <string name="dv7_mode_hdr10_base_layer_desc">Elimina siempre Dolby Vision y reproduce la capa base HEVC HDR10.</string>
+    <string name="dv7_mode_dv81_libdovi">Convertir a DV8.1</string>
+    <string name="dv7_mode_dv81_libdovi_desc">Convierte DV7 a DV8.1 de una sola capa. Requiere una pantalla compatible con Dolby Vision.</string>
+    <string name="dv7_mode_off">Desactivado (nativo)</string>
+    <string name="dv7_mode_off_desc">Transmite DV7 sin modificaciones. Puede presentar fallos en hardware que no sea compatible con Dolby Vision Perfil 7.</string>
+    <string name="dv7_mode_strip_dv">Siempre quitar DV</string>
+    <string name="dv7_mode_strip_dv_desc">Elimina la capa RPU de Dolby Vision de todas las transmisiones.</string>
+    <string name="audio_dv5_to_dv81_title">Convertir DV5 a DV8.1</string>
+    <string name="audio_dv5_to_dv81_sub">Identifica los streams Perfil 5 como Perfil 8.1 para una salida compatible con HDR10. Ayuda en dispositivos que no cuentan con un decodificador DV5 nativo.</string>
+    <string name="audio_strip_hdr10plus_title">Eliminar metadatos HDR10+</string>
+    <string name="audio_strip_hdr10plus_sub">Elimina los metadatos dinámicos HDR10+ de las transmisiones. Si la opción Convertir a DV8.1 también está habilitada, la eliminación se realiza después de la conversión.</string>
+    <string name="audio_dv7_preserve_mapping_title">Conservar mapeo DV (DV7 a DV8.1)</string>
+    <string name="audio_dv7_preserve_mapping_sub">Mantiene el mapeo de tonos original previsto por el creador a costa de un procesamiento ligeramente mayor por fotograma.</string>
+    <string name="dv7_libdovi_mode_caption" translatable="false">Modo de conversión (seleccionado automáticamente; no lo cambies salvo que se te indique). Selecciona uno para forzarlo; Ninguno utiliza el modo automático. Solo está activo cuando la gestión de DV7 está configurada en Convertir a DV8.1.</string>
+    <string name="dv7_libdovi_mode_row_title" translatable="false">Modo de conversión</string>
+    <string name="dv7_libdovi_mode_none_title" translatable="false">Ninguno</string>
+    <string name="dv7_libdovi_mode_none_sub" translatable="false">Sin sobrescritura. Utiliza el modo de conversión seleccionado automáticamente.</string>
+    <string name="dv7_libdovi_mode_0_title" translatable="false">Modo 0 — Copiar (sin convertir)</string>
+    <string name="dv7_libdovi_mode_0_sub" translatable="false">Analiza el RPU y lo vuelve a escribir sin modificaciones. Sin conversión de perfil.</string>
+    <string name="dv7_libdovi_mode_1_title" translatable="false">Modo 1 — MEL</string>
+    <string name="dv7_libdovi_mode_1_sub" translatable="false">Convierte el RPU para que sea compatible con MEL (Minimum Enhancement Layer).</string>
+    <string name="dv7_libdovi_mode_2_title" translatable="false">Modo 2 — 8.1 (mapeo sin cambios)</string>
+    <string name="dv7_libdovi_mode_2_sub" translatable="false">Convierte al perfil 8.1 con el mapeo de luminancia y crominancia sin modificaciones. Es la conversión estándar.</string>
+    <string name="dv7_libdovi_mode_3_title" translatable="false">Modo 3 — Perfil 5 a 8.1</string>
+    <string name="dv7_libdovi_mode_3_sub" translatable="false">Convierte streams Perfil 5 (DV5) a Perfil 8.1. Es la misma conversión utilizada por la opción Convertir DV5 a DV8.1.</string>
+    <string name="dv7_libdovi_mode_4_title" translatable="false">Modo 4 — 8.4 (estático)</string>
+    <string name="dv7_libdovi_mode_4_sub" translatable="false">Convierte al perfil estático 8.4.</string>
     <string name="audio_mpv_hwdec_title">Decodificación por hardware (solo MPV)</string>
-    <string name="audio_mpv_hwdec_dialog_subtitle">Selecciona cómo libmpv debe usar los decodificadores por hardware.</string>
+    <string name="audio_mpv_hwdec_dialog_subtitle">Selecciona cómo libmpv debe utilizar los decodificadores por hardware.</string>
     <string name="audio_mpv_hwdec_legacy_direct_copy">Legacy (directo -&gt; copia)</string>
     <string name="audio_mpv_hwdec_legacy_direct_copy_desc">Comportamiento predeterminado anterior: intenta primero hardware directo, luego copia a memoria.</string>
     <string name="audio_mpv_hwdec_auto_safe">Automático (seguro)</string>
@@ -652,7 +681,6 @@
     <string name="audio_decoder_prefer_app_desc">Usar decodificadores FFmpeg cuando estén disponibles. Mejor soporte de formatos, pero mayor uso de CPU.</string>
     <string name="audio_decoder_controls">Controla si se usan decodificadores de hardware o software (FFmpeg) para audio y video</string>
 
-    <!-- PlaybackSubtitleSettings -->
     <string name="sub_section">Subtítulos</string>
     <string name="sub_not_set">No configurado</string>
     <string name="sub_forced_lang">Forzados</string>
@@ -699,7 +727,6 @@
     <string name="sub_startup_mode_preferred_desc">Obtener subtítulos de addons antes de la reproducción y adjuntar pistas de idioma preferido/secundario.</string>
     <string name="sub_startup_mode_all_desc">Obtener y adjuntar todos los subtítulos de addons antes de la reproducción. El inicio más lento.</string>
 
-    <!-- PlaybackAutoPlaySettings -->
     <string name="autoplay_reuse_last_link">Reutilizar Último Enlace</string>
     <string name="autoplay_reuse_last_link_sub">Auto-reproducir la última fuente que funcionó para esta película/episodio si la caché sigue activa</string>
     <string name="autoplay_last_link_cache">Duración de la Caché del Último Enlace</string>
@@ -716,6 +743,8 @@
     <string name="autoplay_next_episode_sub">Iniciar el siguiente episodio automáticamente cuando aparezca el aviso.</string>
     <string name="autoplay_prefer_binge_group">Preferir grupo de maratón (Binge)</string>
     <string name="autoplay_prefer_binge_group_sub">Intenta primero con el mismo perfil de fuente (mismo addon/calidad) antes de las reglas normales.</string>
+    <string name="autoplay_reuse_binge_group">Reutilizar grupo de maratón</string>
+    <string name="autoplay_reuse_binge_group_sub">Recordar y reutilizar el último grupo de maratón entre sesiones (Seguir viendo, Detalles, etc.).</string>
     <string name="autoplay_threshold_pct">Porcentaje</string>
     <string name="autoplay_threshold_min">Minutos antes del final</string>
     <string name="autoplay_threshold_mode">Modo de Umbral del Siguiente Episodio</string>
@@ -750,7 +779,6 @@
     <string name="autoplay_regex_presets">Ajustes Preestablecidos</string>
     <string name="autoplay_invalid_regex">Patrón regex inválido</string>
 
-    <!-- LayoutSettingsScreen -->
     <string name="layout_title">Ajustes de Diseño</string>
     <string name="layout_subtitle">Ajustar el diseño de inicio, visibilidad de contenido y comportamiento de pósteres</string>
     <string name="layout_classic">Vista Clásica</string>
@@ -799,6 +827,8 @@
     <string name="layout_hide_unreleased_sub">Ocultar películas y series que aún no se han estrenado.</string>
     <string name="layout_section_detail">Página de Detalles</string>
     <string name="layout_section_detail_desc">Ajustes para las pantallas de detalles y episodios.</string>
+    <string name="layout_section_streams">Streams</string>
+    <string name="layout_section_streams_desc">Configuración de visualización para los resultados de streams y los paneles de fuentes del reproductor.</string>
     <string name="layout_section_continue_watching">Continuar viendo</string>
     <string name="layout_section_continue_watching_desc">Configuraciones para la sección Continuar viendo.</string>
     <string name="layout_use_episode_thumbnails_cw">Usar miniaturas de episodios en "Continuar viendo"</string>
@@ -863,7 +893,6 @@
     <string name="layout_custom">Personalizado</string>
 
 
-    <!-- MDBListSettingsScreen -->
     <string name="mdblist_title">Calificaciones de MDBList</string>
     <string name="mdblist_subtitle">Configurar calificaciones externas mostradas en la sección destacada</string>
     <string name="mdblist_enable_title">Habilitar Calificaciones de MDBList</string>
@@ -890,22 +919,31 @@
     <string name="mdblist_not_set">No configurado</string>
     <string name="mdblist_invalid_api_key">Clave API de MDBList inválida</string>
 
-    <string name="debrid_title">Debrid</string>
-    <string name="debrid_subtitle">Fuentes experimentales de cuentas en la nube</string>
-    <string name="debrid_experimental_notice">La compatibilidad con Debrid es experimental y puede mantenerse, modificarse o eliminarse más adelante.</string>
-    <string name="debrid_enable_title">Habilitar fuentes</string>
-    <string name="debrid_enable_subtitle">Mostrar resultados reproducibles de cuentas conectadas.</string>
-    <string name="debrid_add_key_first">Primero agrega una clave API.</string>
-    <string name="debrid_section_account">Cuenta</string>
-    <string name="debrid_section_instant_playback">Reproducción instantánea</string>
-    <string name="debrid_section_filters">Filtros y ordenamiento</string>
-    <string name="debrid_section_formatting">Configuración web</string>
+    <string name="debrid_title">Servicios conectados</string>
+    <string name="debrid_subtitle">Conecta cuentas para enlaces y acceso a la biblioteca</string>
+    <string name="debrid_experimental_notice">Estas integraciones son experimentales y pueden mantenerse, modificarse o eliminarse más adelante.</string>
+    <string name="debrid_cloud_library">Biblioteca en la nube</string>
+    <string name="debrid_cloud_library_description">Explora y reproduce archivos ya disponibles en tus cuentas conectadas.</string>
+    <string name="debrid_enable_title">Resolver enlaces reproducibles</string>
+    <string name="debrid_enable_subtitle">Solicita enlaces reproducibles a un servicio conectado cuando un resultado lo necesite. Esto puede agregar el elemento a ese servicio.</string>
+    <string name="debrid_resolve_with">Resolver con</string>
+    <string name="debrid_resolve_with_description">Elige qué cuenta conectada manejará los enlaces reproducibles.</string>
+    <string name="debrid_add_key_first">Conecta primero una cuenta.</string>
+    <string name="debrid_section_account">Cuentas</string>
+    <string name="debrid_section_instant_playback">Preparación de enlaces</string>
+    <string name="debrid_section_filters">Filtros y orden</string>
+    <string name="debrid_section_formatting">Formato</string>
     <string name="debrid_provider_title">Proveedor</string>
-    <string name="debrid_provider_subtitle">Se agregarán más proveedores más adelante</string>
+    <string name="debrid_provider_subtitle">Se agregarán más proveedores próximamente</string>
     <string name="debrid_provider_torbox">Torbox</string>
     <string name="debrid_provider_available">Torbox</string>
     <string name="debrid_api_key_title">Torbox</string>
     <string name="debrid_api_key_subtitle">Conecta tu cuenta de Torbox.</string>
+    <string name="debrid_provider_description">Conecta tu cuenta de %1$s.</string>
+    <string name="debrid_provider_device_description">Vincula tu cuenta de %1$s en el navegador.</string>
+    <string name="debrid_api_key_dialog_title">Clave API de %1$s</string>
+    <string name="debrid_api_key_dialog_subtitle">Ingresa tu clave API de %1$s.</string>
+    <string name="debrid_api_key_dialog_placeholder">Ingresa la clave API de %1$s</string>
     <string name="debrid_dialog_title">Clave API de Torbox</string>
     <string name="debrid_dialog_subtitle">Ingresa tu clave API de Torbox.</string>
     <string name="debrid_dialog_placeholder">Ingresa la clave API de Torbox</string>
@@ -915,19 +953,39 @@
     <string name="debrid_real_debrid_dialog_subtitle">Ingresa tu token API de Real-Debrid para Direct Debrid</string>
     <string name="debrid_real_debrid_dialog_placeholder">Ingresa el token API de Real-Debrid</string>
     <string name="debrid_not_set">No configurado</string>
+    <string name="debrid_connected">Conectado</string>
+    <string name="debrid_connect_provider">Conectar %1$s</string>
+    <string name="debrid_disconnect_provider">Desconectar %1$s</string>
+    <string name="debrid_disconnect">Desconectar</string>
+    <string name="debrid_device_auth_connected">%1$s está conectado en este dispositivo.</string>
+    <string name="debrid_device_auth_starting">Iniciando inicio de sesión seguro...</string>
+    <string name="debrid_device_auth_instructions">Escanea el QR e ingresa este código para autorizar Nuvio.</string>
+    <string name="debrid_device_auth_code_copied">Código copiado.</string>
+    <string name="debrid_device_auth_waiting">Esperando aprobación...</string>
+    <string name="debrid_device_auth_failed">No se pudo iniciar sesión.</string>
+    <string name="debrid_device_auth_missing_configuration">Este método de inicio de sesión no está configurado en esta compilación.</string>
+    <string name="debrid_device_auth_expired">Este código expiró. Inténtalo nuevamente.</string>
+    <string name="debrid_key_invalid">No se pudo validar esta clave API.</string>
     <string name="debrid_invalid_torbox_api_key">No se pudo validar esta clave API.</string>
     <string name="debrid_invalid_real_debrid_api_key">No se pudo validar esta clave API.</string>
     <string name="debrid_prepare_instant_playback">Preparar enlaces</string>
-    <string name="debrid_prepare_instant_playback_description">Resolver las primeras fuentes antes de que inicie la reproducción.</string>
-    <string name="debrid_prepare_stream_count">Fuentes a preparar</string>
-    <string name="debrid_prepare_count_one">1 fuente</string>
-    <string name="debrid_prepare_count_many">%1$d fuentes</string>
+    <string name="debrid_prepare_instant_playback_description">Resolver enlaces reproducibles antes de iniciar la reproducción.</string>
+    <string name="debrid_prepare_stream_count">Enlaces a preparar</string>
+    <string name="debrid_prepare_stream_count_warning">Usa una cantidad menor cuando sea posible. Los servicios conectados pueden limitar cuántos enlaces se pueden resolver en un período de tiempo. Abrir una película o episodio puede contar para esos límites incluso si no presionas Ver, ya que los enlaces se preparan con anticipación.</string>
+    <string name="debrid_prepare_count_one">1 enlace</string>
+    <string name="debrid_prepare_count_many">%1$d enlaces</string>
     <string name="debrid_stream_max_results_title">Máximo de resultados</string>
     <string name="debrid_stream_max_results_subtitle">Limita cuántas fuentes de Direct Debrid aparecen.</string>
-    <string name="debrid_stream_max_results_all">Todos los streams</string>
-    <string name="debrid_stream_max_results_count">%1$d streams</string>
-    <string name="debrid_stream_sort_title">Ordenar streams</string>
-    <string name="debrid_stream_sort_subtitle">Elige cómo se ordenan las fuentes de Direct Debrid.</string>
+    <string name="debrid_stream_max_results_all">Todas las transmisiones</string>
+    <string name="debrid_stream_max_results_count">%1$d transmisiones</string>
+    <string name="debrid_stream_sort_title">Ordenar resultados</string>
+    <string name="debrid_stream_sort_subtitle">Elige cómo se ordenan los resultados.</string>
+    <string name="debrid_stream_sort_original">Orden original</string>
+    <string name="debrid_stream_sort_best_quality">Mejor calidad primero</string>
+    <string name="debrid_stream_sort_largest">Más grandes primero</string>
+    <string name="debrid_stream_sort_smallest">Más pequeños primero</string>
+    <string name="debrid_stream_sort_best_audio">Mejor audio primero</string>
+    <string name="debrid_stream_sort_language">Idioma primero</string>
     <string name="debrid_stream_sort_default">Predeterminado</string>
     <string name="debrid_stream_sort_quality">Calidad, mayor primero</string>
     <string name="debrid_stream_sort_size_desc">Tamaño, mayor primero</string>
@@ -951,12 +1009,77 @@
     <string name="debrid_stream_codec_h264">H.264 / AVC</string>
     <string name="debrid_stream_codec_hevc">HEVC / H.265</string>
     <string name="debrid_stream_codec_av1">AV1</string>
+
+    <!-- Debrid stream filter dialogs (per-resolution / quality / size / multi-choice pickers) -->
+    <string name="debrid_stream_per_resolution_limit_title">Límite por resolución</string>
+    <string name="debrid_stream_per_resolution_limit_subtitle">Limita resultados repetidos de 2160p, 1080p y 720p después del ordenamiento.</string>
+    <string name="debrid_stream_per_quality_limit_title">Límite por calidad</string>
+    <string name="debrid_stream_per_quality_limit_subtitle">Limita resultados repetidos de BluRay, WEB-DL y REMUX después del ordenamiento.</string>
+    <string name="debrid_stream_size_range_title">Rango de tamaño</string>
+    <string name="debrid_stream_size_range_subtitle">Filtra transmisiones por tamaño de archivo.</string>
+    <string name="debrid_stream_resolutions_preferred">Resoluciones preferidas</string>
+    <string name="debrid_stream_resolutions_required">Resoluciones requeridas</string>
+    <string name="debrid_stream_resolutions_excluded">Resoluciones excluidas</string>
+    <string name="debrid_stream_qualities_preferred">Calidades preferidas</string>
+    <string name="debrid_stream_qualities_required">Calidades requeridas</string>
+    <string name="debrid_stream_qualities_excluded">Calidades excluidas</string>
+    <string name="debrid_stream_visual_tags_preferred">Etiquetas visuales preferidas</string>
+    <string name="debrid_stream_visual_tags_required">Etiquetas visuales requeridas</string>
+    <string name="debrid_stream_visual_tags_excluded">Etiquetas visuales excluidas</string>
+    <string name="debrid_stream_audio_tags_preferred">Etiquetas de audio preferidas</string>
+    <string name="debrid_stream_audio_tags_required">Etiquetas de audio requeridas</string>
+    <string name="debrid_stream_audio_tags_excluded">Etiquetas de audio excluidas</string>
+    <string name="debrid_stream_channels_preferred">Canales preferidos</string>
+    <string name="debrid_stream_channels_required">Canales requeridos</string>
+    <string name="debrid_stream_channels_excluded">Canales excluidos</string>
+    <string name="debrid_stream_encodes_preferred">Codificaciones preferidas</string>
+    <string name="debrid_stream_encodes_required">Codificaciones requeridas</string>
+    <string name="debrid_stream_encodes_excluded">Codificaciones excluidas</string>
+    <string name="debrid_stream_languages_preferred">Idiomas preferidos</string>
+    <string name="debrid_stream_languages_required">Idiomas requeridos</string>
+    <string name="debrid_stream_languages_excluded">Idiomas excluidos</string>
+    <string name="debrid_stream_release_groups_required">Grupos de lanzamiento requeridos</string>
+    <string name="debrid_stream_release_groups_excluded">Grupos de lanzamiento excluidos</string>
+    <string name="debrid_stream_release_groups_input_subtitle">Ingresa un grupo por línea.</string>
+
     <string name="debrid_formatter_title">Editor web</string>
-    <string name="debrid_formatter_subtitle">Configura la visualización, filtros y ordenamiento de fuentes desde otro dispositivo.</string>
+    <string name="debrid_formatter_subtitle">Configura la visualización de fuentes, filtros y ordenamiento desde otro dispositivo.</string>
     <string name="debrid_formatter_configure">Abrir editor web</string>
     <string name="debrid_formatter_reset_title">Restablecer formato</string>
     <string name="debrid_formatter_reset_subtitle">Restaurar el formato predeterminado de las fuentes.</string>
-    <string name="debrid_formatter_qr_instruction">Escanea este código QR en tu teléfono para configurar las opciones de fuentes Debrid.</string>
+    <string name="debrid_formatter_qr_instruction">Escanea este código QR en tu teléfono para configurar los ajustes de las fuentes Debrid.</string>
+    <string name="settings_stream_badges_section">Estilo Fusion</string>
+    <string name="settings_stream_size_badges_title">Insignias de tamaño</string>
+    <string name="settings_stream_size_badges_description">Mostrar insignias del tamaño del archivo en los resultados de transmisiones y en los paneles de fuentes del reproductor.</string>
+    <string name="settings_stream_addon_logo_title">Logo del addon</string>
+    <string name="settings_stream_addon_logo_description">Mostrar el logo y el nombre del addon junto a las fuentes de streaming.</string>
+    <string name="settings_stream_display_section">Visualización</string>
+    <string name="settings_stream_badge_position_title">Posición de las insignias</string>
+    <string name="settings_stream_badge_position_description">Elige si las insignias de Fusion y tamaño aparecen arriba o abajo de las tarjetas de transmisión.</string>
+    <string name="settings_stream_badge_position_dialog_title">Posición de las insignias</string>
+    <string name="settings_stream_badge_position_dialog_description">Selecciona dónde aparecen las insignias de transmisión en las tarjetas de transmisión.</string>
+    <string name="settings_stream_badge_position_top">Arriba</string>
+    <string name="settings_stream_badge_position_bottom">Abajo</string>
+    <string name="settings_stream_badge_urls_title">URLs de las insignias de Fusion</string>
+    <string name="settings_stream_badge_urls_description">Importa hasta %1$d URLs JSON de insignias de streams estilo Fusion. Cada URL puede actualizarse o eliminarse por separado.</string>
+    <string name="settings_stream_badge_urls_search_description">Administra las URLs JSON importadas de insignias de streams estilo Fusion.</string>
+    <string name="settings_fusion_badges_summary">%1$d/%2$d URLs, %3$d insignias Fusion activas</string>
+    <string name="settings_fusion_badges_empty">No se han importado URLs de insignias Fusion.</string>
+    <string name="settings_fusion_badge_url_label">URL JSON de insignias Fusion</string>
+    <string name="settings_fusion_badge_urls_imported">%1$d/%2$d URLs Fusion importadas</string>
+    <string name="settings_fusion_badge_url_active">Activa</string>
+    <string name="settings_fusion_badge_url_inactive">Inactiva</string>
+    <string name="settings_fusion_badge_url_status_summary">%1$s, %2$d insignias habilitadas, %3$d grupos</string>
+    <string name="settings_fusion_badge_preview_action">Vista previa</string>
+    <string name="settings_fusion_badge_preview_title">Vista previa de insignias Fusion</string>
+    <string name="settings_fusion_badge_preview_count">%1$d insignias estilo Fusion desde esta URL</string>
+    <string name="settings_fusion_badge_preview_empty">No hay imágenes de insignias estilo Fusion en esta URL.</string>
+    <string name="settings_fusion_badge_group_title">Grupo %1$d</string>
+    <string name="settings_fusion_badge_other_group_title">Otras insignias Fusion</string>
+    <string name="stream_badge_qr_instruction">Escanea este código QR en tu teléfono para administrar las URLs de insignias Fusion.</string>
+    <string name="streams_size">TAMAÑO %1$s</string>
+    <string name="action_import">Importar</string>
+    <string name="action_delete">Eliminar</string>
 
     <!-- Anime-Skip -->
     <string name="animeskip_title">Anime Skip</string>
@@ -971,7 +1094,6 @@
     <string name="animeskip_invalid_client_id">ID de cliente inválido</string>
     <string name="action_clear">Borrar</string>
 
-    <!-- TmdbSettingsScreen -->
     <string name="tmdb_title">Enriquecimiento de TMDB</string>
     <string name="tmdb_subtitle">Elige qué campos de metadatos deben provenir de TMDB</string>
     <string name="tmdb_enable_title">Habilitar Enriquecimiento de TMDB</string>
@@ -1007,7 +1129,6 @@
 
     <string name="tmdb_language_dialog_title">Idioma de TMDB</string>
 
-    <!-- TraktScreen -->
     <string name="trakt_description">Sincroniza tu lista de seguimiento, progreso, continuar viendo, scrobbles y listas personales con Trakt.</string>
     <string name="trakt_connected_as">Conectado como %1$s</string>
     <string name="trakt_account_login">Iniciar Sesión en la Cuenta</string>
@@ -1085,7 +1206,6 @@
     <string name="trakt_all_history">Todo el historial</string>
     <string name="trakt_days_format">%1$d días</string>
 
-    <!-- DebugSettingsScreen -->
     <string name="debug_title">Depuración</string>
     <string name="debug_subtitle">Herramientas de desarrollador y funciones experimentales (solo para builds de depuración)</string>
     <string name="debug_section_popup">Prueba de Popups / Diálogos</string>
@@ -1096,6 +1216,8 @@
     <string name="debug_account_tab_subtitle">Mostrar la pestaña de Cuenta en la navegación de Ajustes</string>
     <string name="debug_sync_code_title">Funciones del Código de Sincronización</string>
     <string name="debug_sync_code_subtitle">Mostrar botones de Generar/Ingresar Código de Sincronización en los ajustes de cuenta</string>
+    <string name="debug_buffer_logs_title">Activar registros BUFFER</string>
+    <string name="debug_buffer_logs_subtitle">Genera diagnósticos periódicos del búfer del reproductor en logcat (desactivado de forma predeterminada)</string>
     <string name="debug_section_account">Cuenta</string>
     <string name="debug_manual_signin_title">Inicio de Sesión Manual</string>
     <string name="debug_manual_signin_subtitle">Iniciar sesión con correo y contraseña (autenticación Supabase)</string>
@@ -1113,7 +1235,6 @@
     <string name="debug_generate_library_button">Generar</string>
     <string name="debug_generating_library">Generando\u2026</string>
 
-    <!-- ProfileSettingsContent -->
     <string name="profile_title">Perfiles</string>
     <string name="profile_subtitle">Administra los perfiles de usuario para esta cuenta</string>
     <string name="profile_manage_button">Administrar perfiles</string>
@@ -1185,11 +1306,11 @@
     <string name="profile_pin_overlay_back_hint">Presiona atrás para cancelar</string>
 
 
-    <!-- Asistente de configuración esencial de addons -->
+    <!-- Essential addon setup wizard -->
     <string name="essential_addon_setup_title">Configurar addons</string>
     <string name="essential_addon_setup_subtitle">Instala un addon para comenzar a ver contenido. Puedes agregar más después desde Addons.</string>
     <string name="essential_addon_show_qr">Mostrar QR</string>
-    <!-- Valores predeterminados del editor de colecciones -->
+    <!-- Collection editor fallbacks -->
     <string name="collection_editor_no_trakt_lists_found">No se encontraron listas de Trakt</string>
     <string name="collection_editor_untitled_folder">Sin título</string>
     <string name="collection_editor_untitled_collection">Colección sin título</string>
@@ -1206,6 +1327,7 @@
     <string name="addon_installed_section">Instalados</string>
     <string name="addon_empty">No hay addons instalados. Agrega uno para empezar.</string>
     <string name="addon_remove">Eliminar</string>
+    <string name="addons_badge_disabled">Deshabilitado</string>
     <string name="addon_manage_from_phone_title">Administrar desde el teléfono</string>
     <string name="addon_manage_from_phone_subtitle">Escanea un código QR para administrar addons y catálogos de Inicio desde tu teléfono</string>
     <string name="addon_manage_addons_only_from_phone_subtitle">Escanea un código QR para instalar o eliminar add-ons desde tu teléfono</string>
@@ -1231,8 +1353,10 @@
     <string name="addon_refresh_done_subtitle">Addons actualizados hace un momento</string>
     <string name="addon_pending_collections_updated">Colecciones actualizadas</string>
     <string name="addon_pending_collections_replace">%1$d colección(es) reemplazarán las colecciones actuales</string>
+    <string name="addon_confirm_total_addons">Total de addons: %1$d</string>
+    <string name="addon_confirm_total_catalogs">Total de catálogos: %1$d</string>
+    <string name="addon_catalogs_types">Catálogos: %1$d - Tipos: %2$s</string>
 
-    <!-- CatalogOrderScreen -->
     <string name="catalog_order_title">Reordenar Catálogos de Inicio</string>
     <string name="catalog_order_subtitle">Esto controla el orden de la fila de catálogos en Inicio (Clásico + Moderno + Cuadrícula).</string>
     <string name="catalog_order_follow_addons">Seguir el orden de los addons</string>
@@ -1243,7 +1367,6 @@
     <string name="catalog_order_disable">Deshabilitar</string>
 
 
-    <!-- StreamScreen -->
     <string name="stream_retry">Reintentar</string>
     <string name="stream_no_streams">No se encontraron enlaces</string>
     <string name="stream_no_streams_hint">Intenta instalar más addons para encontrar enlaces</string>
@@ -1251,6 +1374,7 @@
     <string name="debrid_resolving_stream">Resolviendo stream de Debrid</string>
     <string name="debrid_stale_stream">Este resultado de Debrid expiró. Actualizando streams.</string>
     <string name="debrid_missing_api_key">Agrega una clave API de Debrid en Configuración.</string>
+    <string name="debrid_not_cached">No está en caché en este servicio.</string>
     <string name="debrid_resolution_failed">No se pudo resolver este stream de Debrid.</string>
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
@@ -1269,8 +1393,8 @@
     <string name="stream_player_internal">Interno</string>
     <string name="stream_player_external">Externo</string>
     <string name="stream_filter_all">Todos</string>
-
-    <!-- PlayerScreen -->
+    <string name="stream_episode_label">T%1$d E%2$d</string>
+    
     <string name="player_no_external_player">No se encontró un reproductor externo</string>
     <string name="player_loading_preparing">Preparando reproducción…</string>
     <string name="player_loading_detecting_format">Detectando formato del stream…</string>
@@ -1321,8 +1445,9 @@
     <string name="player_more_speed">Velocidad de Reproducción</string>
     <string name="player_more_aspect_ratio">Relación de Aspecto</string>
     <string name="player_more_open_external">Abrir en reproductor externo</string>
+    <string name="player_error_no_stream_url">No se proporcionó una URL de stream</string>
+    
 
-    <!-- StreamInfoOverlay -->
     <string name="stream_info_section_source">ORIGEN</string>
     <string name="stream_info_section_file">ARCHIVO</string>
     <string name="stream_info_section_video">VIDEO</string>
@@ -1342,15 +1467,13 @@
     <string name="stream_info_subtitle_source_addon">Addon</string>
     <string name="stream_info_subtitle_source_embedded">Integrado</string>
     <string name="stream_info_player_engine">Motor de reproducción</string>
-
-    <!-- StreamSourcesSidePanel -->
+    
     <string name="sources_title">Fuentes</string>
     <string name="sources_reload">Recargar</string>
     <string name="sources_close">Cerrar</string>
     <string name="sources_playing">Reproduciendo</string>
     <string name="sources_no_streams">No se encontraron fuentes</string>
 
-    <!-- EpisodesSidePanel -->
     <string name="episodes_panel_close">Cerrar</string>
     <string name="episodes_panel_back">Atrás</string>
     <string name="episodes_panel_reload">Recargar</string>
@@ -1368,7 +1491,6 @@
     <string name="player_aspect_mode_slight_zoom">Zoom ligero</string>
     <string name="player_aspect_mode_cinema_zoom">Zoom cine</string>
 
-    <!-- AudioDialog -->
     <string name="audio_dialog_title">Audio</string>
     <string name="audio_dialog_tab_tracks">Audio</string>
     <string name="audio_dialog_tab_mix">Mezcla</string>
@@ -1388,7 +1510,6 @@
     <string name="audio_maintain_original_audio_on_downmix_title">Mantener audio original en mezcla descendente</string>
     <string name="audio_maintain_original_audio_on_downmix_subtitle">Cuando está deshabilitado, la normalización de la mezcla descendente puede reducir el volumen general.</string>
 
-    <!-- SubtitleDialog / SubtitleStyleSidePanel -->
     <string name="subtitle_dialog_title">Subtítulos</string>
     <string name="subtitle_no_builtin">No hay subtítulos integrados disponibles</string>
     <string name="subtitle_loading_addon">Cargando subtítulos de los addons\u2026</string>
@@ -1425,10 +1546,10 @@
     <string name="subtitle_style_defaults">Predeterminados</string>
     <string name="subtitle_style_on">Activado</string>
     <string name="subtitle_style_off">Desactivado</string>
+    <string name="subtitle_style_weight">Grosor</string>
     <string name="panel_failed_load_streams">Error al cargar fuentes</string>
     <string name="panel_failed_load_episodes">Error al cargar episodios</string>
 
-    <!-- PauseOverlay -->
     <string name="pause_you_are_watching">Estás viendo</string>
     <string name="pause_cast_label">Elenco</string>
     <string name="pause_back_to_details">Volver a detalles</string>
@@ -1461,7 +1582,6 @@
     <string name="display_mode_resolution">Resolución</string>
 
 
-    <!-- SearchScreen -->
     <string name="search_keyboard_hint">Presiona Listo en el teclado para buscar</string>
     <string name="search_placeholder">Buscar películas y series</string>
     <string name="search_start_title">Empezar a buscar</string>
@@ -1473,8 +1593,10 @@
     <string name="search_voice_mic_permission">Se requiere permiso de micrófono para búsqueda por voz.</string>
     <string name="search_voice_failed">Error en el reconocimiento de voz. Intenta de nuevo.</string>
     <string name="search_voice_unavailable">La búsqueda por voz no está disponible en este dispositivo.</string>
+    <string name="search_no_results_title">Sin resultados</string>
+    <string name="search_no_results_subtitle">Intenta buscar con palabras clave diferentes</string>
+    <string name="search_error_no_catalogs">No se encontraron catálogos con búsqueda disponibles en los addons instalados</string>
 
-    <!-- LibraryScreen -->
     <string name="library_syncing">Sincronizando biblioteca de Trakt\u2026</string>
     <string name="library_title">Biblioteca</string>
     <string name="library_filter_list">Lista</string>
@@ -1482,7 +1604,6 @@
     <string name="library_filter_sort">Ordenar</string>
     <string name="library_filter_genre">Género</string>
     <string name="library_filter_year">Año</string>
-    <!-- Genre names (from TMDB movie + TV) -->
     <string name="genre_action">Acción</string>
     <string name="genre_adventure">Aventura</string>
     <string name="genre_animation">Animación</string>
@@ -1502,7 +1623,6 @@
     <string name="genre_thriller">Suspenso</string>
     <string name="genre_war">Guerra</string>
     <string name="genre_western">Western</string>
-    <!-- TV-specific genres -->
     <string name="genre_action_adventure">Acción y aventura</string>
     <string name="genre_kids">Infantil</string>
     <string name="genre_news">Noticias</string>
@@ -1535,16 +1655,54 @@
     <string name="library_source_local">LOCAL</string>
     <string name="library_source_nuvio">NUVIO</string>
     <string name="library_source_trakt">TRAKT</string>
+    <string name="library_source_saved">Guardado</string>
+    <string name="library_source_cloud">Nube</string>
     <string name="library_watchlist">Lista de seguimiento</string>
     <string name="library_syncing_library">Sincronizando biblioteca…</string>
-    <string name="library_type_all">Todos</string>
+    <string name="library_type_all">Todo</string>
     <string name="library_type_items">elementos</string>
     <string name="library_empty_local_title">Aún no hay %1$s</string>
     <string name="library_empty_trakt_title">No hay %1$s en esta lista</string>
-    <string name="library_empty_local_subtitle">Empieza a guardar tus favoritos para verlos aquí</string>
-    <string name="library_empty_trakt_subtitle">Usa + en los detalles para agregar elementos a tu lista de seguimiento o a listas</string>
+    <string name="library_empty_local_subtitle">Comienza a guardar tus favoritos para verlos aquí</string>
+    <string name="library_empty_trakt_subtitle">Usa + en detalles para agregar elementos a la lista de seguimiento o listas</string>
     <string name="library_empty_trakt_not_auth_title">Trakt no conectado</string>
     <string name="library_empty_trakt_not_auth_subtitle">Conecta tu cuenta de Trakt en Configuración para ver tu biblioteca de Trakt</string>
+    <string name="library_list_create_dialog_title">Crear lista</string>
+    <string name="library_list_edit_dialog_title">Editar lista</string>
+    <string name="library_sync_btn">Sincronizar</string>
+    <string name="library_syncing_btn">Sincronizando…</string>
+    <string name="cloud_library_connect_action">Conectar cuenta</string>
+    <string name="cloud_library_connect_message">Conecta una cuenta en la configuración de Servicios conectados para explorar archivos reproducibles desde tu biblioteca en la nube.</string>
+    <string name="cloud_library_connect_title">No hay una cuenta en la nube conectada</string>
+    <string name="cloud_library_disabled_action">Abrir Servicios conectados</string>
+    <string name="cloud_library_disabled_message">Activa Biblioteca en la nube en la configuración de Servicios conectados para explorar archivos de cuentas conectadas.</string>
+    <string name="cloud_library_disabled_title">La biblioteca en la nube está desactivada</string>
+    <string name="cloud_library_empty_message">No hay archivos reproducibles en la nube que coincidan con los filtros actuales.</string>
+    <string name="cloud_library_empty_title">Aún no hay nada aquí</string>
+    <string name="cloud_library_file_picker_title">Elige un archivo para reproducir</string>
+    <string name="cloud_library_load_failed">No se pudo cargar la biblioteca en la nube de %1$s</string>
+    <string name="cloud_library_no_files_message">Este elemento no contiene un archivo de video reproducible.</string>
+    <string name="cloud_library_no_files_title">No hay archivos reproducibles</string>
+    <string name="cloud_library_no_playable_files">No hay archivos reproducibles</string>
+    <string name="cloud_library_one_playable_file">1 archivo reproducible</string>
+    <string name="cloud_library_opening">Abriendo…</string>
+    <string name="cloud_library_play_failed">No se pudo reproducir este archivo en la nube.</string>
+    <string name="cloud_library_play_file">Reproducir archivo</string>
+    <string name="cloud_library_playable_file_count">%1$d archivos reproducibles</string>
+    <string name="cloud_library_provider_all">Todo</string>
+    <string name="cloud_library_refresh">Actualizar biblioteca en la nube</string>
+    <string name="cloud_library_select_provider">Seleccionar proveedor</string>
+    <string name="cloud_library_select_type">Seleccionar tipo</string>
+    <string name="cloud_library_status_ready">Listo para reproducir</string>
+    <string name="cloud_library_type_all">Todo</string>
+    <string name="cloud_library_type_torrents">Torrents</string>
+    <string name="cloud_library_type_usenet">Usenet</string>
+    <string name="cloud_library_type_web">Web</string>
+    <string name="cloud_library_type_files">Archivos</string>
+
+    <!-- Cloud library repository errors -->
+    <string name="cloud_library_error_provider_unavailable">La biblioteca en la nube no está disponible para %1$s.</string>
+    <string name="cloud_library_error_disabled">La biblioteca en la nube está deshabilitada.</string>
 
     <!-- AccountSettingsContent -->
     <string name="account_loading">Cargando\u2026</string>
@@ -1556,13 +1714,19 @@
     <string name="account_total_label">Total</string>
     <string name="account_loading_sync">Cargando datos de sincronización\u2026</string>
     <string name="account_sign_out">Cerrar Sesión</string>
+    <string name="account_error_signin_required">Primero debes iniciar sesión con una cuenta.</string>
+    <string name="account_signin_create_title">Iniciar sesión / Crear cuenta</string>
+    <string name="account_signin_create_desc">Usa tu correo electrónico y contraseña para crear o iniciar sesión en tu cuenta.</string>
+    <string name="account_generate_sync_desc">Crea un código en este dispositivo para que otros dispositivos puedan vincularse a él.</string>
+    <string name="account_enter_sync_desc">Vincula este dispositivo a otro dispositivo usando un código de sincronización.</string>
+    <string name="account_signed_in_as">Sesión iniciada como</string>
+    <string name="account_generate_sync_signed_in_desc">Crea un código para que otros dispositivos puedan sincronizarse con esta cuenta.</string>
+    <string name="account_unknown_device">Dispositivo desconocido</string>
 
-    <!-- AuthSignInScreen -->
-    <string name="auth_signin_title">Iniciar Sesión</string>
-    <string name="auth_signin_tv_disabled">La entrada de correo/contraseña en TV está desactivada. Continúa con el inicio de sesión por QR.</string>
+    <string name="auth_signin_title">Iniciar sesión</string>
+    <string name="auth_signin_tv_disabled">La entrada de correo electrónico y contraseña en TV está deshabilitada. Continúa con el inicio de sesión mediante QR.</string>
     <string name="auth_signin_qr_btn">Continuar con QR</string>
-
-    <!-- AuthQrSignInScreen -->
+    
     <string name="auth_qr_title">Iniciar Sesión con QR</string>
     <string name="auth_qr_account_login">Inicio de Sesión de la Cuenta</string>
     <string name="auth_qr_finishing">Finalizando inicio de sesión\u2026</string>
@@ -1581,7 +1745,6 @@
     <string name="auth_qr_continue">Continuar</string>
     <string name="auth_qr_back">Atrás</string>
 
-    <!-- SyncCodeGenerateScreen -->
     <string name="sync_generate_title">Generar Código de Sincronización</string>
     <string name="sync_generate_subtitle">Crea un PIN para proteger tu código de sincronización. Comparte el código con tus otros dispositivos.</string>
     <string name="sync_generate_code_label">Tu Código de Sincronización</string>
@@ -1589,8 +1752,9 @@
     <string name="sync_generate_done">Listo</string>
     <string name="sync_generate_pin_label">Elige un PIN (4-8 caracteres)</string>
     <string name="sync_generate_pin_placeholder">Ingresar PIN</string>
+    <string name="sync_generate_generating">Generando…</string>
+    <string name="sync_generate_code_btn">Generar código</string>
 
-    <!-- SyncCodeClaimScreen -->
     <string name="sync_claim_title">Vincular Dispositivo</string>
     <string name="sync_claim_subtitle">Ingresa el código de sincronización y el PIN de tu otro dispositivo para vincular este dispositivo.</string>
     <string name="sync_claim_success">¡Dispositivo vinculado con éxito! Tus addons y plugins ahora se sincronizarán.</string>
@@ -1599,8 +1763,8 @@
     <string name="sync_claim_code_placeholder">XXXX-XXXX-XXXX-XXXX-XXXX</string>
     <string name="sync_claim_pin_label">PIN</string>
     <string name="sync_claim_pin_placeholder">Ingresar PIN</string>
+    <string name="sync_claim_linking">Vinculando…</string>
 
-    <!-- PluginScreen -->
     <string name="plugin_readonly_notice">Usando los plugins del perfil principal y no se pueden cambiar</string>
     <string name="plugin_repositories_section">Repositorios (%1$d)</string>
     <string name="plugin_providers_section">Proveedores (%1$d)</string>
@@ -1634,20 +1798,30 @@
     <string name="plugin_updated_format">Actualizado: %1$s</string>
     <string name="plugin_test_btn">Probar</string>
     <string name="plugin_test_results">Resultados de la prueba (%1$d enlaces)</string>
+    <string name="plugin_and_more">... y %1$d más</string>
+    <string name="plugin_providers_count">%1$d proveedores</string>
+    <string name="plugin_enabled">Habilitado</string>
+    <string name="plugin_disabled">Deshabilitado</string>
+    <string name="plugin_no_repos">Aún no se han agregado repositorios.\nAgrega un repositorio para comenzar.</string>
+    <string name="plugin_error_invalid_url">Por favor, ingresa una URL válida</string>
+    <string name="plugin_error_add_repo">Error al agregar el repositorio: %1$s</string>
+    <string name="plugin_error_refresh">Error al actualizar: %1$s</string>
+    <string name="plugin_error_test">La prueba falló: %1$s</string>
+    <string name="plugin_test_no_results">No se encontraron resultados</string>
+    <string name="plugin_test_found_streams">Se encontraron %1$d streams</string>
+    <string name="plugin_version">Versión %1$s</string>
 
-    <!-- ProfileSelectionScreen -->
     <string name="profile_selection_title">¿Quién está viendo?</string>
     <string name="profile_selection_subtitle">Selecciona un perfil para continuar</string>
-    <string name="profile_selection_hint">Usa el D-pad para elegir un perfil</string>
+    <string name="profile_selection_hint">Mantén presionado para administrar el perfil</string>
     <string name="profile_selection_empty">No se encontraron perfiles</string>
     <string name="profile_selection_primary_badge">PRINCIPAL</string>
     <string name="profile_selection_options_title">Opciones del perfil</string>
     <string name="profile_delete_confirm_title">¿Eliminar perfil?</string>
-    <string name="profile_delete_confirm_subtitle">Esto eliminará permanentemente este perfil y todos sus datos, incluyendo biblioteca, historial de reproducción y configuraciones de addons. Esta acción no se puede deshacer.</string>
+    <string name="profile_delete_confirm_subtitle">Esto eliminará permanentemente este perfil y todos sus datos, incluida la biblioteca, el historial de reproducción y la configuración de addons. Esta acción no se puede deshacer.</string>
     <string name="profile_delete_btn">Eliminar perfil</string>
-    <string name="profile_saving">Guardando\u2026</string>
+    <string name="profile_saving">Guardando…</string>
 
-    <!-- CastDetailScreen -->
     <string name="cast_detail_error">Algo salió mal</string>
     <string name="cast_detail_retry">Reintentar</string>
     <string name="cast_detail_filmography">Filmografía</string>
@@ -1655,17 +1829,14 @@
     <string name="cast_detail_born_died">Nacimiento: %1$s — †%2$s</string>
     <string name="cast_detail_age">%1$d años</string>
 
-    <!-- CatalogSeeAllScreen -->
     <string name="catalog_see_all_from">de %1$s</string>
     <string name="catalog_see_all_empty_title">No hay elementos disponibles</string>
     <string name="catalog_see_all_empty_subtitle">Prueba un catálogo diferente o revisa más tarde</string>
 
-    <!-- LayoutSelectionScreen -->
     <string name="layout_selection_welcome">Bienvenido a Nuvio</string>
     <string name="layout_selection_subtitle">Elige el diseño de tu pantalla de inicio</string>
     <string name="layout_selection_continue">Continuar</string>
 
-    <!-- UpdatePromptDialog -->
     <string name="update_title">Actualización de la App</string>
     <string name="update_downloading">Descargando actualización</string>
     <string name="update_download">Descargar</string>
@@ -1701,16 +1872,8 @@
     <string name="discover_empty_no_content_subtitle">Prueba con un género o catálogo diferente</string>
 
     <!-- AddonManagerScreen -->
-    <string name="addon_confirm_total_addons">Total de addons: %1$d</string>
-    <string name="addon_confirm_total_catalogs">Total de catálogos: %1$d</string>
-    <string name="addon_catalogs_types">Catálogos: %1$d - Tipos: %2$s</string>
 
     <!-- PluginScreen -->
-    <string name="plugin_and_more">... y %1$d más</string>
-    <string name="plugin_providers_count">%1$d proveedores</string>
-    <string name="plugin_enabled">Habilitado</string>
-    <string name="plugin_disabled">Deshabilitado</string>
-    <string name="plugin_no_repos">No se han añadido repositorios aún.\nAñade un repositorio para empezar.</string>
 
     <!-- ProfileSettingsContent -->
     <string name="profile_edit_title_id">Editar Perfil %1$d</string>
@@ -1718,6 +1881,7 @@
     <!-- PlaybackAudioSettings -->
     <string name="audio_passthrough_info">El passthrough de audio (TrueHD, DTS, AC-3, etc.) es automático. Al conectarlo a un receptor AV o barra de sonido compatible mediante HDMI, el audio sin pérdida se envía tal cual sin decodificarse.</string>
     <string name="audio_dv_title">DV7 - Alternativa HEVC</string>
+    <string name="audio_dv_sub">Convierte Dolby Vision Perfil 7 a HEVC estándar para dispositivos sin compatibilidad de hardware con Dolby Vision.</string>
 
     <!-- SidebarNavigation / MainActivity -->
     <string name="nav_home">Inicio</string>
@@ -1739,8 +1903,11 @@
     <string name="update_open_settings">Abrir configuración</string>
     <string name="update_install">Instalar</string>
     <string name="update_ignore">Ignorar</string>
-    <string name="watchlist_added">Añadido a la lista de seguimiento</string>
-    <string name="watchlist_removed">Eliminado de la lista de seguimiento</string>
+
+        <!-- Update flow errors -->
+    <string name="update_error_check_failed">Error al buscar actualizaciones</string>
+    <string name="update_error_download_failed">Error en la descarga</string>
+    <string name="update_error_apk_missing">No se encontró el archivo descargado</string>
 
     <!-- Profile PIN errors -->
     <string name="profile_pin_save_error">No se pudo guardar el PIN. Inténtalo de nuevo.</string>
@@ -1751,47 +1918,26 @@
     <string name="profile_pin_current_required">Este perfil ya tiene un PIN. Ingresa el PIN actual para cambiarlo.</string>
 
     <!-- Account Screen -->
-    <string name="account_signin_create_title">Iniciar sesión / Crear cuenta</string>
-    <string name="account_signin_create_desc">Usa correo y contraseña para crear o iniciar sesión en tu cuenta.</string>
-    <string name="account_generate_sync_desc">Crea un código en este dispositivo para que otros dispositivos puedan vincularse.</string>
-    <string name="account_enter_sync_desc">Vincula este dispositivo a otro usando un código de sincronización.</string>
-    <string name="account_signed_in_as">Sesión iniciada como</string>
-    <string name="account_generate_sync_signed_in_desc">Crea un código para que otros dispositivos se sincronicen con esta cuenta.</string>
-    <string name="account_unknown_device">Dispositivo desconocido</string>
 
     <!-- Sync screens -->
-    <string name="sync_claim_linking">Vinculando…</string>
-    <string name="sync_generate_generating">Generando…</string>
-    <string name="sync_generate_code_btn">Generar código</string>
 
     <!-- Search -->
-    <string name="search_no_results_title">Sin resultados</string>
-    <string name="search_no_results_subtitle">Prueba con otras palabras clave</string>
     <string name="discover_disabled_title">Discover está desactivado</string>
     <string name="discover_disabled_subtitle">Activa Discover en la configuración de búsqueda</string>
 
     <!-- Library -->
-    <string name="library_list_create_dialog_title">Crear lista</string>
-    <string name="library_list_edit_dialog_title">Editar lista</string>
-    <string name="library_sync_btn">Sincronizar</string>
-    <string name="library_syncing_btn">Sincronizando…</string>
 
     <!-- Error messages (shared) -->
     <string name="error_network_required">Conéctate a Wi-Fi o Ethernet para usar esta función</string>
     <string name="error_server_ports_unavailable">No se pudo iniciar el servidor. Todos los puertos están en uso.</string>
 
     <!-- Plugin errors -->
-    <string name="plugin_error_invalid_url">Introduce una URL válida</string>
-    <string name="plugin_error_add_repo">Error al añadir el repositorio: %1$s</string>
-    <string name="plugin_error_refresh">Error al actualizar: %1$s</string>
-    <string name="plugin_error_test">Error en la prueba: %1$s</string>
-    <string name="plugin_test_no_results">No se encontraron resultados</string>
-    <string name="plugin_test_found_streams">Se encontraron %1$d streams</string>
     <string name="plugin_repo_added_with_providers">Se agregó %1$s con %2$d proveedores</string>
     <string name="plugin_repo_removed">Repositorio eliminado</string>
     <string name="plugin_repo_refreshed">Repositorio actualizado</string>
 
     <!-- Trakt errors -->
+
     <string name="trakt_error_code_expired">El código del dispositivo expiró. Comienza nuevamente.</string>
     <string name="trakt_error_code_used">El código del dispositivo ya fue usado. Comienza nuevamente.</string>
     <string name="trakt_error_denied">Autorización denegada en Trakt.</string>
@@ -1815,39 +1961,27 @@
     <string name="trakt_user_fallback">Usuario de Trakt</string>
     <string name="trakt_error_failed_start">No se pudo iniciar la autenticación de Trakt</string>
 
-    <!-- Errores generales -->
+    <!-- General errors -->
     <string name="error_unknown">Error desconocido</string>
     <string name="addon_error_not_found">Addon no encontrado</string>
 
     <!-- Account errors -->
-    <string name="account_error_signin_required">Primero debes iniciar sesión con una cuenta.</string>
 
     <!-- Search errors -->
-    <string name="search_error_no_catalogs">No se encontraron catálogos de búsqueda en los addons instalados</string>
 
     <!-- Home errors -->
     <string name="home_error_no_addons">No hay addons instalados</string>
     <string name="home_error_no_catalog_addons">No hay addons de catálogo instalados</string>
 
     <!-- Player errors -->
-    <string name="player_error_no_stream_url">No se proporcionó una URL de reproducción</string>
     <string name="player_error_failed_start_torrent">No se pudo iniciar el torrent: %1$s</string>
 
     <!-- Playback subtitle settings -->
     <string name="sub_mode_overlay_canvas_sub">Soporte HDR con renderizado en canvas. Puede bloquear el hilo de la interfaz.</string>
-    <string name="subtitle_style_weight">Grosor</string>
 
-    <!-- Plugin screen -->
-    <string name="plugin_version">Versión %1$s</string>
-
-    <!-- Stream screen -->
-    <string name="stream_episode_label">T%1$d E%2$d</string>
-
-    <!-- Episode ratings -->
     <string name="ratings_season_label">T%1$d</string>
     <string name="ratings_episode_label">E%1$d</string>
 
-    <!-- Content descriptions -->
     <string name="cd_play">Reproducir</string>
     <string name="cd_pause">Pausar</string>
     <string name="cd_subtitles">Subtítulos</string>
@@ -1890,7 +2024,6 @@
     <string name="cd_qr_login">Código QR de inicio de sesión</string>
     <string name="cd_nuvio">Nuvio</string>
 
-    <!-- Debug -->
     <string name="debug_signin_success">Inicio de sesión exitoso</string>
     <string name="debug_generate_description">Elemento generado para depuración %1$s #%2$d</string>
     <string name="debug_generate_result_failed">Error: %1$s</string>
@@ -1898,7 +2031,7 @@
 
     <!-- Collection Management -->
     <string name="collections_header">Colecciones</string>
-    <string name="collections_empty">No hay colecciones aún. Crea una para organizar tus catálogos.</string>
+    <string name="collections_empty">Aún no hay colecciones. Crea una para organizar tus catálogos.</string>
     <string name="collections_delete_confirm">Eliminar</string>
     <string name="collections_delete_confirm_subtitle">Esto eliminará permanentemente \"%1$s\". Esta acción no se puede deshacer.</string>
     <string name="collections_new">Nueva colección</string>
@@ -2384,7 +2517,215 @@
 
     <!-- Trakt: Related / comments / list items error fallbacks -->
     <string name="trakt_related_error_request_failed">La solicitud de relacionados de Trakt falló</string>
-    <string name="trakt_comments_error_request_failed">La solicitud de comentarios de Trakt falló</string>
-    <string name="trakt_library_error_fetch_list_items">No se pudieron obtener los elementos de la lista</string>
+    <string name="trakt_comments_error_request_failed">Error al solicitar comentarios de Trakt</string>
+    <string name="trakt_library_error_fetch_list_items">Error al obtener los elementos de la lista</string>
 
-</resources>
+    <string name="watchlist_removed">Eliminado de la lista de seguimiento</string>
+    <string name="watchlist_added">Agregado a la lista de seguimiento</string>
+
+    <!-- Debrid: filter rule rows (title + subtitle pairs) -->
+    <string name="debrid_picker_preferred_resolutions_title">Resoluciones preferidas</string>
+    <string name="debrid_picker_preferred_resolutions_subtitle">Ordena primero las resoluciones seleccionadas, en el orden predeterminado.</string>
+    <string name="debrid_picker_required_resolutions_title">Resoluciones requeridas</string>
+    <string name="debrid_picker_required_resolutions_subtitle">Mostrar solo las resoluciones seleccionadas.</string>
+    <string name="debrid_picker_excluded_resolutions_title">Resoluciones excluidas</string>
+    <string name="debrid_picker_excluded_resolutions_subtitle">Oculta las resoluciones seleccionadas.</string>
+    <string name="debrid_picker_preferred_qualities_title">Calidades preferidas</string>
+    <string name="debrid_picker_preferred_qualities_subtitle">Ordena primero las calidades seleccionadas, en el orden predeterminado.</string>
+    <string name="debrid_picker_required_qualities_title">Calidades requeridas</string>
+    <string name="debrid_picker_required_qualities_subtitle">Mostrar solo las calidades de fuente seleccionadas.</string>
+    <string name="debrid_picker_excluded_qualities_title">Calidades excluidas</string>
+    <string name="debrid_picker_excluded_qualities_subtitle">Oculta las calidades de fuente seleccionadas.</string>
+    <string name="debrid_picker_preferred_visual_tags_title">Etiquetas visuales preferidas</string>
+    <string name="debrid_picker_preferred_visual_tags_subtitle">Ordena etiquetas como DV, HDR, 10bit, IMAX y similares.</string>
+    <string name="debrid_picker_required_visual_tags_title">Etiquetas visuales requeridas</string>
+    <string name="debrid_picker_required_visual_tags_subtitle">Requiere etiquetas como DV, HDR, 10bit, IMAX, SDR y similares.</string>
+    <string name="debrid_picker_excluded_visual_tags_title">Etiquetas visuales excluidas</string>
+    <string name="debrid_picker_excluded_visual_tags_subtitle">Oculta etiquetas como DV, HDR, 10bit, 3D y similares.</string>
+    <string name="debrid_picker_preferred_audio_tags_title">Etiquetas de audio preferidas</string>
+    <string name="debrid_picker_preferred_audio_tags_subtitle">Ordena etiquetas como Atmos, TrueHD, DTS, AAC y similares.</string>
+    <string name="debrid_picker_required_audio_tags_title">Etiquetas de audio requeridas</string>
+    <string name="debrid_picker_required_audio_tags_subtitle">Requiere etiquetas como Atmos, TrueHD, DTS, AAC y similares.</string>
+    <string name="debrid_picker_excluded_audio_tags_title">Etiquetas de audio excluidas</string>
+    <string name="debrid_picker_excluded_audio_tags_subtitle">Oculta las etiquetas de audio seleccionadas.</string>
+    <string name="debrid_picker_preferred_audio_channels_title">Canales preferidos</string>
+    <string name="debrid_picker_preferred_audio_channels_subtitle">Ordena primero las distribuciones de canales preferidas.</string>
+    <string name="debrid_picker_required_audio_channels_title">Canales requeridos</string>
+    <string name="debrid_picker_required_audio_channels_subtitle">Mostrar solo las distribuciones de canales seleccionadas.</string>
+    <string name="debrid_picker_excluded_audio_channels_title">Canales excluidos</string>
+    <string name="debrid_picker_excluded_audio_channels_subtitle">Oculta las distribuciones de canales seleccionadas.</string>
+    <string name="debrid_picker_preferred_encodes_title">Códecs preferidos</string>
+    <string name="debrid_picker_preferred_encodes_subtitle">Ordena códecs como AV1, HEVC, AVC y similares.</string>
+    <string name="debrid_picker_required_encodes_title">Códecs requeridos</string>
+    <string name="debrid_picker_required_encodes_subtitle">Requiere códecs como AV1, HEVC, AVC y similares.</string>
+    <string name="debrid_picker_excluded_encodes_title">Códecs excluidos</string>
+    <string name="debrid_picker_excluded_encodes_subtitle">Oculta los códecs seleccionados.</string>
+    <string name="debrid_picker_preferred_languages_title">Idiomas preferidos</string>
+    <string name="debrid_picker_preferred_languages_subtitle">Ordena primero los idiomas de audio preferidos.</string>
+    <string name="debrid_picker_required_languages_title">Idiomas requeridos</string>
+    <string name="debrid_picker_required_languages_subtitle">Mostrar solo streams con los idiomas seleccionados.</string>
+    <string name="debrid_picker_excluded_languages_title">Idiomas excluidos</string>
+    <string name="debrid_picker_excluded_languages_subtitle">Oculta streams donde todos los idiomas estén excluidos.</string>
+    <string name="debrid_picker_required_release_groups_title">Grupos de lanzamiento requeridos</string>
+    <string name="debrid_picker_required_release_groups_subtitle">Mostrar solo los grupos de lanzamiento seleccionados.</string>
+    <string name="debrid_picker_excluded_release_groups_title">Grupos de lanzamiento excluidos</string>
+    <string name="debrid_picker_excluded_release_groups_subtitle">Oculta los grupos de lanzamiento seleccionados.</string>
+
+    <!-- Debrid: selection count + size range labels -->
+    <string name="debrid_selection_count_any">Cualquiera</string>
+    <plurals name="debrid_selection_count_value">
+        <item quantity="one">%d seleccionado</item>
+        <item quantity="other">%d seleccionados</item>
+    </plurals>
+    <string name="debrid_size_range_any">Cualquiera</string>
+    <string name="debrid_size_range_up_to">Hasta %1$d GB</string>
+    <string name="debrid_size_range_min_plus">%1$d GB+</string>
+    <string name="debrid_size_range_min_max">%1$d-%2$d GB</string>
+
+    <!-- Subtitle selection: unknown language fallback -->
+    <string name="subtitle_language_unknown">Desconocido</string>
+
+    <!-- External playback keep-alive service -->
+    <string name="external_playback_notification_text">Reproduciendo en reproductor externo</string>
+    <string name="external_playback_channel_description">Mantiene la aplicación activa durante la reproducción en un reproductor externo</string>
+    
+    <!-- Web config page: Direct Debrid formatter -->
+    <string name="web_debrid_title">Configuración de Direct Debrid</string>
+    <string name="web_debrid_intro_title">Personaliza las transmisiones de Debrid</string>
+    <string name="web_debrid_intro_copy">Ajusta las etiquetas, filtros y el orden usados para los resultados de Direct Debrid.</string>
+    <string name="web_debrid_tab_formatter">Formato</string>
+    <string name="web_debrid_tab_rules">Filtros y orden</string>
+    <string name="web_debrid_template_fields">Campos de plantilla</string>
+    <string name="web_debrid_name_template">Plantilla del nombre</string>
+    <string name="web_debrid_description_template">Plantilla de la descripción</string>
+    <string name="web_debrid_error_templates_required">Se requieren ambas plantillas</string>
+    <string name="web_debrid_stream_rules">Reglas de transmisión</string>
+    <string name="web_debrid_per_resolution">Por resolución</string>
+    <string name="web_debrid_per_quality">Por calidad</string>
+    <string name="web_debrid_min_size_gb">Tamaño mínimo (GB)</string>
+    <string name="web_debrid_max_size_gb">Tamaño máximo (GB)</string>
+    <string name="web_debrid_restore_default">Restaurar valores predeterminados</string>
+    <string name="web_debrid_save_settings">Guardar configuración</string>
+    <string name="web_debrid_status_load_error">No se pudo cargar la configuración de Debrid</string>
+
+    <!-- Web config pages: shared save status -->
+    <string name="web_status_saving">Guardando…</string>
+    <string name="web_status_saved_streams">Guardado. Las nuevas transmisiones usarán esta configuración.</string>
+    <string name="web_status_could_not_save">No se pudo guardar</string>
+
+    <!-- Web config page: stream badge import status -->
+    <string name="web_stream_badge_importing">Importando…</string>
+    <string name="web_stream_badge_imported">URL de insignia importada.</string>
+    <string name="web_stream_badge_import_error">Error al importar la insignia.</string>
+    <string name="web_stream_badge_deleted">URL de insignia eliminada.</string>
+    <string name="web_stream_badge_load_error">No se pudo cargar la configuración de insignias de transmisión</string>
+    <string name="web_stream_badge_error_url_required">Ingresa una URL JSON de insignias.</string>
+    <string name="web_stream_badge_error_url_scheme">La URL de las insignias debe comenzar con http:// o https://.</string>
+    <string name="web_stream_badge_error_import_limit">Puedes importar hasta %1$d URL de insignias.</string>
+
+    <!-- Playback — Buffer & Network settings -->
+    <string name="playback_section_buffer_network">Búfer y red</string>
+    <string name="playback_section_buffer_network_desc">Cuánto contenido mantener en memoria y cómo obtener las transmisiones.</string>
+    <string name="playback_buffer_custom">Búferes de reproducción personalizados</string>
+    <string name="playback_buffer_custom_sub">Reemplaza el almacenamiento en búfer predeterminado de Media3 con los valores de abajo. Cuando está desactivado, el reproductor usa las duraciones y el tamaño objetivo del búfer predeterminados de Media3.</string>
+    <string name="playback_buffer_header">Búfer</string>
+    <string name="playback_buffer_warning">Estas configuraciones afectan el comportamiento del búfer. Valores incorrectos pueden causar problemas de reproducción.</string>
+    <string name="playback_buffer_min">Duración mínima del búfer</string>
+    <string name="playback_buffer_min_sub">Cantidad mínima de contenido para almacenar en búfer. El reproductor intentará asegurar que siempre haya al menos esta cantidad de contenido cargado por delante de la posición actual.</string>
+    <string name="playback_buffer_max">Duración máxima del búfer</string>
+    <string name="playback_buffer_max_sub">Cantidad máxima de contenido para almacenar en búfer. Debe ser al menos igual a la duración mínima del búfer. Valores más altos usan más memoria pero ofrecen una reproducción más fluida en conexiones inestables.</string>
+    <string name="playback_buffer_value_same_as_min">%1$ds (igual al mínimo)</string>
+    <string name="playback_buffer_initial">Búfer inicial</string>
+    <string name="playback_buffer_initial_sub">Cantidad de contenido que debe cargarse antes de iniciar la reproducción. Valores bajos inician más rápido pero pueden causar cortes iniciales en conexiones lentas.</string>
+    <string name="playback_buffer_after_rebuffer">Búfer después de recargar</string>
+    <string name="playback_buffer_after_rebuffer_sub">Cantidad de contenido a cargar después de que la reproducción se detenga por almacenamiento en búfer. Valores altos reducen interrupciones repetidas.</string>
+    <string name="playback_buffer_back">Duración del búfer posterior</string>
+    <string name="playback_buffer_back_sub">Cantidad de contenido ya reproducido que se mantiene en memoria. Permite retroceder rápidamente sin volver a descargar. Establécelo en 0 para desactivarlo y ahorrar memoria.</string>
+    <string name="playback_buffer_back_reserve">Reserva aproximadamente %1$d MB además del búfer objetivo. Aumentar la duración máxima del búfer reduce esto sin perder tiempo de búfer posterior.</string>
+    <string name="playback_buffer_managed">Límite de memoria administrado</string>
+    <string name="playback_buffer_managed_sub">Limita el búfer a una parte segura de la memoria del dispositivo. Desactívalo para definir manualmente el tamaño del búfer objetivo (avanzado: valores altos pueden causar cierres en dispositivos con poca memoria).</string>
+    <string name="playback_buffer_target">Tamaño del búfer objetivo</string>
+    <string name="playback_buffer_target_sub">Cantidad máxima de RAM usada para el búfer adelantado. El máximo se calcula según la memoria disponible del dispositivo (límite de memoria por aplicación de Android), por lo que dispositivos con más RAM permiten valores mayores automáticamente.</string>
+    <string name="playback_buffer_target_managed_hint">Administrado por el límite de memoria del dispositivo. Desactiva Límite de memoria administrado para configurarlo.</string>
+    <string name="playback_buffer_target_warning">Advertencia: supera el límite seguro del dispositivo (%1$d MB). La aplicación podría cerrarse durante la reproducción.</string>
+    <string name="playback_buffer_allow_large">Permitir búfer objetivo más grande</string>
+    <string name="playback_buffer_allow_large_sub">Elimina el límite de memoria del dispositivo para el control del tamaño del búfer objetivo, permitiendo valores de hasta 2 GB. Puede causar cierres en dispositivos con menos de 2 GB de RAM.</string>
+    <string name="playback_cache_header">Caché en disco</string>
+    <string name="playback_cache_vod">Caché VOD en disco</string>
+    <string name="playback_cache_vod_sub">Guarda los datos descargados en disco para la transmisión actual. Amplía el retroceso instantáneo más allá del búfer en memoria y resiste caídas breves de red. Solo aplica a transmisiones progresivas (sin HLS/DASH).</string>
+    <string name="playback_cache_auto_size">Tamaño automático</string>
+    <string name="playback_cache_auto_size_sub">Cuando está activado, el tamaño de la caché se calcula según el espacio libre en disco. Desactívalo para elegir el tamaño manualmente.</string>
+    <string name="playback_cache_vod_size">Tamaño de la caché VOD</string>
+    <string name="playback_cache_vod_size_sub">Uso máximo del disco para la caché VOD progresiva (eliminación LRU).</string>
+    <string name="playback_cache_info_range">Rango: %1$d-%2$d MB.</string>
+    <string name="playback_cache_info_auto">El modo automático apunta a aproximadamente el 10 % del espacio libre.</string>
+    <string name="playback_cache_info_manual_headroom">El modo manual mantiene aproximadamente %1$d MB libres.</string>
+    <string name="playback_cache_info_free_disk">Espacio libre disponible: %1$s.</string>
+    <string name="playback_cache_info_restart">El nuevo límite de caché se aplicará tras reiniciar la aplicación al cambiar entre modos o tamaños.</string>
+    <string name="playback_reset_to_default">Restablecer valores predeterminados</string>
+    <string name="playback_net_custom">Red personalizada</string>
+    <string name="playback_net_custom_sub">Usa múltiples conexiones paralelas para obtener transmisiones progresivas. Cuando está desactivado, se usa una sola conexión.</string>
+    <string name="playback_net_parallel">Conexiones paralelas</string>
+    <string name="playback_net_parallel_sub">Usa múltiples conexiones en paralelo para obtener transmisiones. Actívalo si experimentas almacenamiento en búfer aunque tu velocidad de descarga sea claramente suficiente.</string>
+    <string name="playback_net_connection_count">Cantidad de conexiones</string>
+    <string name="playback_net_connection_count_sub">Número de conexiones TCP paralelas. Los valores más altos aumentan el uso de memoria y el rendimiento, pero con beneficios cada vez menores.</string>
+    <string name="playback_net_chunk_size">Tamaño de fragmento</string>
+    <string name="playback_net_chunk_size_sub">Tamaño de cada fragmento de descarga por conexión. Los fragmentos más grandes reducen la sobrecarga, pero utilizan más memoria.</string>
+
+    <!-- Playback diagnostics card -->
+    <string name="diag_last_playback_title">Diagnóstico de la última reproducción</string>
+    <string name="diag_no_data">Aún no hay datos de reproducción. Reproduce una transmisión y vuelve aquí para ver los detalles de la decisión DV de esa reproducción.</string>
+    <string name="diag_section_source_hardware">Fuente y hardware</string>
+    <string name="diag_section_source_hardware_sub">Toma una foto de esta tarjeta si vas a reportar un problema.</string>
+    <string name="diag_label_host">Host</string>
+    <string name="diag_label_when">Fecha y hora</string>
+    <string name="diag_label_device">Dispositivo</string>
+    <string name="diag_label_display">Pantalla</string>
+    <string name="diag_label_dv7_decoder">Decodificador DV7</string>
+    <string name="diag_label_dv_decoder">Decodificador DV</string>
+    <string name="diag_label_dv_bridge">Puente DV</string>
+    <string name="diag_label_bridge_version">Versión del puente</string>
+    <string name="diag_label_bridge_reason">Motivo del puente</string>
+    <string name="diag_section_decision_settings">Decisión y configuración</string>
+    <string name="diag_label_dv_mode_requested">Modo DV (solicitado)</string>
+    <string name="diag_label_dv_mode_effective">Modo DV (efectivo)</string>
+    <string name="diag_label_auto_decision">Decisión AUTO</string>
+    <string name="diag_label_source_profile">Perfil de origen</string>
+    <string name="diag_label_conversions">Conversiones</string>
+    <string name="diag_label_signal_rewrites">Reescrituras de señal</string>
+    <string name="diag_label_custom_buffers">Búferes personalizados</string>
+    <string name="diag_label_custom_network_cache">Red/Caché personalizada</string>
+    <string name="diag_section_outcome">Resultado</string>
+    <string name="diag_label_hdr_format_intended">Formato HDR (previsto)</string>
+    <string name="diag_label_first_frame">Primer fotograma</string>
+    <string name="diag_label_rebuffers">Rebufferizaciones</string>
+    <string name="diag_label_result">Resultado</string>
+    <string name="diag_value_available">Disponible</string>
+    <string name="diag_value_not_available">No disponible</string>
+    <string name="diag_value_none">Ninguno</string>
+    <string name="diag_value_ready">Listo</string>
+    <string name="diag_value_not_ready">No listo</string>
+    <string name="diag_value_decoder_hidden">%1$s (oculto)</string>
+    <string name="diag_value_on">Activado</string>
+    <string name="diag_value_off">Desactivado</string>
+    <string name="diag_value_conversions_fmt">%1$d de %2$d exitosas</string>
+    <string name="diag_value_never_rendered">Nunca se renderizó</string>
+
+    <!-- Player errors -->
+    <string name="player_error_play_stream_failed">No se pudo reproducir la transmisión seleccionada</string>
+
+    <!-- Size and speed units -->
+    <string name="unit_size_b">%1$d B</string>
+    <string name="unit_size_kb">%1$s KB</string>
+    <string name="unit_size_mb">%1$s MB</string>
+    <string name="unit_size_gb">%1$s GB</string>
+    <string name="unit_speed_b_s">%1$d B/s</string>
+    <string name="unit_speed_kb_s">%1$s KB/s</string>
+    <string name="unit_speed_mb_s">%1$s MB/s</string>
+
+    <!-- Misc fallbacks -->
+    <string name="playback_estimated_memory_usage">Uso estimado de memoria: %1$d / %2$d MB</string>
+    <string name="profile_default_name">Perfil %1$d</string>
+    <string name="detail_tmdb_fallback_title">TMDB %1$d</string>
+    <string name="collections_editor_tmdb_collection_fallback">Colección de TMDB %1$d</string>
+    </resources>

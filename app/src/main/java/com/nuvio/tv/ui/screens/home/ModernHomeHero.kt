@@ -1,5 +1,9 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.ui.theme.NuvioMotion
+
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -54,10 +58,8 @@ import com.nuvio.tv.ui.util.recompositionHighlighter
 import coil3.request.transitionFactory
 import com.nuvio.tv.R
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.debounce
+import com.nuvio.tv.ui.components.ImdbRatingSourceLabel
 import com.nuvio.tv.ui.components.TrailerPlayer
-import com.nuvio.tv.ui.theme.NuvioColors
 import androidx.compose.ui.res.stringResource
 
 private data class ModernHeroSecondaryMeta(
@@ -100,7 +102,6 @@ internal fun ModernHeroScene(
     )
 }
 
-@OptIn(FlowPreview::class)
 @Composable
 internal fun ModernHeroMediaLayer(
     heroBackdrop: () -> String?,
@@ -126,43 +127,36 @@ internal fun ModernHeroMediaLayer(
     )
     val localContext = LocalContext.current
 
-    // Read backdrop/enrichment only inside LaunchedEffect to avoid recomposing
-    // this composable on every horizontal focus change.
-    // Single press (>200ms gap): update immediately. Holding: freeze until user stops.
-    // Initialize from HeroBackdropState (survives navigation) to prevent flash.
-    var stableBackdrop by remember { mutableStateOf(HeroBackdropState.lastDisplayedUrl ?: heroBackdrop()) }
-    LaunchedEffect(Unit) {
-        snapshotFlow { heroBackdrop() to enrichmentActive() }
-            .debounce(200L)
-            .collect { (_, _) ->
-                // Re-read current values after debounce to get the truly settled state.
-                // This avoids showing intermediate "addon" backdrop when enrichment
-                // hasn't started yet for the new item.
-                val currentBackdrop = heroBackdrop()
-                val isEnriching = enrichmentActive()
-                if (!isEnriching && currentBackdrop != stableBackdrop) {
-                    stableBackdrop = currentBackdrop
-                }
-            }
+    // Backdrop URL is managed upstream (heroSceneStateLambda freezes it
+    // during rapid nav / scroll). Only update when enrichment is not active
+    val rawBackdrop by remember { derivedStateOf { heroBackdrop() } }
+    val enriching by remember { derivedStateOf { enrichmentActive() } }
+    var displayedBackdrop by remember { mutableStateOf(HeroBackdropState.lastDisplayedUrl ?: heroBackdrop()) }
+    if (rawBackdrop != null && rawBackdrop != displayedBackdrop && !enriching) {
+        displayedBackdrop = rawBackdrop!!
     }
     val imageModel = remember(
         localContext,
-        stableBackdrop,
+        displayedBackdrop,
         requestWidthPx,
         requestHeightPx
     ) {
-        stableBackdrop?.let {
+        displayedBackdrop?.let {
             ImageRequest.Builder(localContext)
                 .data(it)
                 .size(width = requestWidthPx, height = requestHeightPx)
                 .build()
         }
     }
+    // Keep HeroBackdropState in sync for navigation transitions.
+    LaunchedEffect(displayedBackdrop) {
+        displayedBackdrop?.let { HeroBackdropState.update(it) }
+    }
 
     Box(modifier = modifier) {
         androidx.compose.animation.Crossfade(
             targetState = imageModel,
-            animationSpec = tween(durationMillis = 400),
+            animationSpec = tween(durationMillis = NuvioMotion.tokens.durations.overlay),
             label = "heroBackdropCrossfade"
         ) { model ->
             AsyncImage(
@@ -337,9 +331,9 @@ private fun HeroTitleContent(
     val descriptionScale = if (portraitMode) 0.90f else 1f
     val titleScale = if (portraitMode) 0.92f else 1f
     val metaScale = 1f
-    val titleSpacing = 8.dp * titleScale
-    val metaSpacing = 8.dp * metaScale
-    val imdbMetaSpacing = 4.dp * metaScale
+    val titleSpacing = NuvioTheme.spacing.sm * titleScale
+    val metaSpacing = NuvioTheme.spacing.sm * metaScale
+    val imdbMetaSpacing = NuvioTheme.spacing.xs * metaScale
     val context = LocalContext.current
     val density = LocalDensity.current
     val headlineLarge = MaterialTheme.typography.headlineLarge
@@ -357,12 +351,6 @@ private fun HeroTitleContent(
                 .build()
         }
     }
-    val imdbLogoModel = remember(context) {
-        ImageRequest.Builder(context)
-            .data(com.nuvio.tv.R.raw.imdb_logo_2016)
-            .build()
-    }
-
     val trailerPlayingValue = trailerPlaying()
     val metaAlpha by animateFloatAsState(
         targetValue = if (trailerPlayingValue) 0f else 1f,
@@ -404,7 +392,7 @@ private fun HeroTitleContent(
             Text(
                 text = preview.title,
                 style = scaledTitleStyle,
-                color = NuvioColors.TextPrimary,
+                color = NuvioTheme.colors.TextPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -461,10 +449,12 @@ private fun HeroTitleContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(metaSpacing)
         ) {
-            val leadingMetaText = remember(preview.contentTypeText, preview.genres) {
+            val leadingMetaText = remember(preview.contentTypeText, preview.genres, context) {
                 buildList {
                     preview.contentTypeText?.takeIf { it.isNotBlank() }?.let(::add)
-                    preview.genres.firstOrNull()?.takeIf { it.isNotBlank() }?.let(::add)
+                    preview.genres.firstOrNull()?.takeIf { it.isNotBlank() }?.let { genre ->
+                        add(com.nuvio.tv.ui.util.localizedGenreLabel(context, genre))
+                    }
                 }.joinToString(separator = " • ")
             }
             val hasLeadingMeta = leadingMetaText.isNotBlank()
@@ -480,7 +470,7 @@ private fun HeroTitleContent(
                 Text(
                     text = leadingMetaText,
                     style = labelMedium,
-                    color = NuvioColors.TextSecondary,
+                    color = NuvioTheme.colors.TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = if (hasTrailingMeta) {
@@ -503,7 +493,7 @@ private fun HeroTitleContent(
                         Text(
                             text = runtimeText,
                             style = labelMedium,
-                            color = NuvioColors.TextSecondary,
+                            color = NuvioTheme.colors.TextSecondary,
                             maxLines = 1
                         )
                     }
@@ -514,16 +504,15 @@ private fun HeroTitleContent(
                         Text(
                             text = yearText,
                             style = labelMedium,
-                            color = NuvioColors.TextSecondary,
+                            color = NuvioTheme.colors.TextSecondary,
                             maxLines = 1
                         )
                     }
                     if (showImdbInPrimaryWithHighlight && !imdbText.isNullOrBlank()) {
                         HeroImdbMeta(
                             imdbText = imdbText,
-                            imdbLogoModel = imdbLogoModel,
                             textStyle = labelMedium,
-                            textColor = NuvioColors.TextSecondary,
+                            textColor = NuvioTheme.colors.TextSecondary,
                             logoSize = 30.dp * metaScale,
                             spacing = imdbMetaSpacing
                         )
@@ -543,7 +532,7 @@ private fun HeroTitleContent(
                     Text(
                         text = text,
                         style = semiBoldLabelMedium,
-                        color = NuvioColors.TextPrimary,
+                        color = NuvioTheme.colors.TextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -556,21 +545,21 @@ private fun HeroTitleContent(
                         leftText = ageRatingBadge,
                         rightText = statusBadge,
                         textStyle = labelMedium,
-                        contentColor = NuvioColors.TextPrimary
+                        contentColor = NuvioTheme.colors.TextPrimary
                     )
                 } else {
                     ageRatingBadge?.let { badge ->
                         HeroMetaBadge(
                             text = badge,
                             textStyle = labelMedium,
-                            contentColor = NuvioColors.TextPrimary
+                            contentColor = NuvioTheme.colors.TextPrimary
                         )
                     }
                     statusBadge?.let { badge ->
                         HeroMetaBadge(
                             text = badge,
                             textStyle = labelMedium,
-                            contentColor = NuvioColors.TextPrimary
+                            contentColor = NuvioTheme.colors.TextPrimary
                         )
                     }
                 }
@@ -580,9 +569,8 @@ private fun HeroTitleContent(
                 if (showImdbInSecondary) {
                     HeroImdbMeta(
                         imdbText = preview.imdbText.orEmpty(),
-                        imdbLogoModel = imdbLogoModel,
                         textStyle = labelMedium,
-                        textColor = NuvioColors.TextSecondary,
+                        textColor = NuvioTheme.colors.TextSecondary,
                         logoSize = 30.dp * metaScale,
                         spacing = imdbMetaSpacing
                     )
@@ -594,7 +582,7 @@ private fun HeroTitleContent(
                     Text(
                         text = value,
                         style = labelMedium,
-                        color = NuvioColors.TextTertiary,
+                        color = NuvioTheme.colors.TextTertiary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -609,7 +597,7 @@ private fun HeroTitleContent(
             Text(
                 text = description,
                 style = scaledDescriptionStyle,
-                color = NuvioColors.TextPrimary,
+                color = NuvioTheme.colors.TextPrimary,
                 maxLines = descriptionMaxLines,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.graphicsLayer { alpha = metaAlpha }
@@ -621,7 +609,6 @@ private fun HeroTitleContent(
 @Composable
 private fun HeroImdbMeta(
     imdbText: String,
-    imdbLogoModel: Any,
     textStyle: androidx.compose.ui.text.TextStyle,
     textColor: Color,
     logoSize: androidx.compose.ui.unit.Dp,
@@ -631,11 +618,10 @@ private fun HeroImdbMeta(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing)
     ) {
-        AsyncImage(
-            model = imdbLogoModel,
-            contentDescription = stringResource(R.string.cd_imdb),
-            modifier = Modifier.size(logoSize),
-            contentScale = ContentScale.Fit
+        ImdbRatingSourceLabel(
+            logoModifier = Modifier.size(logoSize),
+            textStyle = textStyle,
+            textColor = textColor
         )
         Text(
             text = imdbText,
@@ -659,12 +645,12 @@ private fun HeroCombinedMetaBadge(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .border(
-                border = BorderStroke(1.dp, dividerColor),
+                border = BorderStroke(NuvioTheme.spacing.hairline, dividerColor),
                 shape = RoundedCornerShape(6.dp)
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         val semiBoldStyle = remember(textStyle) { textStyle.copy(fontWeight = FontWeight.SemiBold) }
         Text(
@@ -676,8 +662,8 @@ private fun HeroCombinedMetaBadge(
         )
         Box(
             modifier = Modifier
-                .width(1.dp)
-                .height(12.dp)
+                .width(NuvioTheme.spacing.hairline)
+                .height(NuvioTheme.spacing.md)
                 .background(dividerColor)
         )
         Text(
@@ -700,10 +686,10 @@ private fun HeroMetaBadge(
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
             .border(
-                border = BorderStroke(1.dp, contentColor.copy(alpha = 0.55f)),
+                border = BorderStroke(NuvioTheme.spacing.hairline, contentColor.copy(alpha = 0.55f)),
                 shape = RoundedCornerShape(6.dp)
             )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = NuvioTheme.spacing.sm, vertical = NuvioTheme.spacing.xs),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -720,8 +706,8 @@ private fun HeroMetaBadge(
 private fun HeroMetaDivider(scale: Float) {
     Box(
         modifier = Modifier
-            .size((4.dp * scale).coerceAtLeast(2.dp))
+            .size((NuvioTheme.spacing.xs * scale).coerceAtLeast(NuvioTheme.spacing.xxs))
             .clip(RoundedCornerShape(percent = 50))
-            .background(NuvioColors.TextTertiary.copy(alpha = 0.78f))
+            .background(NuvioTheme.colors.TextTertiary.copy(alpha = 0.78f))
     )
 }

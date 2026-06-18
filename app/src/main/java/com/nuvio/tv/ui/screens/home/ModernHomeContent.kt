@@ -6,6 +6,8 @@
 
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
@@ -75,7 +77,6 @@ import com.nuvio.tv.ui.components.LoadingIndicator
 import com.nuvio.tv.ui.components.ContinueWatchingOptionsDialog
 import com.nuvio.tv.LocalSidebarExpanded
 import com.nuvio.tv.LocalContentFocusRequester
-import com.nuvio.tv.ui.theme.NuvioColors
 import com.nuvio.tv.ui.util.LocalRecompositionHighlighterEnabled
 import com.nuvio.tv.ui.util.StableRef
 import com.nuvio.tv.ui.util.asStable
@@ -113,7 +114,8 @@ fun ModernHomeContent(
     onSaveFocusState: (Int, Int, String?, Map<String, String>, Map<String, Int>, Int, Int) -> Unit,
     scrollToTopTrigger: Int = 0,
     onRequestLazyCatalogLoad: (String) -> Unit = {},
-    onRowItemFocusedCallback: (String, Int, Boolean) -> Unit = { _, _, _ -> }
+    onRowItemFocusedCallback: (String, Int, Boolean) -> Unit = { _, _, _ -> },
+    blockLeftOnFirstExpandedItem: Boolean = false
 ) {
     val onRowItemFocusedPassedDown = rememberUpdatedState(onRowItemFocusedCallback)
     val defaultBringIntoViewSpec = LocalBringIntoViewSpec.current
@@ -590,8 +592,10 @@ fun ModernHomeContent(
                             description = enrichedItem.description,
                             contentTypeText = activeCarouselItem?.heroPreview?.contentTypeText,
                             isSeries = isSeriesType(enrichedItem.apiType),
-                            yearText = activeCarouselItem?.heroPreview?.yearText,
-                            runtimeText = activeCarouselItem?.heroPreview?.runtimeText,
+                            yearText = extractYearText(enrichedItem.type, enrichedItem.releaseInfo, enrichedItem.released)
+                                ?: activeCarouselItem?.heroPreview?.yearText,
+                            runtimeText = formatHeroRuntime(enrichedItem.runtime)
+                                ?: activeCarouselItem?.heroPreview?.runtimeText,
                             imdbText = enrichedItem.imdbRating?.let { String.format(java.util.Locale.US, "%.1f", it) },
                             ageRatingText = enrichedItem.ageRating,
                             statusText = enrichedItem.status,
@@ -669,33 +673,36 @@ fun ModernHomeContent(
                 val url = collectionHeroVideoUrl?.takeIf { it.isNotBlank() }
                 if (focusKey != null && url != null) "$focusKey::${focusedHeroMediaNonce.intValue}::$url" else null
             }
+            val isScrollStoppedState = remember(verticalRowListState) {
+                derivedStateOf { !verticalRowListState.isScrollInProgress }
+            }
             val shouldPlayCatalogHeroTrailerState = remember(
+                isScrollStoppedState,
                 effectiveAutoplayEnabled,
                 trailerPlaybackTarget,
                 heroTrailerUrlsState,
-                verticalRowListState,
                 isSidebarExpanded,
                 isRapidHorizontalNav
             ) {
                 derivedStateOf {
-                    effectiveAutoplayEnabled &&
+                    isScrollStoppedState.value &&
+                        effectiveAutoplayEnabled &&
                         !isSidebarExpanded.value &&
                         !isRapidHorizontalNav.value &&
-                        !verticalRowListState.isScrollInProgress &&
                         trailerPlaybackTarget == FocusedPosterTrailerPlaybackTarget.HERO_MEDIA &&
                         !heroTrailerUrlsState.value.first.isNullOrBlank()
                 }
             }
             val shouldPlayCollectionHeroVideoState = remember(
+                isScrollStoppedState,
                 collectionHeroVideoUrl,
                 collectionHeroVideoPlaybackKey,
                 endedCollectionHeroVideoPlaybackKey,
-                verticalRowListState,
                 isSidebarExpanded
             ) {
                 derivedStateOf {
-                    !isSidebarExpanded.value &&
-                        !verticalRowListState.isScrollInProgress &&
+                    isScrollStoppedState.value &&
+                        !isSidebarExpanded.value &&
                         !collectionHeroVideoUrl.isNullOrBlank() &&
                         collectionHeroVideoPlaybackKey != null &&
                         endedCollectionHeroVideoPlaybackKey != collectionHeroVideoPlaybackKey
@@ -722,7 +729,7 @@ fun ModernHomeContent(
                 heroTrailerFirstFrameRendered = false
             }
 
-            val isTrailerPlayingFullscreenState = remember(fullScreenBackdrop, shouldPlayCatalogHeroTrailerState, heroTrailerFirstFrameRendered) {
+            val isTrailerPlayingFullscreenState = remember(fullScreenBackdrop, shouldPlayCatalogHeroTrailerState) {
                 derivedStateOf { fullScreenBackdrop && shouldPlayCatalogHeroTrailerState.value && heroTrailerFirstFrameRendered }
             }
             BackHandler(enabled = isTrailerPlayingFullscreenState.value) {
@@ -732,7 +739,6 @@ fun ModernHomeContent(
             val liveHeroSceneState = remember(
                 resolvedHeroState,
                 shouldPlayHeroTrailerState,
-                heroTrailerFirstFrameRendered,
                 heroMediaDataState,
                 heroMediaMutedState,
                 fullScreenBackdrop
@@ -801,11 +807,13 @@ fun ModernHomeContent(
 
             val currentLiveHeroSceneStateUpdated by rememberUpdatedState(liveHeroSceneState.value)
             val isScrollInProgressUpdated by rememberUpdatedState(verticalRowListState.isScrollInProgress)
+            val isRapidHorizontalNavUpdated by rememberUpdatedState(isRapidHorizontalNav.value)
 
             val heroSceneStateLambda = remember {
                 {
                     val currentLive = currentLiveHeroSceneStateUpdated
                     val isScrolling = isScrollInProgressUpdated
+                    val isRapidNav = isRapidHorizontalNavUpdated
                     val stable = stableHeroSceneStateRef.value
                     val stableHasPreview = stable?.preview?.title?.isNotBlank() == true
 
@@ -813,6 +821,8 @@ fun ModernHomeContent(
                         // During vertical scroll: freeze stable to avoid flashing
                         // transient addon data before enrichment completes
                         isScrolling && stableHasPreview -> stable!!
+                        // During rapid horizontal nav: freeze to avoid backdrop flashing
+                        isRapidNav && stable != null -> stable
                         // Normal: show live state
                         else -> currentLive
                     }
@@ -825,10 +835,16 @@ fun ModernHomeContent(
             // will gate the preview through enrichmentActive in previewProvider.
             val latestLiveForStable = liveHeroSceneState.value
             if (!verticalRowListState.isScrollInProgress &&
-                latestLiveForStable.preview?.title?.isNotBlank() == true &&
-                !latestLiveForStable.enrichmentActive &&
-                stableHeroSceneStateRef.value?.preview != latestLiveForStable.preview) {
-                stableHeroSceneStateRef.value = latestLiveForStable
+                !isRapidHorizontalNav.value &&
+                !latestLiveForStable.enrichmentActive
+            ) {
+                val hasNewPreview = latestLiveForStable.preview?.title?.isNotBlank() == true &&
+                    stableHeroSceneStateRef.value?.preview != latestLiveForStable.preview
+                val hasNewBackdrop = latestLiveForStable.heroBackdrop != null &&
+                    stableHeroSceneStateRef.value?.heroBackdrop != latestLiveForStable.heroBackdrop
+                if (hasNewPreview || hasNewBackdrop) {
+                    stableHeroSceneStateRef.value = latestLiveForStable
+                }
             }
 
             val isFullScreenState = remember {
@@ -838,24 +854,6 @@ fun ModernHomeContent(
                 { isFullScreenState.value }
             }
 
-            LaunchedEffect(verticalRowListState, liveHeroSceneState) {
-                snapshotFlow {
-                    val currentLive = liveHeroSceneState.value
-                    val isScrolling = verticalRowListState.isScrollInProgress
-                    val isRapidNav = isRapidHorizontalNav.value
-                    val stable = stableHeroSceneStateRef.value
-                    when {
-                        // During vertical scroll, freeze backdrop
-                        isScrolling && stable?.heroBackdrop != null -> stable.heroBackdrop
-                        // During rapid horizontal nav, freeze backdrop too
-                        isRapidNav && stable?.heroBackdrop != null -> stable.heroBackdrop
-                        else -> currentLive.heroBackdrop
-                    }
-                }.collect { backdrop ->
-                    HeroBackdropState.update(backdrop)
-                }
-            }
-
             val localDensity = LocalDensity.current
             val rowsViewportHeightFraction = if (useLandscapePosters) 0.49f else 0.52f
             val rowsViewportHeight = remember(screenHeight, rowsViewportHeightFraction) { screenHeight * rowsViewportHeightFraction }
@@ -863,7 +861,7 @@ fun ModernHomeContent(
             val rowTitleHeight = remember(rowTitleLineHeight, localDensity) {
                 with(localDensity) {
                     runCatching { rowTitleLineHeight.toDp() }
-                        .getOrDefault(24.dp)
+                        .getOrDefault(NuvioTheme.spacing.xl)
                 }
             }
             val heroBackdropHeight = remember(screenHeight, rowsViewportHeight, rowTitleHeight) { (screenHeight - rowsViewportHeight + rowTitleHeight + 14.dp).coerceAtMost(screenHeight) }
@@ -891,20 +889,20 @@ fun ModernHomeContent(
                 with(localDensity) {
                     if (fullScreenBackdrop) screenWidth.roundToPx()
                     else (screenWidth * MODERN_HERO_MEDIA_WIDTH_FRACTION).roundToPx()
-                }
+                }.coerceAtLeast(1)
             }
             val heroMediaHeightPx = remember(heroBackdropHeight, screenHeight, localDensity, fullScreenBackdrop) {
                 with(localDensity) {
                     if (fullScreenBackdrop) screenHeight.roundToPx()
                     else heroBackdropHeight.roundToPx()
-                }
+                }.coerceAtLeast(1)
             }
 
             val heroMediaModifier = remember(heroBackdropHeight, screenHeight, fullScreenBackdrop) {
                 if (fullScreenBackdrop) {
                     Modifier.align(Alignment.TopStart).fillMaxWidth().height(screenHeight)
                 } else {
-                    Modifier.align(Alignment.TopEnd).offset(x = 56.dp).fillMaxWidth(MODERN_HERO_MEDIA_WIDTH_FRACTION).height(heroBackdropHeight)
+                    Modifier.align(Alignment.TopEnd).offset(x = NuvioTheme.spacing.huge).fillMaxWidth(MODERN_HERO_MEDIA_WIDTH_FRACTION).height(heroBackdropHeight)
                 }
             }
 
@@ -945,7 +943,7 @@ fun ModernHomeContent(
             val heroMetadataModifier = remember(rowHorizontalPadding, rowsViewportHeight) {
                 Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = rowHorizontalPadding, end = 48.dp, bottom = 0.dp + rowsViewportHeight + 16.dp)
+                    .padding(start = rowHorizontalPadding, end = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.none + rowsViewportHeight + NuvioTheme.spacing.lg)
                     .fillMaxWidth(MODERN_HERO_TEXT_WIDTH_FRACTION)
             }
 
@@ -1020,7 +1018,7 @@ fun ModernHomeContent(
                 onFastScrollingChanged = onFastScrollingChangedLambda,
                 contentFocusRequester = contentFocusRequester,
                 rowsViewportHeight = rowsViewportHeight,
-                catalogBottomPadding = 0.dp,
+                catalogBottomPadding = NuvioTheme.spacing.none,
                 trailerContentAlpha = stableTrailerContentAlphaLambda,
                 verticalRowBringIntoViewSpec = verticalRowBringIntoViewSpec,
                 onRowItemFocusedInternal = onRowItemFocusedInternalLambda,
@@ -1073,6 +1071,7 @@ fun ModernHomeContent(
                 focusedHeroMediaNonce = focusedHeroMediaNonce,
                 onFocusedHeroMediaNonceChange = onFocusedHeroMediaNonceChangeLambda,
                 onExpansionInteractionNonceChange = onExpansionInteractionNonceChangeLambda,
+                blockLeftOnFirstExpandedItem = blockLeftOnFirstExpandedItem,
                 isVerticalRowsScrollingState = isVerticalRowsScrollingState,
                 modifier = Modifier.align(Alignment.BottomStart)
             )
@@ -1124,7 +1123,7 @@ private fun ModernHeroSection(
     onFirstFrameRendered: () -> Unit
 ) {
     val highlighterEnabled = LocalRecompositionHighlighterEnabled.current
-    val bgColor = NuvioColors.Background
+    val bgColor = NuvioTheme.colors.Background
     ModernHeroScene(
         state = heroSceneState,
         isFullScreen = isFullScreen,

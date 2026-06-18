@@ -8,6 +8,7 @@ import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.data.repository.TraktScrobbleItem
 import com.nuvio.tv.data.repository.extractYear
 import com.nuvio.tv.data.repository.parseContentIds
+import com.nuvio.tv.data.repository.resolveEffectiveContentId
 import com.nuvio.tv.data.repository.toTraktIds
 import com.nuvio.tv.domain.model.WatchProgress
 import kotlinx.coroutines.delay
@@ -114,6 +115,19 @@ internal fun PlayerRuntimeController.resetPostPlayStateAfterPlaybackEnded() {
     ) {
         return
     }
+
+    // If auto-play is enabled and the user dismissed the card earlier,
+    // still auto-play the next episode when playback ends naturally.
+    val state = _uiState.value
+    if (state.postPlayDismissedForCurrentEpisode &&
+        streamAutoPlayNextEpisodeEnabledSetting &&
+        state.nextEpisode?.hasAired == true &&
+        nextEpisodeVideo != null
+    ) {
+        playNextEpisode()
+        return
+    }
+
     resetPostPlayOverlayState(clearEpisode = false)
 }
 
@@ -147,6 +161,9 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                         firstFrameReady = pos > 0L || (playingNow && !cacheBuffering && playerDuration > 0L)
                         if (firstFrameReady) {
                             hasRenderedFirstFrame = true
+                            if (_uiState.value.postPlayDismissedForCurrentEpisode) {
+                                _uiState.update { it.copy(postPlayDismissedForCurrentEpisode = false) }
+                            }
                         }
                     }
                     if (playerDuration > lastKnownDuration) {
@@ -196,7 +213,8 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                 val displayPosition = pendingPreviewSeekPosition ?: pos
                 updatePlaybackTimeline(
                     currentPosition = displayPosition,
-                    duration = playerDuration.coerceAtLeast(0L)
+                    duration = playerDuration.coerceAtLeast(0L),
+                    bufferedPosition = player.bufferedPosition.coerceAtLeast(displayPosition)
                 )
                 // Update torrent rebuffer progress from ExoPlayer's buffer state
                 if (isTorrentStream && _uiState.value.isBuffering && hasRenderedFirstFrame) {
@@ -206,10 +224,19 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                     val message = if (statsHidden) {
                         null
                     } else {
-                        val speed = formatTorrentSpeed(_uiState.value.torrentDownloadSpeed)
-                        val peerInfo = "${_uiState.value.torrentSeeds} seeds \u00B7 ${_uiState.value.torrentPeers} peers"
+                        val speed = formatTorrentSpeed(context, _uiState.value.torrentDownloadSpeed)
+                        val peerInfo = context.getString(
+                            R.string.player_torrent_peer_info,
+                            _uiState.value.torrentSeeds,
+                            _uiState.value.torrentPeers
+                        )
                         val bufLabel = String.format("%.0fs", bufferedSec)
-                        "$bufLabel buffered \u00B7 $peerInfo \u00B7 $speed"
+                        context.getString(
+                            R.string.player_torrent_buffered_status,
+                            bufLabel,
+                            peerInfo,
+                            speed
+                        )
                     }
                     val progress = (bufferedSec / 10f).coerceIn(0f, 1f)
                     _uiState.update {
@@ -315,8 +342,17 @@ internal fun PlayerRuntimeController.saveWatchProgressInternal(position: Long, d
 
     val fallbackPercent = if (duration <= 0L) 5f else null
 
+    // If Trakt is the active CW source and contentId is not Trakt-resolvable
+    // but videoId contains a valid IMDB/TMDB, use the resolved ID to avoid
+    // duplicate CW entries (one local with garbage ID, one from Trakt with real ID).
+    val effectiveContentId = if (isTraktCwActive) {
+        resolveEffectiveContentId(contentId, currentVideoId)
+    } else {
+        contentId
+    }
+
     val progress = WatchProgress(
-        contentId = contentId,
+        contentId = effectiveContentId,
         contentType = contentType,
         name = contentName ?: title,
         poster = poster,
@@ -333,7 +369,12 @@ internal fun PlayerRuntimeController.saveWatchProgressInternal(position: Long, d
     )
 
     scope.launch(kotlinx.coroutines.NonCancellable) {
-        watchProgressRepository.saveProgress(progress, syncRemote = syncRemote)
+        if (progress.isCompleted() && !hasMarkedCurrentEpisodeCompleted) {
+            hasMarkedCurrentEpisodeCompleted = true
+            watchProgressRepository.markAsCompleted(progress)
+        } else {
+            watchProgressRepository.saveProgress(progress, syncRemote = syncRemote)
+        }
     }
 }
 
@@ -356,7 +397,17 @@ internal fun PlayerRuntimeController.refreshScrobbleItem() {
 internal fun PlayerRuntimeController.buildScrobbleItem(): TraktScrobbleItem? {
     val rawContentId = contentId ?: return null
     val parsedIds = parseContentIds(rawContentId)
-    val ids = toTraktIds(parsedIds)
+    var ids = toTraktIds(parsedIds)
+    // Fallback: if contentId doesn't resolve to valid Trakt IDs, try videoId.
+    // Some addons use non-standard contentId (e.g. "tun_tt7821582") but set a
+    // valid IMDB/TMDB videoId (e.g. "tt7821582:3:7").
+    if (ids.trakt == null && ids.imdb.isNullOrBlank() && ids.tmdb == null) {
+        val fallbackVideoId = currentVideoId
+        if (!fallbackVideoId.isNullOrBlank() && fallbackVideoId != rawContentId) {
+            ids = toTraktIds(parseContentIds(fallbackVideoId))
+        }
+    }
+    if (ids.trakt == null && ids.imdb.isNullOrBlank() && ids.tmdb == null) return null
     val parsedYear = extractYear(year)
     val normalizedType = contentType?.lowercase()
     val currentMappingKey = currentEpisodeMappingCacheKey()
@@ -392,13 +443,17 @@ internal fun PlayerRuntimeController.buildScrobbleItem(): TraktScrobbleItem? {
 
 internal fun PlayerRuntimeController.emitScrobbleStart() {
     if (isShortPlaceholderStream()) return
-    val item = currentScrobbleItem ?: buildScrobbleItem().also { currentScrobbleItem = it }
-    if (item == null) return
     if (hasRequestedScrobbleStartForCurrentItem) return
 
     hasRequestedScrobbleStartForCurrentItem = true
     val requestGeneration = ++scrobbleStartRequestGeneration
     scope.launch {
+        // Wait for the episode mapping to finish (with its own timeout) so that
+        // the scrobble start is sent with the correct season/episode number.
+        traktMappingJob?.join()
+        currentScrobbleItem = buildScrobbleItem()
+        val item = currentScrobbleItem ?: return@launch
+        if (requestGeneration != scrobbleStartRequestGeneration || !hasRequestedScrobbleStartForCurrentItem) return@launch
         val progressPercent = currentPlaybackProgressPercent()
         traktScrobbleService.scrobbleStart(
             item = item,
@@ -553,11 +608,7 @@ internal fun PlayerRuntimeController.adjustSubtitleDelay(deltaMs: Int, showOverl
         }
     }
 
-    _exoPlayer?.let { player ->
-        player.trackSelectionParameters = player.trackSelectionParameters
-            .buildUpon()
-            .build()
-    }
+    refreshActiveSubtitleTrackAfterTimingChange()
     // Remember the delay so it survives to the next session (issue #1063).
     persistTrackPreference()
 
@@ -1216,6 +1267,23 @@ internal fun PlayerRuntimeController.buildStreamInfoData(): StreamInfoData {
     val selectedSubtitle = state.subtitleTracks.firstOrNull { it.isSelected }
     val addonSub = state.selectedAddonSubtitle
 
+    val activeVideoFormat = _exoPlayer?.videoFormat
+    val matchedFormat = _exoPlayer?.currentTracks?.groups
+        ?.firstOrNull { it.type == androidx.media3.common.C.TRACK_TYPE_VIDEO && it.isSelected }
+        ?.let { group ->
+            (0 until group.length)
+                .map { group.getTrackFormat(it) }
+                .firstOrNull { it.id == activeVideoFormat?.id || (it.bitrate > 0 && it.bitrate == activeVideoFormat?.bitrate) }
+        }
+
+    val videoWidth = matchedFormat?.width?.takeIf { it > 0 } ?: activeVideoFormat?.width?.takeIf { it > 0 } ?: currentVideoWidth
+    val videoHeight = matchedFormat?.height?.takeIf { it > 0 } ?: activeVideoFormat?.height?.takeIf { it > 0 } ?: currentVideoHeight
+    val videoBitrate = activeVideoFormat?.bitrate?.takeIf { it > 0 } ?: currentVideoBitrate
+    val videoCodec = activeVideoFormat?.let { format ->
+        CustomDefaultTrackNameProvider.formatNameFromMime(format.sampleMimeType)
+            ?: CustomDefaultTrackNameProvider.formatNameFromMime(format.codecs)
+    } ?: currentVideoCodec
+
     return StreamInfoData(
         addonName = currentAddonName,
         addonLogo = currentAddonLogo,
@@ -1223,11 +1291,11 @@ internal fun PlayerRuntimeController.buildStreamInfoData(): StreamInfoData {
         streamDescription = currentStreamDescription,
         filename = currentFilename,
         fileSize = currentVideoSize,
-        videoCodec = currentVideoCodec,
-        videoWidth = currentVideoWidth,
-        videoHeight = currentVideoHeight,
+        videoCodec = videoCodec,
+        videoWidth = videoWidth,
+        videoHeight = videoHeight,
         videoFrameRate = state.detectedFrameRate.takeIf { it > 0f },
-        videoBitrate = currentVideoBitrate,
+        videoBitrate = videoBitrate,
         audioCodec = selectedAudio?.codec,
         audioChannels = selectedAudio?.channelCount?.let {
             CustomDefaultTrackNameProvider.getChannelLayoutName(it)
@@ -1250,10 +1318,10 @@ internal fun PlayerRuntimeController.buildStreamInfoData(): StreamInfoData {
     )
 }
 
-private fun formatTorrentSpeed(bytesPerSec: Long): String {
+private fun formatTorrentSpeed(context: android.content.Context, bytesPerSec: Long): String {
     return when {
-        bytesPerSec >= 1_048_576 -> String.format("%.1f MB/s", bytesPerSec / 1_048_576.0)
-        bytesPerSec >= 1_024 -> String.format("%.0f KB/s", bytesPerSec / 1_024.0)
-        else -> "$bytesPerSec B/s"
+        bytesPerSec >= 1_048_576 -> context.getString(R.string.unit_speed_mb_s, String.format("%.1f", bytesPerSec / 1_048_576.0))
+        bytesPerSec >= 1_024 -> context.getString(R.string.unit_speed_kb_s, String.format("%.0f", bytesPerSec / 1_024.0))
+        else -> context.getString(R.string.unit_speed_b_s, bytesPerSec)
     }
 }

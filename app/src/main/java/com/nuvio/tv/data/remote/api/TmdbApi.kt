@@ -554,6 +554,7 @@ data class TmdbListItem(
     @Json(name = "release_date") val releaseDate: String? = null,
     @Json(name = "first_air_date") val firstAirDate: String? = null,
     @Json(name = "vote_average") val voteAverage: Double? = null,
+    @Json(name = "vote_count") val voteCount: Int? = null,
     @Json(name = "genre_ids") val genreIds: List<Int>? = null
 )
 
@@ -675,6 +676,7 @@ data class TmdbPersonCreditCast(
     @Json(name = "first_air_date") val firstAirDate: String? = null,
     @Json(name = "character") val character: String? = null,
     @Json(name = "vote_average") val voteAverage: Double? = null,
+    @Json(name = "vote_count") val voteCount: Int? = null,
     @Json(name = "overview") val overview: String? = null,
     @Json(name = "genre_ids") val genreIds: List<Int>? = null
 )
@@ -691,6 +693,7 @@ data class TmdbPersonCreditCrew(
     @Json(name = "first_air_date") val firstAirDate: String? = null,
     @Json(name = "job") val job: String? = null,
     @Json(name = "vote_average") val voteAverage: Double? = null,
+    @Json(name = "vote_count") val voteCount: Int? = null,
     @Json(name = "overview") val overview: String? = null,
     @Json(name = "genre_ids") val genreIds: List<Int>? = null
 )
@@ -713,7 +716,8 @@ data class TmdbCollectionPart(
     @Json(name = "release_date") val releaseDate: String? = null,
     @Json(name = "poster_path") val posterPath: String? = null,
     @Json(name = "backdrop_path") val backdropPath: String? = null,
-    @Json(name = "vote_average") val voteAverage: Double? = null
+    @Json(name = "vote_average") val voteAverage: Double? = null,
+    @Json(name = "vote_count") val voteCount: Int? = null
 )
 
 @JsonClass(generateAdapter = true)

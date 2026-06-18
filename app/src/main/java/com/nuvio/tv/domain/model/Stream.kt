@@ -23,20 +23,74 @@ data class Stream(
     val quality: String? = null,
     val qualityValue: Int = -1,
     /** Sidecar subtitle files bundled with the stream (currently from local library sources). */
-    val externalSubtitles: List<ExternalSubtitle> = emptyList()
-    val clientResolve: StreamClientResolve? = null
+    val externalSubtitles: List<ExternalSubtitle> = emptyList(),
+    val clientResolve: StreamClientResolve? = null,
+    val debridCacheStatus: StreamDebridCacheStatus? = null,
+    val badges: List<StreamBadge> = emptyList()
 ) {
     /**
      * Returns the primary stream source URL
      */
-    fun getStreamUrl(): String? = url ?: externalUrl
+    fun getStreamUrl(): String? =
+        listOfNotNull(url, externalUrl)
+            .firstOrNull { !it.isMagnetLink() && !it.isTorrentUrl() }
+
+    fun torrentMagnetUri(): String? =
+        listOfNotNull(url, externalUrl)
+            .firstOrNull { it.isMagnetLink() }
 
     /**
      * Returns true if this is a torrent-only stream (no HTTP URL available).
      * When both infoHash and url are present (e.g. debrid cached torrents),
      * the HTTP url is preferred and this returns false.
      */
-    fun isTorrent(): Boolean = !isDirectDebrid() && infoHash != null && url.isNullOrBlank()
+    fun isTorrent(): Boolean =
+        !isDirectDebrid() &&
+            getStreamUrl().isNullOrBlank() &&
+            (!infoHash.isNullOrBlank() || !torrentMagnetUri().isNullOrBlank() || hasTorrentUrl())
+
+    fun needsLocalDebridResolve(): Boolean =
+        isTorrent() && getStreamUrl().isNullOrBlank()
+
+    fun getEffectiveInfoHash(): String? =
+        infoHash?.takeIf { it.isNotBlank() }
+            ?: url?.let { extractInfoHashFromTorrentUrl(it) ?: extractInfoHashFromMagnetLink(it) }
+            ?: externalUrl?.let { extractInfoHashFromTorrentUrl(it) ?: extractInfoHashFromMagnetLink(it) }
+
+    fun getEffectiveFileIdx(): Int? =
+        fileIdx ?: url?.let { extractFileIdxFromTorrentUrl(it) } ?: externalUrl?.let { extractFileIdxFromTorrentUrl(it) }
+
+    private fun String.isTorrentUrl(): Boolean =
+        this.trimStart().startsWith("torrent:", ignoreCase = true)
+
+    private fun hasTorrentUrl(): Boolean =
+        url?.isTorrentUrl() == true || externalUrl?.isTorrentUrl() == true
+
+    private fun extractInfoHashFromTorrentUrl(url: String): String? {
+        if (!url.startsWith("torrent:", ignoreCase = true)) return null
+        val clean = url.substringAfter("torrent://").substringAfter("torrent:")
+            .substringBefore('?')
+            .trimEnd('/')
+        val hash = clean.substringBefore('/')
+        return hash.takeIf { it.length == 40 || it.length == 32 }
+    }
+
+    private fun extractInfoHashFromMagnetLink(url: String): String? {
+        if (!url.startsWith("magnet:", ignoreCase = true)) return null
+        val btih = url.substringAfter("urn:btih:", "")
+        if (btih.isBlank()) return null
+        val hash = btih.substringBefore('&').substringBefore('?')
+        return hash.takeIf { it.length == 40 || it.length == 32 }
+    }
+
+    private fun extractFileIdxFromTorrentUrl(url: String): Int? {
+        if (!url.startsWith("torrent:", ignoreCase = true)) return null
+        val clean = url.substringAfter("torrent://").substringAfter("torrent:")
+            .substringBefore('?')
+            .trimEnd('/')
+        val idxStr = clean.substringAfter('/', "").substringBefore('/')
+        return idxStr.toIntOrNull()
+    }
 
     fun isDirectDebrid(): Boolean {
         val resolve = clientResolve ?: return false
@@ -53,12 +107,18 @@ data class Stream(
     /**
      * Returns true if this is an external URL (opens in browser)
      */
-    fun isExternal(): Boolean = externalUrl != null && url == null
+    fun isExternal(): Boolean = externalUrl != null && url == null && !externalUrl.isMagnetLink()
+
+    /**
+     * Returns a display name for the stream, or null when no field is usable.
+     * UI call sites should substitute a localized fallback (R.string.stream_unknown).
+     */
+    fun getDisplayNameOrNull(): String? = name ?: title ?: description
 
     /**
      * Returns a display name for the stream
      */
-    fun getDisplayName(): String = name ?: title ?: description ?: "Unknown Stream"
+    fun getDisplayName(): String = getDisplayNameOrNull() ?: "Unknown Stream"
 
     /**
      * Returns a display description for the stream
@@ -86,6 +146,32 @@ data class Stream(
             append(occurrence)
         }
     }
+}
+
+@Immutable
+data class StreamBadge(
+    val name: String,
+    val imageURL: String = "",
+    val tagColor: String = "",
+    val tagStyle: String = "",
+    val textColor: String = "",
+    val borderColor: String = ""
+)
+
+@Immutable
+data class StreamDebridCacheStatus(
+    val providerId: String,
+    val providerName: String,
+    val state: StreamDebridCacheState,
+    val cachedName: String? = null,
+    val cachedSize: Long? = null
+)
+
+enum class StreamDebridCacheState {
+    CHECKING,
+    CACHED,
+    NOT_CACHED,
+    UNKNOWN
 }
 
 @Immutable
@@ -193,3 +279,6 @@ data class AddonStreams(
     val addonLogo: String?,
     val streams: List<Stream>
 )
+
+private fun String?.isMagnetLink(): Boolean =
+    this?.trimStart()?.startsWith("magnet:", ignoreCase = true) == true

@@ -46,7 +46,36 @@ class DebridFormatterConfigServerTest {
         assertEquals(listOf(DebridStreamQuality.CAM), saved?.streamPreferences?.excludedQualities)
     }
 
-    private class FakePostSession(body: String) : NanoHTTPD.IHTTPSession {
+    @Test
+    fun `saves blank formatter templates for original stream formatting`() {
+        var saved: DebridFormatterSettings? = null
+        val server = DebridFormatterConfigServer(
+            currentSettingsProvider = {
+                DebridFormatterSettings(
+                    nameTemplate = "{stream.resolution}",
+                    descriptionTemplate = "{stream.filename}"
+                )
+            },
+            onSettingsChanged = { saved = it }
+        )
+        val body = Gson().toJson(
+            mapOf(
+                "nameTemplate" to "",
+                "descriptionTemplate" to ""
+            )
+        )
+
+        val response = server.serve(FakePostSession(body))
+
+        assertEquals(NanoHTTPD.Response.Status.OK, response.status)
+        assertEquals("", saved?.nameTemplate)
+        assertEquals("", saved?.descriptionTemplate)
+    }
+
+    private class FakePostSession(
+        body: String,
+        private val uri: String = "/api/settings"
+    ) : NanoHTTPD.IHTTPSession {
         private val bytes = body.toByteArray(StandardCharsets.UTF_8)
 
         override fun execute() = Unit
@@ -60,7 +89,7 @@ class DebridFormatterConfigServerTest {
         override fun getParms(): Map<String, String> = emptyMap()
         override fun getParameters(): Map<String, List<String>> = emptyMap()
         override fun getQueryParameterString(): String? = null
-        override fun getUri(): String = "/api/settings"
+        override fun getUri(): String = uri
         override fun parseBody(files: MutableMap<String, String>) {
             error("parseBody should not be used")
         }

@@ -426,8 +426,18 @@ internal fun HomeViewModel.requestTrailerPreviewPipeline(
 }
 
 internal fun HomeViewModel.onItemFocusPipeline(item: MetaPreview) {
-    if (startupGracePeriodActive) return
-    if (item.id in prefetchedTmdbIds || item.id in prefetchedExternalMetaIds) return
+    if (startupGracePeriodActive) {
+        deferredEnrichItem = item
+        return
+    }
+    if (item.id in prefetchedTmdbIds || item.id in prefetchedExternalMetaIds) {
+        // Even if TMDB enriched, re-enter when artwork is still missing and external addon can help.
+        val artworkStillNeeded = item.id !in prefetchedExternalMetaIds &&
+            externalMetaPrefetchEnabled &&
+            !currentTmdbSettings.useArtwork &&
+            item.logo.isNullOrBlank()
+        if (!artworkStillNeeded) return
+    }
     if (pendingTmdbEnrichItemId == item.id) return
 
     // Clear enriching for previous item immediately when focus moves away
@@ -450,8 +460,14 @@ internal fun HomeViewModel.onItemFocusPipeline(item: MetaPreview) {
             return@launch
         }
         if (item.id in prefetchedTmdbIds || item.id in prefetchedExternalMetaIds) {
-            if (_enrichingItemId.value == item.id) setEnrichingItemId(null)
-            return@launch
+            val artworkStillNeeded = item.id !in prefetchedExternalMetaIds &&
+                externalMetaPrefetchEnabled &&
+                !currentTmdbSettings.useArtwork &&
+                item.logo.isNullOrBlank()
+            if (!artworkStillNeeded) {
+                if (_enrichingItemId.value == item.id) setEnrichingItemId(null)
+                return@launch
+            }
         }
 
         try {
@@ -474,12 +490,21 @@ internal fun HomeViewModel.onItemFocusPipeline(item: MetaPreview) {
 
                 if (enrichment != null) {
                     prefetchedTmdbIds.add(item.id)
-                    prefetchedExternalMetaIds.add(item.id)
+                    // Only mark external meta as done if TMDB covered artwork too.
+                    if (currentTmdbSettings.useArtwork || !item.logo.isNullOrBlank()) {
+                        prefetchedExternalMetaIds.add(item.id)
+                    }
                     updateCatalogItemWithTmdb(item.id, enrichment)
                     tmdbEnriched = true
                 }
             }
-            if (!tmdbEnriched && externalMetaPrefetchEnabled &&
+            // Fall through to external addon when:
+            // 1. TMDB didn't enrich at all, OR
+            // 2. TMDB enriched but useArtwork is off and the item still lacks a logo.
+            val artworkStillMissing = tmdbEnriched && !currentTmdbSettings.useArtwork &&
+                item.logo.isNullOrBlank()
+            val needsExternalAddon = !tmdbEnriched || artworkStillMissing
+            if (needsExternalAddon && externalMetaPrefetchEnabled &&
                 item.id !in prefetchedExternalMetaIds &&
                 externalMetaPrefetchInFlightIds.add(item.id)) {
                 try {
@@ -487,7 +512,11 @@ internal fun HomeViewModel.onItemFocusPipeline(item: MetaPreview) {
                         .first { it is NetworkResult.Success || it is NetworkResult.Error }
                     if (result is NetworkResult.Success) {
                         prefetchedExternalMetaIds.add(item.id)
-                        updateCatalogItemWithMeta(item.id, result.data)
+                        if (artworkStillMissing) {
+                            updateCatalogItemArtworkOnly(item.id, result.data)
+                        } else {
+                            updateCatalogItemWithMeta(item.id, result.data)
+                        }
                     }
                 } finally {
                     externalMetaPrefetchInFlightIds.remove(item.id)
@@ -535,12 +564,17 @@ internal fun HomeViewModel.preloadAdjacentItemPipeline(item: MetaPreview) {
                 }.getOrNull() else null
                 if (enrichment != null) {
                     prefetchedTmdbIds.add(item.id)
-                    prefetchedExternalMetaIds.add(item.id)
+                    if (currentTmdbSettings.useArtwork || !item.logo.isNullOrBlank()) {
+                        prefetchedExternalMetaIds.add(item.id)
+                    }
                     updateCatalogItemWithTmdb(item.id, enrichment)
                     tmdbEnriched = true
                 }
             }
-            if (!tmdbEnriched &&
+            val artworkStillMissing = tmdbEnriched && !currentTmdbSettings.useArtwork &&
+                item.logo.isNullOrBlank()
+            val needsExternalAddon = !tmdbEnriched || artworkStillMissing
+            if (needsExternalAddon &&
                 externalMetaPrefetchEnabled &&
                 item.id !in prefetchedExternalMetaIds &&
                 externalMetaPrefetchInFlightIds.add(item.id)
@@ -550,7 +584,11 @@ internal fun HomeViewModel.preloadAdjacentItemPipeline(item: MetaPreview) {
                         .first { it is NetworkResult.Success || it is NetworkResult.Error }
                     if (result is NetworkResult.Success) {
                         prefetchedExternalMetaIds.add(item.id)
-                        updateCatalogItemWithMeta(item.id, result.data)
+                        if (artworkStillMissing) {
+                            updateCatalogItemArtworkOnly(item.id, result.data)
+                        } else {
+                            updateCatalogItemWithMeta(item.id, result.data)
+                        }
                     }
                 } finally {
                     externalMetaPrefetchInFlightIds.remove(item.id)
@@ -713,6 +751,40 @@ private fun HomeViewModel.updateCatalogItemWithMeta(itemId: String, meta: Meta) 
         trailerPreviewRequestVersion++
         val currentItem = findCatalogItemById(itemId) ?: return
         requestTrailerPreviewPipeline(currentItem)
+    }
+}
+
+private fun HomeViewModel.updateCatalogItemArtworkOnly(itemId: String, meta: Meta) {
+    fun mergeItem(currentItem: MetaPreview): MetaPreview = currentItem.copy(
+        background = meta.backdropUrl ?: currentItem.backdropUrl,
+        logo = meta.logo ?: currentItem.logo
+    )
+
+    updateIndexedCatalogItem(itemId, ::mergeItem)
+
+    _uiState.update { state ->
+        var changed = false
+        val updatedRows = state.catalogRows.map { row ->
+            val itemIndex = row.items.indexOfFirst { it.id == itemId }
+            if (itemIndex < 0) {
+                row
+            } else {
+                val mergedItem = mergeItem(row.items[itemIndex])
+                if (mergedItem == row.items[itemIndex]) {
+                    row
+                } else {
+                    changed = true
+                    val mutableItems = row.items.toMutableList()
+                    mutableItems[itemIndex] = mergedItem
+                    row.copy(items = mutableItems)
+                }
+            }
+        }
+        if (changed) state.copy(catalogRows = updatedRows) else state
+    }
+    findCatalogItemById(itemId)?.let { enriched ->
+        _lastEnrichedPreview.value = enriched
+        _enrichedPreviews.update { it + (itemId to enriched) }
     }
 }
 

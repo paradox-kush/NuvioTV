@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import android.util.Log
@@ -50,7 +52,6 @@ import com.nuvio.tv.ui.components.PosterCardStyle
 import androidx.compose.ui.res.stringResource
 import com.nuvio.tv.R
 import com.nuvio.tv.data.local.StartupAuthNotice
-import com.nuvio.tv.ui.theme.NuvioColors
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -116,14 +117,19 @@ fun HomeScreen(
         viewModel.notifyLocaleChanged()
     }
 
-    // Watched status: the lambda is recreated whenever movieWatchedStatus changes,
-    // which forces downstream LazyRow items to recompose with fresh watched state.
     val movieWatchedStatus = uiState.movieWatchedStatus
-    val isCatalogItemWatched: (MetaPreview) -> Boolean = remember(movieWatchedStatus) {
-        { item -> movieWatchedStatus[homeItemStatusKey(item.id, item.apiType)] == true }
+    // Use a stable lambda whose identity NEVER changes. The lambda captures
+    // movieWatchedStatus via rememberUpdatedState so it always reads the latest
+    // value without forcing downstream recomposition from lambda identity change.
+    val latestMovieWatchedStatus = androidx.compose.runtime.rememberUpdatedState(movieWatchedStatus)
+    val isCatalogItemWatched: (MetaPreview) -> Boolean = remember {
+        { item: MetaPreview -> latestMovieWatchedStatus.value[homeItemStatusKey(item.id, item.apiType)] == true }
     }
     val onCatalogItemLongPress: (MetaPreview, String) -> Unit = remember {
-        { item, addonBaseUrl -> posterOptionsTarget = HomePosterOptionsTarget(item, addonBaseUrl) }
+        { item, addonBaseUrl ->
+            posterOptionsTarget = HomePosterOptionsTarget(item, addonBaseUrl)
+            viewModel.refreshPosterLibraryStatus(item)
+        }
     }
 
     val onNavigateToDetailStable = remember(onNavigateToDetail) { onNavigateToDetail }
@@ -234,7 +240,7 @@ fun HomeScreen(
                         Text(
                             text = stringResource(R.string.home_no_addons),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = NuvioColors.TextSecondary
+                            color = NuvioTheme.colors.TextSecondary
                         )
                     }
                 }
@@ -253,7 +259,7 @@ fun HomeScreen(
                         Text(
                             text = stringResource(R.string.home_no_catalog_addons),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = NuvioColors.TextSecondary
+                            color = NuvioTheme.colors.TextSecondary
                         )
                     }
                 }
@@ -284,7 +290,7 @@ fun HomeScreen(
                         Text(
                             text = stringResource(R.string.web_no_catalogs),
                             style = MaterialTheme.typography.bodyLarge,
-                            color = NuvioColors.TextSecondary
+                            color = NuvioTheme.colors.TextSecondary
                         )
                     }
                 }
@@ -396,7 +402,7 @@ fun HomeScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
+                    .padding(top = NuvioTheme.spacing.xl)
                     .background(
                         color = Color(0xFF5A1C1C),
                         shape = RoundedCornerShape(10.dp)
@@ -409,7 +415,7 @@ fun HomeScreen(
                         StartupAuthNotice.TRAKT -> stringResource(R.string.auth_notice_trakt_logged_out)
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = NuvioColors.TextPrimary
+                    color = NuvioTheme.colors.TextPrimary
                 )
             }
         }
@@ -420,13 +426,17 @@ fun HomeScreen(
         val item = selectedPoster.item
         val statusKey = homeItemStatusKey(item.id, item.apiType)
         val isMovie = item.apiType.equals("movie", ignoreCase = true)
+        val isSeries = item.apiType.equals("series", ignoreCase = true) ||
+            item.apiType.equals("tv", ignoreCase = true) ||
+            item.apiType.equals("anime", ignoreCase = true)
         HomePosterOptionsDialog(
             title = item.name,
             isInLibrary = uiState.posterLibraryMembership[statusKey] == true,
             isLibraryPending = statusKey in uiState.posterLibraryPending,
             showManageLists = uiState.librarySourceMode == LibrarySourceMode.TRAKT,
             isMovie = isMovie,
-            isWatched = uiState.movieWatchedStatus[statusKey] == true,
+            isSeries = isSeries,
+            isWatched = movieWatchedStatus[statusKey] == true,
             isWatchedPending = statusKey in uiState.movieWatchedPending,
             onDismiss = { posterOptionsTarget = null },
             onDetails = {
@@ -442,7 +452,11 @@ fun HomeScreen(
                 posterOptionsTarget = null
             },
             onToggleWatched = {
-                viewModel.togglePosterMovieWatched(item)
+                if (isMovie) {
+                    viewModel.togglePosterMovieWatched(item)
+                } else {
+                    viewModel.togglePosterSeriesWatched(item)
+                }
                 posterOptionsTarget = null
             }
         )
@@ -646,6 +660,7 @@ private fun HomePosterOptionsDialog(
     isLibraryPending: Boolean,
     showManageLists: Boolean,
     isMovie: Boolean,
+    isSeries: Boolean = false,
     isWatched: Boolean,
     isWatchedPending: Boolean,
     onDismiss: () -> Unit,
@@ -670,8 +685,8 @@ private fun HomePosterOptionsDialog(
                 .fillMaxWidth()
                 .focusRequester(primaryFocusRequester),
             colors = ButtonDefaults.colors(
-                containerColor = NuvioColors.BackgroundCard,
-                contentColor = NuvioColors.TextPrimary
+                containerColor = NuvioTheme.colors.BackgroundCard,
+                contentColor = NuvioTheme.colors.TextPrimary
             )
         ) {
             Text(stringResource(R.string.cw_action_go_to_details))
@@ -682,8 +697,8 @@ private fun HomePosterOptionsDialog(
             enabled = !isLibraryPending,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.colors(
-                containerColor = NuvioColors.BackgroundCard,
-                contentColor = NuvioColors.TextPrimary
+                containerColor = NuvioTheme.colors.BackgroundCard,
+                contentColor = NuvioTheme.colors.TextPrimary
             )
         ) {
             Text(
@@ -699,14 +714,14 @@ private fun HomePosterOptionsDialog(
             )
         }
 
-        if (isMovie) {
+        if (isMovie || isSeries) {
             Button(
                 onClick = onToggleWatched,
                 enabled = !isWatchedPending,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.colors(
-                    containerColor = NuvioColors.BackgroundCard,
-                    contentColor = NuvioColors.TextPrimary
+                    containerColor = NuvioTheme.colors.BackgroundCard,
+                    contentColor = NuvioTheme.colors.TextPrimary
                 )
             ) {
                 Text(
@@ -773,8 +788,8 @@ private fun HomeLibraryListPickerDialog(
                         Modifier.fillMaxWidth()
                     },
                     colors = ButtonDefaults.colors(
-                        containerColor = if (selected) NuvioColors.FocusBackground else NuvioColors.BackgroundCard,
-                        contentColor = NuvioColors.TextPrimary
+                        containerColor = if (selected) NuvioTheme.colors.FocusBackground else NuvioTheme.colors.BackgroundCard,
+                        contentColor = NuvioTheme.colors.TextPrimary
                     )
                 ) {
                     Text(
@@ -786,15 +801,15 @@ private fun HomeLibraryListPickerDialog(
             }
         }
 
-        Divider(color = NuvioColors.Border, thickness = 1.dp)
+        Divider(color = NuvioTheme.colors.Border, thickness = NuvioTheme.spacing.hairline)
 
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             Button(
                 onClick = onSave,
                 enabled = !isPending,
                 colors = ButtonDefaults.colors(
-                    containerColor = NuvioColors.BackgroundCard,
-                    contentColor = NuvioColors.TextPrimary
+                    containerColor = NuvioTheme.colors.BackgroundCard,
+                    contentColor = NuvioTheme.colors.TextPrimary
                 )
             ) {
                 Text(if (isPending) stringResource(R.string.action_saving) else stringResource(R.string.action_save))

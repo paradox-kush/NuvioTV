@@ -1,15 +1,28 @@
 package com.nuvio.tv.ui.screens.settings
 
+import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nuvio.tv.R
+import com.nuvio.tv.core.qr.QrCodeGenerator
+import com.nuvio.tv.core.server.DeviceIpAddress
+import com.nuvio.tv.core.server.StreamBadgeConfigServer
+import com.nuvio.tv.core.streams.StreamBadgePlacement
+import com.nuvio.tv.core.streams.StreamBadgeRules
+import com.nuvio.tv.core.streams.StreamBadgeSettings
 import com.nuvio.tv.data.local.LayoutPreferenceDataStore
+import com.nuvio.tv.data.local.StreamBadgeSettingsDataStore
 import com.nuvio.tv.data.local.TraktSettingsDataStore
+import com.nuvio.tv.data.local.TrailerSettingsDataStore
 import com.nuvio.tv.domain.model.ContinueWatchingSortMode
 import com.nuvio.tv.domain.model.DiscoverLocation
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
+import com.nuvio.tv.domain.model.enabledAddons
 import com.nuvio.tv.domain.repository.AddonRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,6 +62,8 @@ data class LayoutSettingsUiState(
     val blurContinueWatchingNextUp: Boolean = false,
     val useEpisodeThumbnailsInCw: Boolean = true,
     val detailPageTrailerButtonEnabled: Boolean = true,
+    val detailPageTrailerAutoplayEnabled: Boolean = true,
+    val detailPageTrailerAutoplayDelaySeconds: Int = 7,
     val preferExternalMetaAddonDetail: Boolean = false,
     val hideUnreleasedContent: Boolean = false,
     val showFullReleaseDate: Boolean = true,
@@ -90,6 +105,8 @@ sealed class LayoutSettingsEvent {
     data class SetBlurContinueWatchingNextUp(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetUseEpisodeThumbnailsInCw(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetDetailPageTrailerButtonEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetDetailPageTrailerAutoplayEnabled(val enabled: Boolean) : LayoutSettingsEvent()
+    data class SetDetailPageTrailerAutoplayDelaySeconds(val seconds: Int) : LayoutSettingsEvent()
     data class SetPreferExternalMetaAddonDetail(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetHideUnreleasedContent(val enabled: Boolean) : LayoutSettingsEvent()
     data class SetShowFullReleaseDate(val enabled: Boolean) : LayoutSettingsEvent()
@@ -101,14 +118,22 @@ sealed class LayoutSettingsEvent {
 
 @HiltViewModel
 class LayoutSettingsViewModel @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
+    private val streamBadgeSettingsDataStore: StreamBadgeSettingsDataStore,
     private val traktSettingsDataStore: TraktSettingsDataStore,
+    private val trailerSettingsDataStore: TrailerSettingsDataStore,
     private val addonRepository: AddonRepository,
     private val metaRepository: com.nuvio.tv.domain.repository.MetaRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LayoutSettingsUiState())
     val uiState: StateFlow<LayoutSettingsUiState> = _uiState.asStateFlow()
+    private var streamBadgeServer: StreamBadgeConfigServer? = null
+    private var logoBytes: ByteArray? = null
+
+    private val _streamBadgeUiState = MutableStateFlow(StreamBadgeSettingsUiState())
+    val streamBadgeUiState: StateFlow<StreamBadgeSettingsUiState> = _streamBadgeUiState.asStateFlow()
 
     private inline fun updateUiStateIfChanged(
         update: (LayoutSettingsUiState) -> LayoutSettingsUiState
@@ -120,6 +145,12 @@ class LayoutSettingsViewModel @Inject constructor(
     }
 
     init {
+        loadLogoBytes()
+        viewModelScope.launch {
+            streamBadgeSettingsDataStore.settings.collectLatest { settings ->
+                _streamBadgeUiState.update { it.copy(settings = settings) }
+            }
+        }
         viewModelScope.launch {
             layoutPreferenceDataStore.selectedLayout.distinctUntilChanged().collectLatest { layout ->
                 updateUiStateIfChanged { it.copy(selectedLayout = layout) }
@@ -256,6 +287,16 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            trailerSettingsDataStore.settings.distinctUntilChanged().collectLatest { settings ->
+                updateUiStateIfChanged {
+                    it.copy(
+                        detailPageTrailerAutoplayEnabled = settings.enabled,
+                        detailPageTrailerAutoplayDelaySeconds = settings.delaySeconds
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
             layoutPreferenceDataStore.preferExternalMetaAddonDetail.distinctUntilChanged().collectLatest { enabled ->
                 updateUiStateIfChanged { it.copy(preferExternalMetaAddonDetail = enabled) }
             }
@@ -317,6 +358,8 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetBlurContinueWatchingNextUp -> setBlurContinueWatchingNextUp(event.enabled)
             is LayoutSettingsEvent.SetUseEpisodeThumbnailsInCw -> setUseEpisodeThumbnailsInCw(event.enabled)
             is LayoutSettingsEvent.SetDetailPageTrailerButtonEnabled -> setDetailPageTrailerButtonEnabled(event.enabled)
+            is LayoutSettingsEvent.SetDetailPageTrailerAutoplayEnabled -> setDetailPageTrailerAutoplayEnabled(event.enabled)
+            is LayoutSettingsEvent.SetDetailPageTrailerAutoplayDelaySeconds -> setDetailPageTrailerAutoplayDelaySeconds(event.seconds)
             is LayoutSettingsEvent.SetPreferExternalMetaAddonDetail -> setPreferExternalMetaAddonDetail(event.enabled)
             is LayoutSettingsEvent.SetHideUnreleasedContent -> setHideUnreleasedContent(event.enabled)
             is LayoutSettingsEvent.SetShowFullReleaseDate -> setShowFullReleaseDate(event.enabled)
@@ -325,6 +368,74 @@ class LayoutSettingsViewModel @Inject constructor(
             is LayoutSettingsEvent.SetContinueWatchingSortMode -> setContinueWatchingSortMode(event.mode)
             LayoutSettingsEvent.ResetPosterCardStyle -> resetPosterCardStyle()
         }
+    }
+
+    fun startStreamBadgeQrMode() {
+        val ip = DeviceIpAddress.get(context)
+        if (ip == null) {
+            _streamBadgeUiState.update { it.copy(serverError = context.getString(R.string.error_network_required)) }
+            return
+        }
+        stopStreamBadgeServer()
+        streamBadgeServer = StreamBadgeConfigServer.startOnAvailablePort(
+            currentSettingsProvider = { _streamBadgeUiState.value.settings },
+            onSettingsChanged = { settings ->
+                _streamBadgeUiState.update { it.copy(settings = settings) }
+                viewModelScope.launch { streamBadgeSettingsDataStore.setSettings(settings) }
+            },
+            context = context,
+            logoProvider = { logoBytes }
+        )
+        val server = streamBadgeServer
+        if (server == null) {
+            _streamBadgeUiState.update { it.copy(serverError = context.getString(R.string.error_server_ports_unavailable)) }
+            return
+        }
+        val url = "http://$ip:${server.listeningPort}"
+        _streamBadgeUiState.update {
+            it.copy(
+                isQrModeActive = true,
+                qrCodeBitmap = QrCodeGenerator.generate(url, 512),
+                serverUrl = url,
+                serverError = null
+            )
+        }
+    }
+
+    fun stopStreamBadgeQrMode() {
+        stopStreamBadgeServer()
+        _streamBadgeUiState.update {
+            it.copy(
+                isQrModeActive = false,
+                qrCodeBitmap = null,
+                serverUrl = null
+            )
+        }
+    }
+
+    fun setShowFileSizeBadges(enabled: Boolean) {
+        viewModelScope.launch { streamBadgeSettingsDataStore.setShowFileSizeBadges(enabled) }
+    }
+
+    fun setShowAddonLogo(enabled: Boolean) {
+        viewModelScope.launch { streamBadgeSettingsDataStore.setShowAddonLogo(enabled) }
+    }
+
+    fun setStreamBadgePlacement(placement: StreamBadgePlacement) {
+        viewModelScope.launch { streamBadgeSettingsDataStore.setStreamBadgePlacement(placement) }
+    }
+
+    private fun loadLogoBytes() {
+        try {
+            val inputStream = context.resources.openRawResource(R.drawable.app_logo_wordmark)
+            logoBytes = inputStream.use { it.readBytes() }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun stopStreamBadgeServer() {
+        streamBadgeServer?.stop()
+        streamBadgeServer = null
     }
 
     private fun selectLayout(layout: HomeLayout) {
@@ -480,6 +591,20 @@ class LayoutSettingsViewModel @Inject constructor(
         }
     }
 
+    private fun setDetailPageTrailerAutoplayEnabled(enabled: Boolean) {
+        if (_uiState.value.detailPageTrailerAutoplayEnabled == enabled) return
+        viewModelScope.launch {
+            trailerSettingsDataStore.setEnabled(enabled)
+        }
+    }
+
+    private fun setDetailPageTrailerAutoplayDelaySeconds(seconds: Int) {
+        if (_uiState.value.detailPageTrailerAutoplayDelaySeconds == seconds) return
+        viewModelScope.launch {
+            trailerSettingsDataStore.setDelaySeconds(seconds)
+        }
+    }
+
     private fun setBlurUnwatchedEpisodes(enabled: Boolean) {
         if (_uiState.value.blurUnwatchedEpisodes == enabled) return
         viewModelScope.launch {
@@ -561,7 +686,8 @@ class LayoutSettingsViewModel @Inject constructor(
 
     private fun loadAvailableCatalogs() {
         viewModelScope.launch {
-            addonRepository.getInstalledAddons().collectLatest { addons ->
+            addonRepository.getInstalledAddons().collectLatest { installedAddons ->
+                val addons = installedAddons.enabledAddons()
                 val catalogs = addons.flatMap { addon ->
                     addon.catalogs
                         .filter { catalog ->
@@ -579,4 +705,29 @@ class LayoutSettingsViewModel @Inject constructor(
             }
         }
     }
+
+    override fun onCleared() {
+        stopStreamBadgeServer()
+        super.onCleared()
+    }
+}
+
+data class StreamBadgeSettingsUiState(
+    val settings: StreamBadgeSettings = StreamBadgeSettings(),
+    val isQrModeActive: Boolean = false,
+    val qrCodeBitmap: Bitmap? = null,
+    val serverUrl: String? = null,
+    val serverError: String? = null
+) {
+    val rules: StreamBadgeRules
+        get() = settings.rules
+
+    val showFileSizeBadges: Boolean
+        get() = settings.showFileSizeBadges
+
+    val showAddonLogo: Boolean
+        get() = settings.showAddonLogo
+
+    val badgePlacement: StreamBadgePlacement
+        get() = settings.badgePlacement
 }

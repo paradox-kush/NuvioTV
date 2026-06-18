@@ -33,7 +33,9 @@ internal data class PlayerNavigationArgs(
     val fileIdx: Int?,
     val sourcesJson: String?,
     val contentLanguage: String?,
-    val externalSubtitlesJson: String?
+    val externalSubtitlesJson: String?,
+    val rememberedAudioLanguage: String?,
+    val rememberedAudioName: String?
 ) {
     val externalSubtitles: List<ExternalSubtitle>
         get() {
@@ -120,7 +122,9 @@ internal data class PlayerNavigationArgs(
                 fileIdx = savedStateHandle.get<String>("fileIdx")?.toIntOrNull(),
                 sourcesJson = decodedOrNull("sources"),
                 contentLanguage = decodedOrNull("contentLanguage"),
-                externalSubtitlesJson = decodedOrNull("externalSubtitles")
+                externalSubtitlesJson = decodedOrNull("externalSubtitles"),
+                rememberedAudioLanguage = decodedOrNull("rememberedAudioLanguage"),
+                rememberedAudioName = decodedOrNull("rememberedAudioName")
             )
         }
     }

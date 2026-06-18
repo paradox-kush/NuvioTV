@@ -339,6 +339,21 @@ class TraktProgressService @Inject constructor(
         refreshSignals.emit(Unit)
     }
 
+    /** Full cache invalidation + refresh. Called on Activity cold-start (warm process). */
+    suspend fun invalidateAndRefresh() {
+        trace("invalidateAndRefresh: resetting fingerprints and caches")
+        lastKnownActivityFingerprint = null
+        lastKnownMoviesWatchedAt = null
+        lastKnownEpisodeActivityFingerprint = null
+        watchedMoviesStale = true
+        watchedShowSeedsStale = true
+        cachedMoviesPlayback = null
+        cachedEpisodesPlayback = null
+        forceRefreshUntilMs = System.currentTimeMillis() + 30_000L
+        lastManualRefreshSignalMs = 0L
+        refreshSignals.emit(Unit)
+    }
+
     suspend fun getCachedStats(forceRefresh: Boolean = false): TraktCachedStats? {
         val now = System.currentTimeMillis()
         cacheMutex.withLock {
@@ -391,6 +406,35 @@ class TraktProgressService @Inject constructor(
             }
         }
         requestFastSync()
+    }
+
+    /**
+     * Updates the optimistic progress state WITHOUT triggering a fast sync.
+     * Use this for periodic in-playback saves where we only need the local
+     * UI (Continue Watching) to reflect the current position, but don't need
+     * to force a full remote refresh cycle.
+     */
+    fun updateOptimisticProgressQuietly(progress: WatchProgress) {
+        val now = System.currentTimeMillis()
+        val derivedPercent = when {
+            progress.progressPercent != null -> progress.progressPercent
+            progress.duration > 0L -> ((progress.position.toFloat() / progress.duration.toFloat()) * 100f)
+            else -> null
+        }?.coerceIn(0f, 100f)
+
+        val optimistic = progress.copy(
+            progressPercent = derivedPercent,
+            source = WatchProgress.SOURCE_TRAKT_PLAYBACK
+        )
+
+        optimisticProgress.update { current ->
+            current.toMutableMap().apply {
+                this[progressKey(optimistic)] = OptimisticProgressEntry(
+                    progress = optimistic,
+                    expiresAtMs = now + optimisticTtlMs
+                )
+            }
+        }
     }
 
     fun applyOptimisticRemoval(contentId: String, season: Int?, episode: Int?) {
@@ -603,13 +647,30 @@ class TraktProgressService @Inject constructor(
             "season=${progress.season} episode=${progress.episode} " +
             "contentType=${progress.contentType} title=$title year=$year")
 
-        val body = buildHistoryAddRequest(progress, title, year)
+        val effectiveInitialProgress = if (isSeriesEpisodeProgress(progress)) {
+            val remapped = resolveCanonicalEpisodeMapping(progress)
+            if (remapped != null && (remapped.season != progress.season || remapped.episode != progress.episode)) {
+                Log.d(TAG, "markAsWatched: proactive remap from s=${progress.season} e=${progress.episode} " +
+                    "to s=${remapped.season} e=${remapped.episode}")
+                progress.copy(
+                    season = remapped.season,
+                    episode = remapped.episode,
+                    videoId = remapped.videoId ?: progress.videoId
+                )
+            } else {
+                progress
+            }
+        } else {
+            progress
+        }
+
+        val body = buildHistoryAddRequest(effectiveInitialProgress, title, year)
             ?: throw IllegalStateException(appContext.getString(com.nuvio.tv.R.string.trakt_error_insufficient_ids_mark_watched))
 
-        val isSeriesEpisode = isSeriesEpisodeProgress(progress)
+        val isSeriesEpisode = isSeriesEpisodeProgress(effectiveInitialProgress)
         val watchedShowSeedsSnapshot = if (isSeriesEpisode) {
             snapshotWatchedShowSeeds()
-                .also { updateWatchedShowSeedOptimistically(progress) }
+                .also { updateWatchedShowSeedOptimistically(effectiveInitialProgress) }
         } else {
             null
         }
@@ -647,8 +708,9 @@ class TraktProgressService @Inject constructor(
                 !hasSuccessfulHistoryAdd(responseBody)
         )
         var recoveredByRemap = false
-        var effectiveProgress = progress
+        var effectiveProgress = effectiveInitialProgress
         if (shouldRetryRemap) {
+            // Fallback: if proactive remap failed, try remapping from original progress
             val remappedAttempt = attemptEpisodeRemapHistoryAdd(
                 progress = progress,
                 title = title,
@@ -682,7 +744,7 @@ class TraktProgressService @Inject constructor(
         }
 
         if (progress.contentType.equals("movie", ignoreCase = true)) {
-            setMovieWatchedInCache(progress.contentId, watched = true)
+            setMovieWatchedInCache(effectiveProgress.contentId, watched = true)
         } else if (
             progress.contentType.equals("series", ignoreCase = true) ||
             progress.contentType.equals("tv", ignoreCase = true)
@@ -724,6 +786,13 @@ class TraktProgressService @Inject constructor(
                 invalidateEpisodeProgressCache(effectiveProgress.contentId)
             }
             updateWatchedShowSeedOptimistically(effectiveProgress)
+        }
+        // Invalidate playback cache and remove completed item from CW immediately.
+        cachedMoviesPlayback = null
+        cachedEpisodesPlayback = null
+        val completedKey = progressKey(effectiveProgress)
+        remoteProgress.update { current ->
+            current.filter { progressKey(it) != completedKey }
         }
         refreshNow()
     }
@@ -1440,31 +1509,37 @@ class TraktProgressService @Inject constructor(
             traktEpisodeId = progress.traktEpisodeId
         )
 
-        watchedShowSeedsState.update { current ->
-            val updated = current.toMutableList()
-            val existingIndex = updated.indexOfFirst { canonicalLookupKey(it.contentId) == contentId }
-            if (existingIndex >= 0) {
-                val existing = updated[existingIndex]
-                val shouldReplace =
-                    (candidate.season ?: -1) > (existing.season ?: -1) ||
-                        (
-                            candidate.season == existing.season &&
-                                (
-                                    (candidate.episode ?: -1) > (existing.episode ?: -1) ||
-                                        (
-                                            candidate.episode == existing.episode &&
-                                                candidate.lastWatched >= existing.lastWatched
-                                            )
-                                    )
-                            )
-                if (!shouldReplace) {
-                    return@update current
+        scope.launch {
+            val useFurthest = layoutPreferenceDataStore.nextUpFromFurthestEpisode.first()
+            watchedShowSeedsState.update { current ->
+                val updated = current.toMutableList()
+                val existingIndex = updated.indexOfFirst { canonicalLookupKey(it.contentId) == contentId }
+                if (existingIndex >= 0) {
+                    val existing = updated[existingIndex]
+                    val shouldReplace = if (useFurthest) {
+                        (candidate.season ?: -1) > (existing.season ?: -1) ||
+                            (
+                                candidate.season == existing.season &&
+                                    (
+                                        (candidate.episode ?: -1) > (existing.episode ?: -1) ||
+                                            (
+                                                candidate.episode == existing.episode &&
+                                                    candidate.lastWatched >= existing.lastWatched
+                                                )
+                                        )
+                                )
+                    } else {
+                        candidate.lastWatched >= existing.lastWatched
+                    }
+                    if (!shouldReplace) {
+                        return@update current
+                    }
+                    updated[existingIndex] = candidate
+                } else {
+                    updated.add(candidate)
                 }
-                updated[existingIndex] = candidate
-            } else {
-                updated.add(candidate)
+                updated.sortedByDescending { it.lastWatched }
             }
-            updated.sortedByDescending { it.lastWatched }
         }
         watchedShowSeedsUpdatedAtMs = now
         hasLoadedWatchedShowSeeds = true

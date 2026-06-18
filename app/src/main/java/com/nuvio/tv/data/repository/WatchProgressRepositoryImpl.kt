@@ -65,7 +65,6 @@ class WatchProgressRepositoryImpl @Inject constructor(
     companion object {
         private const val TAG = "WatchProgressRepo"
         private const val OPTIMISTIC_NEXT_UP_SEED_WINDOW_MS = 3 * 60_000L
-        private const val NUVIO_SYNC_PERIODIC_INTERVAL_MS = 5 * 60_000L
     }
 
     private data class EpisodeMetadata(
@@ -101,41 +100,6 @@ class WatchProgressRepositoryImpl @Inject constructor(
     private val metadataMutex = Mutex()
     private val inFlightMetadataKeys = mutableSetOf<String>()
     private val metadataHydrationLimit = 30
-
-    init {
-        // Nuvio Sync has no recurring remote pull after startup; add one so watch progress
-        // written on other devices (phone → TV) appears without requiring an app restart.
-        syncScope.launch {
-            while (true) {
-                delay(NUVIO_SYNC_PERIODIC_INTERVAL_MS)
-                if (useTraktProgressFlow().first()) continue
-                if (isSyncingFromRemote || !hasCompletedInitialPull || !authManager.isAuthenticated) continue
-                // Capture profile ID at the start of the sync cycle to prevent
-                // race conditions if the user switches profiles mid-operation.
-                val profileId = profileManager.activeProfileId.value
-                val sinceLastWatched = watchProgressPreferences.getAllRawEntries(profileId)
-                    .values
-                    .maxOfOrNull { progress -> progress.lastWatched }
-                watchProgressSyncService.pullFromRemote(
-                    profileId = profileId,
-                    sinceLastWatched = sinceLastWatched
-                )
-                    .onSuccess { entries ->
-                        val hadUnsynced = watchProgressPreferences.mergeRemoteEntries(
-                            entries.toMap(),
-                            lastSuccessfulPushMs = watchProgressSyncService.lastSuccessfulPushMs,
-                            profileId = profileId,
-                            removeMissingRemoteEntries = false
-                        )
-                        Log.d(TAG, "Periodic Nuvio Sync pull: merged ${entries.size} entries for profile $profileId sinceLastWatched=$sinceLastWatched")
-                        if (hadUnsynced) {
-                            watchProgressSyncService.pushToRemote(profileId)
-                        }
-                    }
-                    .onFailure { Log.w(TAG, "Periodic Nuvio Sync pull failed", it) }
-            }
-        }
-    }
 
     private fun triggerRemoteSync() {
         if (isSyncingFromRemote) return
@@ -343,7 +307,28 @@ class WatchProgressRepositoryImpl @Inject constructor(
         get() = useTraktProgressFlow()
             .flatMapLatest { useTraktProgress ->
                 if (useTraktProgress) {
-                    traktAllProgressFlow()
+                    // Merge Trakt remote progress with local-only entries that use
+                    // non-Trakt-compatible IDs (kitsu:, mal:, anilist:, etc.).
+                    // Trakt will never return these IDs, so they must come from local storage.
+                    combine(
+                        traktAllProgressFlow(),
+                        watchProgressPreferences.allProgress
+                    ) { traktItems, localItems ->
+                        val localNonTraktItems = localItems.filter { !isTraktCompatibleId(it.contentId) }
+                        if (localNonTraktItems.isEmpty()) {
+                            traktItems
+                        } else {
+                            val traktKeys = traktItems.map { progressKey(it) }.toSet()
+                            val merged = traktItems.toMutableList()
+                            localNonTraktItems.forEach { localItem ->
+                                val key = progressKey(localItem)
+                                if (key !in traktKeys) {
+                                    merged.add(localItem)
+                                }
+                            }
+                            merged.sortedByDescending { it.lastWatched }
+                        }
+                    }
                 } else {
                     watchProgressPreferences.allProgress
                         .onEach { items ->
@@ -441,9 +426,10 @@ class WatchProgressRepositoryImpl @Inject constructor(
                                         progress.source == WatchProgress.SOURCE_TRAKT_HISTORY
                                 }
                             }
-                            .onStart { emit(emptyList()) }
-                    ) { canonicalSeeds, optimisticSeeds ->
-                        mergeNextUpSeeds(canonicalSeeds, optimisticSeeds)
+                            .onStart { emit(emptyList()) },
+                        layoutPreferenceDataStore.nextUpFromFurthestEpisode
+                    ) { canonicalSeeds, optimisticSeeds, useFurthest ->
+                        mergeNextUpSeeds(canonicalSeeds, optimisticSeeds, useFurthest)
                     }
                 } else {
                     // Use watched items (fully synced with pagination) to build seeds
@@ -511,7 +497,8 @@ class WatchProgressRepositoryImpl @Inject constructor(
 
     private fun mergeNextUpSeeds(
         canonicalSeeds: List<WatchProgress>,
-        optimisticSeeds: List<WatchProgress>
+        optimisticSeeds: List<WatchProgress>,
+        useFurthest: Boolean
     ): List<WatchProgress> {
         val merged = linkedMapOf<String, WatchProgress>()
         canonicalSeeds.forEach { seed ->
@@ -520,7 +507,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
         optimisticSeeds.forEach { seed ->
             val key = nextUpSeedKey(seed)
             val existing = merged[key]
-            if (existing == null || shouldReplaceNextUpSeed(existing, seed)) {
+            if (existing == null || shouldReplaceNextUpSeed(existing, seed, useFurthest)) {
                 merged[key] = seed
             }
         }
@@ -546,8 +533,12 @@ class WatchProgressRepositoryImpl @Inject constructor(
 
     private fun shouldReplaceNextUpSeed(
         existing: WatchProgress,
-        candidate: WatchProgress
+        candidate: WatchProgress,
+        useFurthest: Boolean
     ): Boolean {
+        if (!useFurthest) {
+            return candidate.lastWatched >= existing.lastWatched
+        }
         val candidateSeason = candidate.season ?: -1
         val candidateEpisode = candidate.episode ?: -1
         val existingSeason = existing.season ?: -1
@@ -707,7 +698,14 @@ class WatchProgressRepositoryImpl @Inject constructor(
         // Capture profile ID now so async operations target the correct profile.
         val profileId = profileManager.activeProfileId.value
         if (shouldUseTraktProgress()) {
-            traktProgressService.applyOptimisticProgress(progress)
+            // For periodic in-playback saves (syncRemote=false), only update the
+            // local optimistic state without triggering a full remote refresh cycle.
+            // This prevents Trakt API calls every 10s which cause CPU load and stutters.
+            if (syncRemote) {
+                traktProgressService.applyOptimisticProgress(progress)
+            } else {
+                traktProgressService.updateOptimisticProgressQuietly(progress)
+            }
             watchProgressPreferences.saveProgress(progress)
             if (progress.isCompleted()) {
                 val watchedItem = progress.toWatchedItem()
@@ -1036,7 +1034,9 @@ class WatchProgressRepositoryImpl @Inject constructor(
     override suspend fun clearAll() {
         if (shouldUseTraktProgress()) {
             traktProgressService.clearOptimistic()
-            watchProgressPreferences.clearAll()
+            watchProgressPreferences.clearAllPreservingNonTraktIds { contentId ->
+                !isTraktCompatibleId(contentId)
+            }
             return
         }
         watchProgressPreferences.clearAll()

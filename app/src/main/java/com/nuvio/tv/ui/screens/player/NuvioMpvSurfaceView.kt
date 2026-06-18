@@ -407,7 +407,10 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
             preferred.takeIf { it.isNotBlank() && !it.equals("none", ignoreCase = true) },
             secondary?.takeIf { it.isNotBlank() && !it.equals("none", ignoreCase = true) }
         )
-        if (languages.isEmpty()) return
+        if (languages.isEmpty()) {
+            disableSubtitles()
+            return
+        }
         runCatching {
             mpv.setPropertyString("slang", languages.joinToString(","))
         }.onFailure {
@@ -509,6 +512,7 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
         setVo("gpu")
         mpv.setOptionString("gpu-context", "android")
         mpv.setOptionString("opengl-es", "yes")
+        mpv.setOptionString("user-agent", PlayerMediaSourceFactory.DEFAULT_USER_AGENT)
         // Preserve native ASS/SSA styling behavior on MPV.
         mpv.setOptionString("sub-ass-override", "no")
         mpv.setOptionString("sub-font", "Roboto")
@@ -537,10 +541,19 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
     }
 
     private fun applyHeaders(headers: Map<String, String>) {
+        if (headers.isEmpty()) {
+            mpv.setPropertyString("http-header-fields", "")
+            return
+        }
         val raw = headers.entries
             .filter { it.key.isNotBlank() && it.value.isNotBlank() }
             .sortedWith(compareBy({ it.key.lowercase(Locale.ROOT) }, { it.value }))
-            .joinToString(separator = ",") { "${it.key}: ${it.value}" }
+            .joinToString(separator = ",") { (key, value) ->
+                val escapedHeader = "$key: $value"
+                    .replace("\\", "\\\\")
+                    .replace(",", "\\,")
+                escapedHeader
+            }
         mpv.setPropertyString("http-header-fields", raw)
     }
 

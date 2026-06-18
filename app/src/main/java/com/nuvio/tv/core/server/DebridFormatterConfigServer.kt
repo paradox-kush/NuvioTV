@@ -52,15 +52,26 @@ class DebridFormatterConfigServer(
     }
 
     private fun serveSettings(): Response {
-        val response = DebridFormatterSettingsResponse(
-            settings = currentSettingsProvider(),
-            defaults = DebridFormatterSettings(
-                nameTemplate = DebridStreamFormatterDefaults.NAME_TEMPLATE,
-                descriptionTemplate = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
-                streamPreferences = DebridStreamPreferences()
-            )
+        val settings = currentSettingsProvider()
+        val defaults = DebridFormatterSettings(
+            nameTemplate = DebridStreamFormatterDefaults.NAME_TEMPLATE,
+            descriptionTemplate = DebridStreamFormatterDefaults.DESCRIPTION_TEMPLATE,
+            streamPreferences = DebridStreamPreferences()
         )
-        return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", gson.toJson(response))
+        val settingsMap = mapOf(
+            "nameTemplate" to settings.nameTemplate,
+            "descriptionTemplate" to settings.descriptionTemplate,
+            "streamPreferences" to settings.streamPreferences
+        )
+        val defaultsMap = mapOf(
+            "nameTemplate" to defaults.nameTemplate,
+            "descriptionTemplate" to defaults.descriptionTemplate,
+            "streamPreferences" to defaults.streamPreferences
+        )
+        val settingsJson = gson.toJson(settingsMap)
+        val defaultsJson = gson.toJson(defaultsMap)
+        val responseJson = """{"settings":$settingsJson,"defaults":$defaultsJson}"""
+        return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", responseJson)
     }
 
     private fun handleSettingsUpdate(session: IHTTPSession): Response {
@@ -68,17 +79,14 @@ class DebridFormatterConfigServer(
         val parsed = runCatching {
             gson.fromJson<Map<String, Any?>>(body, settingsMapType)
         }.getOrNull()
-        val nameTemplate = (parsed?.get("nameTemplate") as? String)?.takeIf { it.isNotBlank() }
-        val descriptionTemplate = (parsed?.get("descriptionTemplate") as? String)?.takeIf { it.isNotBlank() }
+        val nameTemplate = parsed?.get("nameTemplate") as? String
+        val descriptionTemplate = parsed?.get("descriptionTemplate") as? String
+        val currentSettings = currentSettingsProvider()
         val streamPreferences = runCatching {
             gson.fromJson(gson.toJson(parsed?.get("streamPreferences")), DebridStreamPreferences::class.java)
-        }.getOrNull() ?: currentSettingsProvider().streamPreferences
+        }.getOrNull() ?: currentSettings.streamPreferences
         if (nameTemplate == null || descriptionTemplate == null) {
-            return newFixedLengthResponse(
-                Response.Status.BAD_REQUEST,
-                "application/json; charset=utf-8",
-                gson.toJson(mapOf("error" to "Both templates are required"))
-            )
+            return errorResponse(context?.getString(com.nuvio.tv.R.string.web_debrid_error_templates_required) ?: "Both templates are required")
         }
 
         onSettingsChanged(
@@ -90,6 +98,13 @@ class DebridFormatterConfigServer(
         )
         return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", gson.toJson(mapOf("status" to "saved")))
     }
+
+    private fun errorResponse(message: String): Response =
+        newFixedLengthResponse(
+            Response.Status.BAD_REQUEST,
+            "application/json; charset=utf-8",
+            gson.toJson(mapOf("error" to message))
+        )
 
     private fun readUtf8Body(session: IHTTPSession): String {
         val length = session.headers["content-length"]?.toIntOrNull() ?: return ""
@@ -136,9 +151,4 @@ data class DebridFormatterSettings(
     val nameTemplate: String,
     val descriptionTemplate: String,
     val streamPreferences: DebridStreamPreferences = DebridStreamPreferences()
-)
-
-private data class DebridFormatterSettingsResponse(
-    val settings: DebridFormatterSettings,
-    val defaults: DebridFormatterSettings
 )

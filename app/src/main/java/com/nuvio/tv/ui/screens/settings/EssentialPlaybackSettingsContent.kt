@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.settings
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -49,7 +51,7 @@ fun EssentialPlaybackSettingsContent(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
         ) {
             item(key = "header") {
                 SettingsDetailHeader(
@@ -118,9 +120,23 @@ fun EssentialPlaybackSettingsContent(
                     SettingsActionRow(
                         title = stringResource(R.string.essential_subtitle_language),
                         subtitle = stringResource(R.string.essential_subtitle_language_subtitle),
-                        value = settings?.subtitleStyle?.preferredLanguage.orEmpty(),
+                        value = if (settings?.subtitleStyle?.preferredLanguage == "none") {
+                            stringResource(R.string.action_none)
+                        } else {
+                            settings?.subtitleStyle?.preferredLanguage.orEmpty()
+                        },
                         trailingIcon = Icons.Default.VideoSettings,
                         onClick = { showSubtitleLanguageDialog = true },
+                        enabled = settings != null
+                    )
+                    SettingsToggleRow(
+                        title = stringResource(R.string.sub_use_forced_subtitles),
+                        subtitle = stringResource(R.string.sub_use_forced_subtitles_desc),
+                        checked = settings?.subtitleStyle?.useForcedSubtitles == true,
+                        onToggle = {
+                            val current = settings ?: return@SettingsToggleRow
+                            coroutineScope.launch { viewModel.setUseForcedSubtitles(!current.subtitleStyle.useForcedSubtitles) }
+                        },
                         enabled = settings != null
                     )
                     SettingsActionRow(
@@ -153,12 +169,10 @@ fun EssentialPlaybackSettingsContent(
     if (showSubtitleLanguageDialog && settings != null) {
         LanguageSelectionDialog(
             title = stringResource(R.string.essential_subtitle_language),
-            selectedLanguage = settings.subtitleStyle.preferredLanguage,
-            showNoneOption = false,
+            selectedLanguage = if (settings.subtitleStyle.preferredLanguage == "none") null else settings.subtitleStyle.preferredLanguage,
+            showNoneOption = true,
             onLanguageSelected = { language ->
-                if (language != null) {
-                    coroutineScope.launch { viewModel.setSubtitlePreferredLanguage(language) }
-                }
+                coroutineScope.launch { viewModel.setSubtitlePreferredLanguage(language ?: "none") }
                 showSubtitleLanguageDialog = false
             },
             onDismiss = { showSubtitleLanguageDialog = false }

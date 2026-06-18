@@ -11,6 +11,8 @@ import com.nuvio.tv.domain.model.Addon
 import com.nuvio.tv.domain.model.CatalogDescriptor
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.DiscoverLocation
+import com.nuvio.tv.domain.model.mergeCatalogPage
+import com.nuvio.tv.domain.model.nextCatalogSkip
 import com.nuvio.tv.domain.model.skipStep
 import com.nuvio.tv.domain.model.supportsExtra
 import com.nuvio.tv.core.util.filterReleasedItems
@@ -20,6 +22,7 @@ import java.time.LocalDate
 import com.nuvio.tv.domain.model.ContentType
 import com.nuvio.tv.domain.model.MetaPreview
 import com.nuvio.tv.domain.model.PosterShape
+import com.nuvio.tv.domain.model.enabledAddons
 import com.nuvio.tv.domain.repository.CatalogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -222,7 +225,7 @@ class SearchViewModel @Inject constructor(
             kotlinx.coroutines.delay(SUGGESTION_DEBOUNCE_MS)
 
             val addons = try {
-                addonRepository.getInstalledAddons().first()
+                addonRepository.getInstalledAddons().first().enabledAddons()
             } catch (_: Exception) {
                 return@launch
             }
@@ -332,7 +335,7 @@ class SearchViewModel @Inject constructor(
             _uiState.update { it.copy(isSearching = true, error = null, catalogRows = emptyList()) }
 
             val addons = try {
-                addonRepository.getInstalledAddons().first()
+                addonRepository.getInstalledAddons().first().enabledAddons()
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSearching = false, error = e.message ?: context.getString(com.nuvio.tv.R.string.search_error_load_addons_failed)) }
                 return@launch
@@ -468,15 +471,23 @@ class SearchViewModel @Inject constructor(
 
     private fun loadMoreCatalogItems(catalogId: String, addonId: String, type: String) {
         val key = catalogKey(addonId = addonId, type = type, catalogId = catalogId)
-        val currentRow = catalogsMap[key] ?: return
+        val currentRow = catalogsMap[key]
 
-        if (currentRow.isLoading || !currentRow.hasMore) return
+        if (currentRow == null) {
+            return
+        }
+
+        if (currentRow.isLoading || !currentRow.hasMore) {
+            return
+        }
 
         catalogsMap[key] = currentRow.copy(isLoading = true)
         scheduleCatalogRowsUpdate()
 
         val query = uiState.value.query.trim()
-        if (query.isBlank()) return
+        if (query.isBlank()) {
+            return
+        }
 
         viewModelScope.launch {
             val addon = uiState.value.installedAddons.find { it.id == addonId } ?: run {
@@ -485,7 +496,7 @@ class SearchViewModel @Inject constructor(
                 return@launch
             }
 
-            val nextSkip = (currentRow.currentPage + 1) * currentRow.skipStep
+            val nextSkip = currentRow.nextCatalogSkip()
             catalogRepository.getCatalog(
                 addonBaseUrl = addon.baseUrl,
                 addonId = addon.id,
@@ -500,15 +511,9 @@ class SearchViewModel @Inject constructor(
             ).collect { result ->
                 when (result) {
                     is NetworkResult.Success -> {
-                        val existingIds = currentRow.items.asSequence()
-                            .map { "${it.apiType}:${it.id}" }
-                            .toHashSet()
-                        val newUniqueItems = result.data.items.filter { item ->
-                            "${item.apiType}:${item.id}" !in existingIds
-                        }
-                        val mergedItems = currentRow.items + newUniqueItems
-                        val hasMore = if (newUniqueItems.isEmpty()) false else result.data.hasMore
-                        catalogsMap[key] = result.data.copy(items = mergedItems, hasMore = hasMore)
+                        val latestRow = catalogsMap[key] ?: currentRow
+                        val mergedRow = latestRow.mergeCatalogPage(result.data)
+                        catalogsMap[key] = mergedRow
                         scheduleCatalogRowsUpdate()
                     }
                     is NetworkResult.Error -> {
@@ -575,7 +580,7 @@ class SearchViewModel @Inject constructor(
         if (_uiState.value.discoverLocation == DiscoverLocation.OFF) return
         _uiState.update { it.copy(discoverLoading = true) }
         val addons = try {
-            addonRepository.getInstalledAddons().first()
+            addonRepository.getInstalledAddons().first().enabledAddons()
         } catch (_: Exception) {
             _uiState.update { it.copy(discoverInitialized = true, discoverLoading = false) }
             return

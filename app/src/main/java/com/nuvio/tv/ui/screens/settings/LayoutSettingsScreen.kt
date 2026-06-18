@@ -2,6 +2,9 @@
 
 package com.nuvio.tv.ui.screens.settings
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -57,6 +62,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.nuvio.tv.core.build.AppFeaturePolicy
+import com.nuvio.tv.core.streams.STREAM_BADGE_IMPORT_LIMIT
+import com.nuvio.tv.core.streams.StreamBadgePlacement
 import com.nuvio.tv.domain.model.ContinueWatchingSortMode
 import com.nuvio.tv.domain.model.DiscoverLocation
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
@@ -65,7 +72,7 @@ import com.nuvio.tv.ui.components.ClassicLayoutPreview
 import com.nuvio.tv.ui.components.GridLayoutPreview
 import com.nuvio.tv.ui.components.ModernLayoutPreview
 import com.nuvio.tv.ui.components.NuvioDialog
-import com.nuvio.tv.ui.theme.NuvioColors
+import com.nuvio.tv.ui.screens.addon.QrCodeOverlay
 
 @Composable
 fun LayoutSettingsScreen(
@@ -86,6 +93,7 @@ private enum class LayoutSettingsSection {
     HOME_LAYOUT,
     HOME_CONTENT,
     DETAIL_PAGE,
+    STREAMS,
     CONTINUE_WATCHING,
     FOCUSED_POSTER,
     POSTER_CARD_STYLE
@@ -98,18 +106,23 @@ fun LayoutSettingsContent(
     essentialMode: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val streamBadgeUiState by viewModel.streamBadgeUiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var homeLayoutExpanded by rememberSaveable(essentialMode) { mutableStateOf(essentialMode) }
     var homeContentExpanded by rememberSaveable { mutableStateOf(false) }
     var detailPageExpanded by rememberSaveable { mutableStateOf(false) }
+    var streamsExpanded by rememberSaveable { mutableStateOf(false) }
     var continueWatchingExpanded by rememberSaveable { mutableStateOf(false) }
     var focusedPosterExpanded by rememberSaveable { mutableStateOf(false) }
     var posterCardStyleExpanded by rememberSaveable { mutableStateOf(false) }
     var showCwSortModeDialog by rememberSaveable { mutableStateOf(false) }
+    var showStreamBadgePositionDialog by rememberSaveable { mutableStateOf(false) }
 
     val defaultHomeLayoutHeaderFocus = remember { FocusRequester() }
     val homeContentHeaderFocus = remember { FocusRequester() }
     val detailPageHeaderFocus = remember { FocusRequester() }
+    val streamsHeaderFocus = remember { FocusRequester() }
     val continueWatchingHeaderFocus = remember { FocusRequester() }
     val focusedPosterHeaderFocus = remember { FocusRequester() }
     val posterCardStyleHeaderFocus = remember { FocusRequester() }
@@ -133,6 +146,11 @@ fun LayoutSettingsContent(
             detailPageHeaderFocus.requestFocus()
         }
     }
+    LaunchedEffect(streamsExpanded, focusedSection) {
+        if (!streamsExpanded && focusedSection == LayoutSettingsSection.STREAMS) {
+            streamsHeaderFocus.requestFocus()
+        }
+    }
     LaunchedEffect(continueWatchingExpanded, focusedSection) {
         if (!continueWatchingExpanded && focusedSection == LayoutSettingsSection.CONTINUE_WATCHING) {
             continueWatchingHeaderFocus.requestFocus()
@@ -147,6 +165,10 @@ fun LayoutSettingsContent(
         if (!posterCardStyleExpanded && focusedSection == LayoutSettingsSection.POSTER_CARD_STYLE) {
             posterCardStyleHeaderFocus.requestFocus()
         }
+    }
+    LaunchedEffect(streamBadgeUiState.serverError) {
+        val error = streamBadgeUiState.serverError ?: return@LaunchedEffect
+        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
     }
 
     Column(
@@ -171,7 +193,7 @@ fun LayoutSettingsContent(
             state = layoutListState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
         ) {
             item(key = "home_layout_section") {
                 CollapsibleSectionCard(
@@ -184,7 +206,7 @@ fun LayoutSettingsContent(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)
                     ) {
                         LayoutCard(
                             layout = HomeLayout.MODERN,
@@ -275,16 +297,16 @@ fun LayoutSettingsContent(
                         Text(
                             text = stringResource(R.string.layout_hero_catalogs),
                             style = MaterialTheme.typography.labelLarge,
-                            color = NuvioColors.TextSecondary
+                            color = NuvioTheme.colors.TextSecondary
                         )
                         Text(
                             text = stringResource(R.string.layout_hero_catalogs_sub),
                             style = MaterialTheme.typography.bodySmall,
-                            color = NuvioColors.TextTertiary
+                            color = NuvioTheme.colors.TextTertiary
                         )
                         LazyRow(
-                            contentPadding = PaddingValues(end = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            contentPadding = PaddingValues(end = NuvioTheme.spacing.sm),
+                            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
                         ) {
                             items(
                                 items = uiState.availableCatalogs,
@@ -444,6 +466,40 @@ fun LayoutSettingsContent(
                         onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
                     )
 
+                    if (AppFeaturePolicy.inAppTrailerPlaybackEnabled) {
+                        CompactToggleRow(
+                            title = stringResource(R.string.audio_autoplay_trailers),
+                            subtitle = stringResource(R.string.audio_autoplay_trailers_sub),
+                            checked = uiState.detailPageTrailerAutoplayEnabled,
+                            onToggle = {
+                                viewModel.onEvent(
+                                    LayoutSettingsEvent.SetDetailPageTrailerAutoplayEnabled(
+                                        !uiState.detailPageTrailerAutoplayEnabled
+                                    )
+                                )
+                            },
+                            onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                        )
+
+                        if (uiState.detailPageTrailerAutoplayEnabled) {
+                            SliderSettingsItem(
+                                icon = Icons.Default.Timer,
+                                title = stringResource(R.string.audio_trailer_delay),
+                                value = uiState.detailPageTrailerAutoplayDelaySeconds,
+                                valueText = "${uiState.detailPageTrailerAutoplayDelaySeconds}s",
+                                minValue = 3,
+                                maxValue = 15,
+                                step = 1,
+                                onValueChange = { seconds ->
+                                    viewModel.onEvent(
+                                        LayoutSettingsEvent.SetDetailPageTrailerAutoplayDelaySeconds(seconds)
+                                    )
+                                },
+                                onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                            )
+                        }
+                    }
+
                     CompactToggleRow(
                         title = stringResource(R.string.layout_trailer_button),
                         subtitle = stringResource(R.string.layout_trailer_button_sub),
@@ -482,6 +538,60 @@ fun LayoutSettingsContent(
                             )
                         },
                         onFocused = { focusedSection = LayoutSettingsSection.DETAIL_PAGE }
+                    )
+                }
+            }
+
+            item(key = "streams_section") {
+                CollapsibleSectionCard(
+                    title = stringResource(R.string.layout_section_streams),
+                    description = stringResource(R.string.layout_section_streams_desc),
+                    expanded = streamsExpanded,
+                    onToggle = { streamsExpanded = !streamsExpanded },
+                    focusRequester = streamsHeaderFocus,
+                    onFocused = { focusedSection = LayoutSettingsSection.STREAMS }
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_stream_badges_section),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = NuvioTheme.colors.TextSecondary
+                    )
+                    CompactToggleRow(
+                        title = stringResource(R.string.settings_stream_size_badges_title),
+                        subtitle = stringResource(R.string.settings_stream_size_badges_description),
+                        checked = streamBadgeUiState.showFileSizeBadges,
+                        onToggle = {
+                            viewModel.setShowFileSizeBadges(!streamBadgeUiState.showFileSizeBadges)
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.STREAMS }
+                    )
+                    NavigationSettingsItem(
+                        icon = Icons.Default.Image,
+                        title = stringResource(R.string.settings_stream_badge_position_title),
+                        subtitle = streamBadgePlacementLabel(streamBadgeUiState.badgePlacement),
+                        onClick = { showStreamBadgePositionDialog = true },
+                        onFocused = { focusedSection = LayoutSettingsSection.STREAMS }
+                    )
+                    NavigationSettingsItem(
+                        icon = Icons.Default.Image,
+                        title = stringResource(R.string.settings_stream_badge_urls_title),
+                        subtitle = streamBadgeRulesPreview(streamBadgeUiState),
+                        onClick = viewModel::startStreamBadgeQrMode,
+                        onFocused = { focusedSection = LayoutSettingsSection.STREAMS }
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_stream_display_section),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = NuvioTheme.colors.TextSecondary
+                    )
+                    CompactToggleRow(
+                        title = stringResource(R.string.settings_stream_addon_logo_title),
+                        subtitle = stringResource(R.string.settings_stream_addon_logo_description),
+                        checked = streamBadgeUiState.showAddonLogo,
+                        onToggle = {
+                            viewModel.setShowAddonLogo(!streamBadgeUiState.showAddonLogo)
+                        },
+                        onFocused = { focusedSection = LayoutSettingsSection.STREAMS }
                     )
                 }
             }
@@ -712,7 +822,79 @@ fun LayoutSettingsContent(
                 onDismiss = { showCwSortModeDialog = false }
             )
         }
+
+        if (showStreamBadgePositionDialog) {
+            StreamBadgePositionDialog(
+                currentPlacement = streamBadgeUiState.badgePlacement,
+                onPlacementSelected = { placement ->
+                    viewModel.setStreamBadgePlacement(placement)
+                    showStreamBadgePositionDialog = false
+                },
+                onDismiss = { showStreamBadgePositionDialog = false }
+            )
+        }
+
+        if (streamBadgeUiState.isQrModeActive) {
+            QrCodeOverlay(
+                qrBitmap = streamBadgeUiState.qrCodeBitmap,
+                serverUrl = streamBadgeUiState.serverUrl,
+                instruction = stringResource(R.string.stream_badge_qr_instruction),
+                onClose = viewModel::stopStreamBadgeQrMode,
+                qrSize = 168.dp
+            )
+        }
     }
+}
+
+@Composable
+private fun streamBadgePlacementLabel(placement: StreamBadgePlacement): String =
+    when (placement) {
+        StreamBadgePlacement.TOP -> stringResource(R.string.settings_stream_badge_position_top)
+        StreamBadgePlacement.BOTTOM -> stringResource(R.string.settings_stream_badge_position_bottom)
+    }
+
+@Composable
+private fun streamBadgeRulesPreview(uiState: StreamBadgeSettingsUiState): String {
+    val rules = uiState.rules.normalized()
+    return if (rules.hasImport) {
+        stringResource(
+            R.string.settings_fusion_badges_summary,
+            rules.imports.size,
+            STREAM_BADGE_IMPORT_LIMIT,
+            rules.enabledFilterCount
+        )
+    } else {
+        stringResource(R.string.settings_fusion_badges_empty)
+    }
+}
+
+@Composable
+private fun StreamBadgePositionDialog(
+    currentPlacement: StreamBadgePlacement,
+    onPlacementSelected: (StreamBadgePlacement) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf(
+        SettingsPickerOption(
+            StreamBadgePlacement.BOTTOM,
+            stringResource(R.string.settings_stream_badge_position_bottom)
+        ),
+        SettingsPickerOption(
+            StreamBadgePlacement.TOP,
+            stringResource(R.string.settings_stream_badge_position_top)
+        )
+    )
+
+    SettingsSingleChoiceDialog(
+        title = stringResource(R.string.settings_stream_badge_position_dialog_title),
+        subtitle = stringResource(R.string.settings_stream_badge_position_dialog_description),
+        options = options,
+        selectedValue = currentPlacement,
+        onOptionSelected = onPlacementSelected,
+        onDismiss = onDismiss,
+        width = 420.dp,
+        maxHeight = 260.dp
+    )
 }
 
 @Composable
@@ -757,7 +939,7 @@ private fun CollapsibleSectionCard(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         SettingsActionRow(
             title = title,
@@ -803,16 +985,16 @@ private fun ModernTrailerPlaybackTargetRow(
     Text(
         text = stringResource(R.string.layout_trailer_location),
         style = MaterialTheme.typography.labelLarge,
-        color = NuvioColors.TextSecondary
+        color = NuvioTheme.colors.TextSecondary
     )
     Text(
         text = stringResource(R.string.layout_trailer_location_sub),
         style = MaterialTheme.typography.bodySmall,
-        color = NuvioColors.TextTertiary
+        color = NuvioTheme.colors.TextTertiary
     )
     LazyRow(
-        contentPadding = PaddingValues(end = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(end = NuvioTheme.spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         item(key = "trailer_target_expanded_card") {
             SettingsChoiceChip(
@@ -946,16 +1128,16 @@ private fun LayoutCard(
             }
         },
         colors = CardDefaults.colors(
-            containerColor = NuvioColors.Background,
-            focusedContainerColor = NuvioColors.Background
+            containerColor = NuvioTheme.colors.Background,
+            focusedContainerColor = NuvioTheme.colors.Background
         ),
         border = CardDefaults.border(
             border = if (isSelected) Border(
-                border = BorderStroke(1.dp, NuvioColors.FocusRing),
+                border = BorderStroke(NuvioTheme.spacing.hairline, NuvioTheme.colors.FocusRing),
                 shape = RoundedCornerShape(SettingsSecondaryCardRadius)
             ) else Border.None,
             focusedBorder = Border(
-                border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
                 shape = RoundedCornerShape(SettingsSecondaryCardRadius)
             )
         ),
@@ -994,9 +1176,9 @@ private fun LayoutCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = stringResource(R.string.cd_selected),
-                        tint = NuvioColors.FocusRing,
+                        tint = NuvioTheme.colors.FocusRing,
                         modifier = Modifier
-                            .size(16.dp)
+                            .size(NuvioTheme.spacing.lg)
                             .padding(end = 6.dp)
                     )
                 }
@@ -1007,7 +1189,7 @@ private fun LayoutCard(
                         HomeLayout.MODERN -> stringResource(R.string.layout_modern)
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (isSelected || isFocused) NuvioColors.TextPrimary else NuvioColors.TextSecondary
+                    color = if (isSelected || isFocused) NuvioTheme.colors.TextPrimary else NuvioTheme.colors.TextSecondary
                 )
             }
         }
@@ -1021,23 +1203,23 @@ private fun LayoutPreviewPlaceholder() {
             .fillMaxWidth()
             .height(112.dp)
             .background(
-                color = NuvioColors.BackgroundCard,
-                shape = RoundedCornerShape(12.dp)
+                color = NuvioTheme.colors.BackgroundCard,
+                shape = RoundedCornerShape(NuvioTheme.radii.md)
             )
             .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.7f)
                 .height(10.dp)
-                .background(NuvioColors.Border, RoundedCornerShape(999.dp))
+                .background(NuvioTheme.colors.Border, RoundedCornerShape(999.dp))
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(NuvioColors.BackgroundElevated, RoundedCornerShape(10.dp))
+                .background(NuvioTheme.colors.BackgroundElevated, RoundedCornerShape(10.dp))
         )
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(3) {
@@ -1045,7 +1227,7 @@ private fun LayoutPreviewPlaceholder() {
                     modifier = Modifier
                         .weight(1f)
                         .height(10.dp)
-                        .background(NuvioColors.Border, RoundedCornerShape(999.dp))
+                        .background(NuvioTheme.colors.Border, RoundedCornerShape(999.dp))
                 )
             }
         }
@@ -1094,7 +1276,7 @@ private fun PosterCardStyleControls(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         OptionRow(
             title = stringResource(R.string.layout_card_width),
@@ -1118,12 +1300,12 @@ private fun PosterCardStyleControls(
             },
             shape = ButtonDefaults.shape(shape = RoundedCornerShape(SettingsPillRadius)),
             colors = ButtonDefaults.colors(
-                containerColor = NuvioColors.Background,
-                focusedContainerColor = NuvioColors.Background
+                containerColor = NuvioTheme.colors.Background,
+                focusedContainerColor = NuvioTheme.colors.Background
             ),
             border = ButtonDefaults.border(
                 focusedBorder = Border(
-                    border = BorderStroke(2.dp, NuvioColors.FocusRing),
+                    border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
                     shape = RoundedCornerShape(SettingsPillRadius)
                 )
             )
@@ -1131,7 +1313,7 @@ private fun PosterCardStyleControls(
             Text(
                 text = stringResource(R.string.layout_reset_default),
                 style = MaterialTheme.typography.labelLarge,
-                color = NuvioColors.TextPrimary
+                color = NuvioTheme.colors.TextPrimary
             )
         }
     }
@@ -1150,12 +1332,12 @@ private fun OptionRow(
     Text(
         text = "$title ($selectedLabel)",
         style = MaterialTheme.typography.labelLarge,
-        color = NuvioColors.TextSecondary
+        color = NuvioTheme.colors.TextSecondary
     )
 
     LazyRow(
-        contentPadding = PaddingValues(end = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(end = NuvioTheme.spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
     ) {
         items(
             items = options,

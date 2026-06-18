@@ -1,5 +1,7 @@
 package com.nuvio.tv.ui.screens.home
 
+import com.nuvio.tv.ui.theme.NuvioTheme
+
 import androidx.compose.runtime.State
 import androidx.compose.foundation.lazy.grid.items
 import com.nuvio.tv.LocalContentFocusRequester
@@ -34,6 +36,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -76,7 +79,6 @@ import com.nuvio.tv.ui.components.PosterCardDefaults
 import com.nuvio.tv.ui.components.PosterCardStyle
 import com.nuvio.tv.ui.components.collectionFolderCardImageUrl
 import com.nuvio.tv.ui.components.rememberArtworkBackedCardGlow
-import com.nuvio.tv.ui.theme.NuvioColors
 
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -161,7 +163,7 @@ fun GridHomeContent(
     val hasHero = remember(gridItems) {
         gridItems.firstOrNull() is GridItem.Hero
     }
-    val topPadding = if (hasHero) 0.dp else 24.dp
+    val topPadding = if (hasHero) NuvioTheme.spacing.none else NuvioTheme.spacing.xl
 
     // Determine if hero is scrolled past
     val isScrolledPastHeroState = remember(hasHero, gridState) {
@@ -189,14 +191,25 @@ fun GridHomeContent(
         gridItems.any { it is GridItem.Content || it is GridItem.SeeAll }
     }
 
+    // Once the user scrolls, initial focus must not pull back to the hero.
+    var userScrolledGrid by remember { mutableStateOf(false) }
+    LaunchedEffect(gridState) {
+        snapshotFlow {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
+        }.collect { scrolledAway ->
+            if (scrolledAway) userScrolledGrid = true
+        }
+    }
+
+    // Keyed on the "is there something focusable" booleans (not gridItems.size, which
+    // churns per catalog and stole focus back to the top); retries until the target attaches.
     LaunchedEffect(
         shouldRequestInitialFocus,
         hasHero,
         hasContinueWatching,
-        hasStandaloneFocusableGridItem,
-            gridItems.size
+        hasStandaloneFocusableGridItem
     ) {
-        if (!shouldRequestInitialFocus) return@LaunchedEffect
+        if (!shouldRequestInitialFocus || userScrolledGrid) return@LaunchedEffect
         if (hasContinueWatching && !hasHero) return@LaunchedEffect
         val targetRequester = when {
             hasHero -> heroFocusRequester
@@ -204,10 +217,12 @@ fun GridHomeContent(
             else -> null
         } ?: return@LaunchedEffect
 
-        repeat(2) { withFrameNanos { } }
-        try {
-            targetRequester.requestFocus()
-        } catch (_: IllegalStateException) {
+        repeat(8) {
+            withFrameNanos { }
+            if (userScrolledGrid) return@LaunchedEffect
+            if (runCatching { targetRequester.requestFocus(); true }.getOrDefault(false)) {
+                return@LaunchedEffect
+            }
         }
     }
 
@@ -263,13 +278,13 @@ fun GridHomeContent(
                 .focusRestorer()
                 .dpadRepeatThrottle(),
             contentPadding = PaddingValues(
-                start = 48.dp,
-                end = 24.dp,
+                start = NuvioTheme.spacing.xxxl,
+                end = NuvioTheme.spacing.xl,
                 top = topPadding,
-                bottom = 32.dp
+                bottom = NuvioTheme.spacing.xxl
             ),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md),
+            verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg)
         ) {
             var firstGridFocusableAssigned = false
 
@@ -563,12 +578,12 @@ private fun SectionDivider(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 24.dp, bottom = 12.dp)
+            .padding(top = NuvioTheme.spacing.xl, bottom = NuvioTheme.spacing.md)
     ) {
         Text(
             text = catalogName,
             style = MaterialTheme.typography.headlineMedium,
-            color = NuvioColors.TextPrimary
+            color = NuvioTheme.colors.TextPrimary
         )
     }
 }
@@ -578,7 +593,7 @@ private fun StickyCategoryHeader(
     sectionName: String,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = NuvioColors.Background
+    val bgColor = NuvioTheme.colors.Background
     val headerGradient = remember(bgColor) {
         Brush.verticalGradient(
             colorStops = arrayOf(
@@ -593,12 +608,12 @@ private fun StickyCategoryHeader(
         modifier = modifier
             .fillMaxWidth()
             .background(headerGradient)
-            .padding(horizontal = 48.dp, vertical = 12.dp)
+            .padding(horizontal = NuvioTheme.spacing.xxxl, vertical = NuvioTheme.spacing.md)
     ) {
         Text(
             text = sectionName,
             style = MaterialTheme.typography.titleLarge,
-            color = NuvioColors.TextPrimary
+            color = NuvioTheme.colors.TextPrimary
         )
     }
 }
@@ -623,12 +638,12 @@ private fun SeeAllGridCard(
             shape = seeAllCardShape
         ),
         colors = CardDefaults.colors(
-            containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.BackgroundCard
+            containerColor = NuvioTheme.colors.BackgroundCard,
+            focusedContainerColor = NuvioTheme.colors.BackgroundCard
         ),
         border = CardDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(posterCardStyle.focusedBorderWidth, NuvioColors.FocusRing),
+                border = BorderStroke(posterCardStyle.focusedBorderWidth, NuvioTheme.colors.FocusRing),
                 shape = seeAllCardShape
             )
         ),
@@ -647,14 +662,14 @@ private fun SeeAllGridCard(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                     contentDescription = label ?: stringResource(R.string.action_see_all),
-                    modifier = Modifier.size(32.dp),
-                    tint = NuvioColors.TextSecondary
+                    modifier = Modifier.size(NuvioTheme.spacing.xxl),
+                    tint = NuvioTheme.colors.TextSecondary
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(NuvioTheme.spacing.sm))
                 Text(
                     text = label ?: stringResource(R.string.action_see_all),
                     style = MaterialTheme.typography.titleSmall,
-                    color = NuvioColors.TextSecondary,
+                    color = NuvioTheme.colors.TextSecondary,
                     textAlign = TextAlign.Center
                 )
             }
@@ -698,12 +713,12 @@ private fun GridCollectionFolderCard(
             },
         shape = CardDefaults.shape(shape = cardShape),
         colors = CardDefaults.colors(
-            containerColor = NuvioColors.BackgroundCard,
-            focusedContainerColor = NuvioColors.BackgroundCard
+            containerColor = NuvioTheme.colors.BackgroundCard,
+            focusedContainerColor = NuvioTheme.colors.BackgroundCard
         ),
         border = CardDefaults.border(
             focusedBorder = Border(
-                border = BorderStroke(posterCardStyle.focusedBorderWidth, NuvioColors.FocusRing),
+                border = BorderStroke(posterCardStyle.focusedBorderWidth, NuvioTheme.colors.FocusRing),
                 shape = cardShape
             )
         ),
@@ -728,7 +743,7 @@ private fun GridCollectionFolderCard(
                     Text(
                         text = folder.title.take(2).uppercase(),
                         style = MaterialTheme.typography.headlineMedium,
-                        color = NuvioColors.TextSecondary
+                        color = NuvioTheme.colors.TextSecondary
                     )
                 }
             }
@@ -764,7 +779,7 @@ private fun GridCollectionFolderCard(
                                 colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
                             )
                         )
-                        .padding(8.dp),
+                        .padding(NuvioTheme.spacing.sm),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
