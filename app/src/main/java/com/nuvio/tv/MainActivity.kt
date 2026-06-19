@@ -921,6 +921,7 @@ private fun LegacySidebarScaffold(
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val drawerItemFocusRequesters = rememberDrawerItemFocusRequesters(drawerItems)
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val showSidebar = currentRoute in rootRoutes
 
     LaunchedEffect(currentRoute) {
@@ -1097,6 +1098,7 @@ private fun LegacySidebarScaffold(
                                     selected = selectedDrawerRoute == item.route,
                                     expanded = isExpanded,
                                     onClick = {
+                                        keyboardController?.hide()
                                         onNavigate(item.route)
                                         navigateToDrawerRoute(
                                             navController = navController,
@@ -1284,6 +1286,7 @@ private fun ModernSidebarScaffold(
     val isRtl = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val contentFocusRequester = remember { FocusRequester() }
     val drawerItemFocusRequesters = rememberDrawerItemFocusRequesters(drawerItems)
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     var isSidebarExpanded by remember { mutableStateOf(false) }
     var sidebarCollapsePending by remember { mutableStateOf(false) }
@@ -1618,6 +1621,7 @@ private fun ModernSidebarScaffold(
                         drawerItemFocusRequesters = drawerItemFocusRequesters,
                         onDrawerItemFocused = { focusedDrawerIndex = it },
                         onDrawerItemClick = { targetRoute ->
+                            keyboardController?.hide()
                             onNavigate(targetRoute)
                             navigateToDrawerRoute(
                                 navController = navController,
