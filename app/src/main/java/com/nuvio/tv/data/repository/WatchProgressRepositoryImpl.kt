@@ -878,7 +878,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun markAsCompleted(progress: WatchProgress) {
+    override suspend fun markAsCompleted(progress: WatchProgress, syncRemoteToTrakt: Boolean) {
         // Clear any CW dismiss keys for this series so it reappears in Continue Watching.
         if (progress.contentType.equals("series", ignoreCase = true) ||
             progress.contentType.equals("tv", ignoreCase = true)) {
@@ -902,11 +902,13 @@ class WatchProgressRepositoryImpl @Inject constructor(
             val watchedItem = progress.toWatchedItem(watchedAt = now)
             watchedItemsPreferences.markAsWatched(watchedItem)
             runCatching {
-                traktProgressService.markAsWatched(
-                    progress = completed,
-                    title = completed.name.takeIf { it.isNotBlank() },
-                    year = null
-                )
+                if (syncRemoteToTrakt) {
+                    traktProgressService.markAsWatched(
+                        progress = completed,
+                        title = completed.name.takeIf { it.isNotBlank() },
+                        year = null
+                    )
+                }
             }.onFailure {
                 traktProgressService.applyOptimisticRemoval(
                     contentId = completed.contentId,
@@ -923,7 +925,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
         watchProgressPreferences.markAsCompleted(progress)
         val watchedItem = progress.toWatchedItem()
         watchedItemsPreferences.markAsWatched(watchedItem)
-        if (hasEffectiveTraktConnection) {
+        if (hasEffectiveTraktConnection && syncRemoteToTrakt) {
             val now = System.currentTimeMillis()
             val duration = progress.duration.takeIf { it > 0L } ?: 1L
             val completed = progress.copy(

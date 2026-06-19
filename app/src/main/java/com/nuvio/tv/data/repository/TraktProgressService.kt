@@ -665,7 +665,10 @@ class TraktProgressService @Inject constructor(
         }
 
         val body = buildHistoryAddRequest(effectiveInitialProgress, title, year)
-            ?: throw IllegalStateException(appContext.getString(com.nuvio.tv.R.string.trakt_error_insufficient_ids_mark_watched))
+        if (body == null) {
+            Log.w(TAG, "markAsWatched: insufficient Trakt IDs for contentId=${progress.contentId} videoId=${progress.videoId} — skipping")
+            return
+        }
 
         val isSeriesEpisode = isSeriesEpisodeProgress(effectiveInitialProgress)
         val watchedShowSeedsSnapshot = if (isSeriesEpisode) {

@@ -371,7 +371,10 @@ internal fun PlayerRuntimeController.saveWatchProgressInternal(position: Long, d
     scope.launch(kotlinx.coroutines.NonCancellable) {
         if (progress.isCompleted() && !hasMarkedCurrentEpisodeCompleted) {
             hasMarkedCurrentEpisodeCompleted = true
-            watchProgressRepository.markAsCompleted(progress)
+            // Don't send markAsWatched to Trakt from the player — the scrobble
+            // stop (≥80%) already causes Trakt to add the history entry.
+            // Local stores + Nuvio Sync are still updated.
+            watchProgressRepository.markAsCompleted(progress, syncRemoteToTrakt = false)
         } else {
             watchProgressRepository.saveProgress(progress, syncRemote = syncRemote)
         }
@@ -444,6 +447,13 @@ internal fun PlayerRuntimeController.buildScrobbleItem(): TraktScrobbleItem? {
 internal fun PlayerRuntimeController.emitScrobbleStart() {
     if (isShortPlaceholderStream()) return
     if (hasRequestedScrobbleStartForCurrentItem) return
+
+    // Don't start a new Trakt scrobble session if playback resumes at ≥80%.
+    // This avoids creating a duplicate history entry when the user continues
+    // watching something already marked as watched. If the user seeks back
+    // below 80%, the next progress update will re-trigger scrobble start.
+    val currentProgress = currentPlaybackProgressPercent()
+    if (currentProgress >= 80f) return
 
     hasRequestedScrobbleStartForCurrentItem = true
     val requestGeneration = ++scrobbleStartRequestGeneration
