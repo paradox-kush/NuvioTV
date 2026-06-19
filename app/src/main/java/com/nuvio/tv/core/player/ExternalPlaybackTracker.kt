@@ -81,7 +81,7 @@ data class ExternalAutoNextEpisode(
     val logo: String?,
     val year: String?,
     val nextVideoId: String,
-    val nextSeason: Int,
+    val nextSeason: Int?,
     val nextEpisode: Int,
     // Lets the collector skip a value replayed after a config change while still
     // acting on a genuinely new event after a process restart.
@@ -199,9 +199,14 @@ class ExternalPlaybackTracker @Inject constructor(
         isAutoLaunch = autoLaunch
         // Fresh launch — allow the auto-next loader / advance again.
         autoNextCancelled = false
-        // A continuation of the auto-next chain (a launch right after an emit) keeps a user's abort
-        // in effect; any later launch (manual click, or a replay) is fresh and re-enables auto-next.
-        if (System.currentTimeMillis() - lastAutoNextEmitMs >= CONTINUATION_WINDOW_MS) {
+        // A manual launch is always fresh; only an auto-launch within the window is a continuation
+        // that keeps a user's abort in effect (so one Back press stops a runaway chain).
+        if (ExternalAutoNextPolicy.shouldResetChainAbort(
+                autoLaunch = autoLaunch,
+                nowMs = System.currentTimeMillis(),
+                lastAutoNextEmitMs = lastAutoNextEmitMs,
+                continuationWindowMs = CONTINUATION_WINDOW_MS
+            )) {
             autoNextChainAborted = false
         }
         autoNextOverlaySuppressed = false
@@ -518,15 +523,17 @@ class ExternalPlaybackTracker @Inject constructor(
     private fun maybeTriggerAutoNextEpisode(metadata: ExternalPlaybackMetadata) {
         val season = metadata.season
         val episode = metadata.episode
-        val type = metadata.contentType.lowercase()
-        if (season == null || episode == null || type !in listOf("series", "tv")) {
-            Log.d(AUTO_NEXT_TAG, "Auto-next skipped: season=$season episode=$episode type=$type")
-            return
-        }
-        // User backed out of the loader — for this return (autoNextCancelled) or to stop a
-        // runaway chain (autoNextChainAborted). Don't re-raise the loader or advance.
-        if (autoNextCancelled || autoNextChainAborted) {
-            Log.d(AUTO_NEXT_TAG, "Auto-next suppressed (cancelled=$autoNextCancelled, chainAborted=$autoNextChainAborted)")
+        // Season may be null (absolute-numbered anime); only the episode and a series/tv type are
+        // required. The `episode == null` here is redundant with the policy but gives the smart cast.
+        val attemptAdvance = ExternalAutoNextPolicy.shouldAttemptAdvance(
+            episode = episode,
+            contentType = metadata.contentType,
+            cancelled = autoNextCancelled,
+            chainAborted = autoNextChainAborted
+        )
+        if (!attemptAdvance || episode == null) {
+            Log.d(AUTO_NEXT_TAG, "Auto-next not attempted: season=$season episode=$episode " +
+                "type=${metadata.contentType} cancelled=$autoNextCancelled chainAborted=$autoNextChainAborted")
             _autoNextOverlay.value = null
             return
         }
@@ -572,13 +579,13 @@ class ExternalPlaybackTracker @Inject constructor(
                 currentSeason = season,
                 currentEpisode = episode
             )
-            val nextSeason = nextVideo?.season
             val nextEpisode = nextVideo?.episode
-            if (nextVideo == null || nextSeason == null || nextEpisode == null) {
+            if (nextVideo == null || nextEpisode == null) {
                 Log.d(AUTO_NEXT_TAG, "No next episode after S${season}E${episode} for ${metadata.contentId}")
                 dismissOverlayIfCurrent()
                 return@launch
             }
+            val nextSeason = nextVideo.season
 
             Log.d(
                 AUTO_NEXT_TAG,
@@ -643,7 +650,12 @@ class ExternalPlaybackTracker @Inject constructor(
      *  screen calls this to skip the auto-launch and fall back to the source list. Only within the
      *  continuation window, so it can't suppress a fresh first auto-play of an unrelated title. */
     fun isAutoNextContinuationAborted(): Boolean =
-        autoNextChainAborted && System.currentTimeMillis() - lastAutoNextEmitMs < CONTINUATION_WINDOW_MS
+        ExternalAutoNextPolicy.isAbortedContinuation(
+            chainAborted = autoNextChainAborted,
+            nowMs = System.currentTimeMillis(),
+            lastAutoNextEmitMs = lastAutoNextEmitMs,
+            continuationWindowMs = CONTINUATION_WINDOW_MS
+        )
 
     /** Called by the Stream screen when it skips an aborted continuation, so the window expires and
      *  the next launch is treated as fresh (re-enabling auto-next). */
@@ -659,10 +671,15 @@ class ExternalPlaybackTracker @Inject constructor(
     }
 
     private fun raiseAutoNextOverlay(metadata: ExternalPlaybackMetadata) {
-        if (autoNextCancelled || autoNextChainAborted || autoNextOverlaySuppressed) return
-        if (metadata.season == null || metadata.episode == null) return
-        if (metadata.contentType.lowercase() !in listOf("series", "tv")) return
-        if (_autoNextOverlay.value != null) return
+        val shouldRaise = ExternalAutoNextPolicy.shouldRaiseLoader(
+            episode = metadata.episode,
+            contentType = metadata.contentType,
+            cancelled = autoNextCancelled,
+            chainAborted = autoNextChainAborted,
+            overlaySuppressed = autoNextOverlaySuppressed,
+            alreadyShowing = _autoNextOverlay.value != null
+        )
+        if (!shouldRaise) return
         _autoNextOverlay.value = ExternalAutoNextOverlay(
             backdrop = metadata.backdrop ?: metadata.poster,
             logo = metadata.logo,
