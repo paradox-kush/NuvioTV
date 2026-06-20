@@ -923,6 +923,14 @@ class FolderDetailViewModel @Inject constructor(
             _enrichingItemId.value = null
         }
         if (item.id in enrichedItemIds) {
+            // Ensure enrichedPreviews has this item for hero display.
+            if (item.id !in _enrichedPreviews.value) {
+                val enrichedItem = _uiState.value.tabs
+                    .firstNotNullOfOrNull { tab -> tab.catalogRow?.items?.firstOrNull { it.id == item.id } }
+                if (enrichedItem != null) {
+                    _enrichedPreviews.update { it + (item.id to enrichedItem) }
+                }
+            }
             return
         }
 
@@ -1104,6 +1112,7 @@ class FolderDetailViewModel @Inject constructor(
             if (enrichedItem != null) {
                 _enrichedPreviews.update { it + (item.id to enrichedItem) }
             }
+            enrichedItemIds.add(item.id)
             rebuildFollowLayoutState()
         }
     }
@@ -1309,8 +1318,18 @@ class FolderDetailViewModel @Inject constructor(
                                 releaseInfo = meta.releaseInfo?.takeIf { it.isNotBlank() } ?: merged.releaseInfo
                             )
                         }
+                        val enrichedItem = _uiState.value.tabs
+                            .firstNotNullOfOrNull { tab -> tab.catalogRow?.items?.firstOrNull { it.id == item.id } }
+                        if (enrichedItem != null) {
+                            _enrichedPreviews.update { it + (item.id to enrichedItem) }
+                        }
                     } else if (result is com.nuvio.tv.core.network.NetworkResult.Error && result.code == com.nuvio.tv.core.network.NetworkResult.SOURCE_SUFFICIENT_CODE) {
                         enrichedItemIds.add(item.id)
+                        val enrichedItem = _uiState.value.tabs
+                            .firstNotNullOfOrNull { tab -> tab.catalogRow?.items?.firstOrNull { it.id == item.id } }
+                        if (enrichedItem != null) {
+                            _enrichedPreviews.update { it + (item.id to enrichedItem) }
+                        }
                     }
                 }
                 // Artwork-only fallback: TMDB enriched but useArtwork is off and item lacks logo.
