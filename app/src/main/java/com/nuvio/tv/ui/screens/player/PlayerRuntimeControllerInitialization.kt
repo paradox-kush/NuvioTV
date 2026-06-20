@@ -1746,31 +1746,98 @@ private class CueNormalizingTextOutput(
 
     private fun fixRtlCueText(cue: Cue): Cue {
         val text = cue.text ?: return cue
-        if (!containsRtlChars(text)) return cue
-        val original = text.toString()
-        val fixed = original.split('\n').joinToString("\n") { line ->
-            fixRtlPunctuationForLtr(line)
+        
+        // Arabic subtitles use the RLE (\u202B) / PDF (\u202C) wrapping method on each line.
+        // This forces both physical and auto-wrapped lines to be correctly rendered as RTL.
+        if (containsArabic(text)) {
+            val original = text.toString()
+            if (original.startsWith("\u202B") && original.endsWith("\u202C")) {
+                return cue
+            }
+            val builder = android.text.SpannableStringBuilder()
+            val lines = text.splitByNewlines()
+            for (i in lines.indices) {
+                if (i > 0) {
+                    builder.append("\n")
+                }
+                val line = lines[i]
+                if (line.isNotEmpty()) {
+                    builder.append("\u202B")
+                    builder.append(line)
+                    builder.append("\u202C")
+                } else {
+                    builder.append(line)
+                }
+            }
+            return cue.buildUpon().setText(builder).build()
         }
-        if (fixed == original) return cue
-        return cue.buildUpon().setText(android.text.SpannableString(fixed)).build()
+        
+        // Other RTL subtitles (e.g. Hebrew) use the pre-commit character swapping method.
+        if (containsRtlChars(text)) {
+            val original = text.toString()
+            val fixed = original.split('\n').joinToString("\n") { line ->
+                fixRtlPunctuationForLtr(line)
+            }
+            if (fixed == original) return cue
+            return cue.buildUpon().setText(android.text.SpannableString(fixed)).build()
+        }
+        
+        return cue
+    }
+
+    private fun containsArabic(text: CharSequence): Boolean {
+        var i = 0
+        while (i < text.length) {
+            val codePoint = Character.codePointAt(text, i)
+            if (codePoint in 0x0600..0x06FF || // Arabic block
+                codePoint in 0x0750..0x077F || // Arabic Supplement
+                codePoint in 0x0870..0x08FF || // Arabic Extended
+                codePoint in 0xFB50..0xFDFF || // Arabic Presentation Forms-A
+                codePoint in 0xFE70..0xFEFF || // Arabic Presentation Forms-B
+                Character.getDirectionality(codePoint) == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC
+            ) {
+                return true
+            }
+            i += Character.charCount(codePoint)
+        }
+        return false
     }
 
     private fun fixRtlPunctuationForLtr(line: String): String {
         if (line.isEmpty()) return line
+        val hasCr = line.endsWith('\r')
+        val cleanLine = if (hasCr) line.substring(0, line.length - 1) else line
+        if (cleanLine.isEmpty()) return line
         
         var start = 0
-        while (start < line.length && isRtlPunctuation(line[start])) start++
+        while (start < cleanLine.length && isRtlPunctuation(cleanLine[start])) start++
         
-        var end = line.length
-        while (end > start && isRtlPunctuation(line[end - 1])) end--
+        var end = cleanLine.length
+        while (end > start && isRtlPunctuation(cleanLine[end - 1])) end--
         
-        if (start == 0 && end == line.length) return line
+        if (start == 0 && end == cleanLine.length) return line
         
-        val leadingPunct = line.substring(0, start)
-        val middle = line.substring(start, end)
-        val trailingPunct = line.substring(end)
+        val leadingPunct = cleanLine.substring(0, start)
+        val middle = cleanLine.substring(start, end)
+        val trailingPunct = cleanLine.substring(end)
         
-        return "$trailingPunct$middle$leadingPunct"
+        val fixed = "$trailingPunct$middle$leadingPunct"
+        return if (hasCr) "$fixed\r" else fixed
+    }
+
+    private fun CharSequence.splitByNewlines(): List<CharSequence> {
+        val result = mutableListOf<CharSequence>()
+        var start = 0
+        var i = 0
+        while (i < this.length) {
+            if (this[i] == '\n') {
+                result.add(this.subSequence(start, i))
+                start = i + 1
+            }
+            i++
+        }
+        result.add(this.subSequence(start, this.length))
+        return result
     }
 
     private fun isRtlPunctuation(ch: Char): Boolean {
@@ -1778,10 +1845,27 @@ private class CueNormalizingTextOutput(
     }
 
     private fun containsRtlChars(text: CharSequence): Boolean {
-        for (ch in text) {
-            val d = Character.getDirectionality(ch)
+        var i = 0
+        while (i < text.length) {
+            val codePoint = Character.codePointAt(text, i)
+            
+            // Direct Unicode range checks for Hebrew and Arabic scripts
+            if (codePoint in 0x0590..0x05FF || // Hebrew block (letters, points, punctuation)
+                codePoint in 0xFB1D..0xFB4F || // Hebrew Presentation Forms
+                codePoint in 0x0600..0x06FF || // Arabic block
+                codePoint in 0x0750..0x077F || // Arabic Supplement
+                codePoint in 0x0870..0x08FF || // Arabic Extended
+                codePoint in 0xFB50..0xFDFF || // Arabic Presentation Forms-A
+                codePoint in 0xFE70..0xFEFF    // Arabic Presentation Forms-B
+            ) {
+                return true
+            }
+            
+            val d = Character.getDirectionality(codePoint)
             if (d == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) return true
+                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC ||
+                d == Character.DIRECTIONALITY_ARABIC_NUMBER) return true
+            i += Character.charCount(codePoint)
         }
         return false
     }
