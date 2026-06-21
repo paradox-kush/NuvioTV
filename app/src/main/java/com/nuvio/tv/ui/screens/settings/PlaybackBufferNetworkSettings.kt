@@ -72,7 +72,7 @@ internal fun LazyListScope.bufferAndNetworkSettingsItems(
         )
     }
 
-    if (playerSettings.nuvioPerformanceModeEnabled && !playerSettings.bufferEngineEnabled) {
+    if (playerSettings.nuvioPerformanceModeEnabled) {
         item(key = "buffer_net_device_memory_info") {
             val context = LocalContext.current
             val ramLabel = NuvioExoPlayerPerformanceHelper.getFriendlyRamLabel(context)
