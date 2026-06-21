@@ -1787,31 +1787,124 @@ private class CueNormalizingTextOutput(
 
     private fun fixRtlCueText(cue: Cue): Cue {
         val text = cue.text ?: return cue
-        if (!containsRtlChars(text)) return cue
-        val original = text.toString()
-        val fixed = original.split('\n').joinToString("\n") { line ->
-            fixRtlPunctuationForLtr(line)
+
+        // Arabic: wrap each physical line with RLE (\u202B) ... PDF (\u202C).
+        // This renders boundary punctuation and auto-wrapped lines as RTL in an LTR container.
+        if (containsArabic(text)) {
+            val builder = android.text.SpannableStringBuilder()
+            val lines = text.splitByNewlines()
+            for (i in lines.indices) {
+                if (i > 0) builder.append("\n")
+                // Clear existing directional markers -> prevents double wrapping upon re-execution (idempotent).
+                val line = lines[i].stripDirectionalWrap()
+                if (line.isEmpty()) {
+                    builder.append(line)
+                    continue
+                }
+                // Keep the trailing CR (paragraph separator) OUTSIDE of the embedding; otherwise
+                // it terminates the RLE run and leaves the PDF orphan.
+                val hasCr = line[line.length - 1] == '\r'
+                val core = if (hasCr) line.subSequence(0, line.length - 1) else line
+                if (core.isEmpty()) {
+                    builder.append(line)
+                    continue
+                }
+                builder.append("\u202B").append(core).append("\u202C")
+                if (hasCr) builder.append("\r")
+            }
+            if (builder.contentEquals(text)) return cue
+            return cue.buildUpon().setText(builder).build()
         }
-        if (fixed == original) return cue
-        return cue.buildUpon().setText(android.text.SpannableString(fixed)).build()
+
+        // Hebrew / other RTL: punctuation boundary-swap method (span preserving).
+        if (containsRtlChars(text)) {
+            val builder = android.text.SpannableStringBuilder()
+            val lines = text.splitByNewlines()
+            var changed = false
+            for (i in lines.indices) {
+                if (i > 0) builder.append("\n")
+                val line = lines[i]
+                val fixed = fixRtlPunctuationForLtr(line)
+                if (fixed !== line) changed = true
+                builder.append(fixed)
+            }
+            if (!changed) return cue
+            return cue.buildUpon().setText(builder).build()
+        }
+
+        return cue
     }
 
-    private fun fixRtlPunctuationForLtr(line: String): String {
+    private fun containsArabic(text: CharSequence): Boolean {
+        var i = 0
+        while (i < text.length) {
+            val codePoint = Character.codePointAt(text, i)
+            if (codePoint in 0x0600..0x06FF || // Arabic block
+                codePoint in 0x0750..0x077F || // Arabic Supplement
+                codePoint in 0x0870..0x08FF || // Arabic Extended
+                codePoint in 0xFB50..0xFDFF || // Arabic Presentation Forms-A
+                codePoint in 0xFE70..0xFEFF || // Arabic Presentation Forms-B
+                Character.getDirectionality(codePoint) == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC
+            ) {
+                return true
+            }
+            i += Character.charCount(codePoint)
+        }
+        return false
+    }
+
+    // Take CharSequence instead of String -> preserve spans.
+    private fun fixRtlPunctuationForLtr(line: CharSequence): CharSequence {
         if (line.isEmpty()) return line
-        
+        val hasCr = line[line.length - 1] == '\r'
+        val end0 = if (hasCr) line.length - 1 else line.length
+        if (end0 == 0) return line
+
         var start = 0
-        while (start < line.length && isRtlPunctuation(line[start])) start++
-        
-        var end = line.length
+        while (start < end0 && isRtlPunctuation(line[start])) start++
+
+        var end = end0
         while (end > start && isRtlPunctuation(line[end - 1])) end--
-        
-        if (start == 0 && end == line.length) return line
-        
-        val leadingPunct = line.substring(0, start)
-        val middle = line.substring(start, end)
-        val trailingPunct = line.substring(end)
-        
-        return "$trailingPunct$middle$leadingPunct"
+
+        if (start == 0 && end == end0) return line
+
+        val out = android.text.SpannableStringBuilder()
+        out.append(line.subSequence(end, end0))   // trailing punct -> front
+            .append(line.subSequence(start, end)) // middle
+            .append(line.subSequence(0, start))   // leading punct -> end
+        if (hasCr) out.append("\r")
+        return out
+    }
+
+    // Clears existing directional control characters (idempotency + legacy RLM/LRE remnants).
+    private fun CharSequence.stripDirectionalWrap(): CharSequence {
+        val hasMarker = (0 until length).any { isDirectionalMark(this[it]) }
+        if (!hasMarker) return this
+        val sb = android.text.SpannableStringBuilder(this)
+        var k = 0
+        while (k < sb.length) {
+            if (isDirectionalMark(sb[k])) sb.delete(k, k + 1) else k++
+        }
+        return sb
+    }
+
+    private fun isDirectionalMark(c: Char): Boolean =
+        c == '\u202A' || c == '\u202B' || c == '\u202C' || // LRE / RLE / PDF
+        c == '\u200E' || c == '\u200F'                     // LRM / RLM
+
+    private fun CharSequence.splitByNewlines(): List<CharSequence> {
+        val result = mutableListOf<CharSequence>()
+        var start = 0
+        var i = 0
+        while (i < this.length) {
+            if (this[i] == '\n') {
+                result.add(this.subSequence(start, i))
+                start = i + 1
+            }
+            i++
+        }
+        result.add(this.subSequence(start, this.length))
+        return result
     }
 
     private fun isRtlPunctuation(ch: Char): Boolean {
@@ -1819,10 +1912,27 @@ private class CueNormalizingTextOutput(
     }
 
     private fun containsRtlChars(text: CharSequence): Boolean {
-        for (ch in text) {
-            val d = Character.getDirectionality(ch)
+        var i = 0
+        while (i < text.length) {
+            val codePoint = Character.codePointAt(text, i)
+            
+            // Direct Unicode range checks for Hebrew and Arabic scripts
+            if (codePoint in 0x0590..0x05FF || // Hebrew block (letters, points, punctuation)
+                codePoint in 0xFB1D..0xFB4F || // Hebrew Presentation Forms
+                codePoint in 0x0600..0x06FF || // Arabic block
+                codePoint in 0x0750..0x077F || // Arabic Supplement
+                codePoint in 0x0870..0x08FF || // Arabic Extended
+                codePoint in 0xFB50..0xFDFF || // Arabic Presentation Forms-A
+                codePoint in 0xFE70..0xFEFF    // Arabic Presentation Forms-B
+            ) {
+                return true
+            }
+            
+            val d = Character.getDirectionality(codePoint)
             if (d == Character.DIRECTIONALITY_RIGHT_TO_LEFT ||
-                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC) return true
+                d == Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC ||
+                d == Character.DIRECTIONALITY_ARABIC_NUMBER) return true
+            i += Character.charCount(codePoint)
         }
         return false
     }
