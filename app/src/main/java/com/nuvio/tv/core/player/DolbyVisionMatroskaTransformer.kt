@@ -82,7 +82,8 @@ internal class DolbyVisionMatroskaTransformer(
                 return stripHdr10PlusIfEnabled(sample, sampleLength, nalUnitLengthFieldLength) ?: sample
             }
             val stripped = HevcDvRpuStripper.stripRpuLengthDelimited(
-                sample, sampleLength, nalUnitLengthFieldLength
+                sample, sampleLength, nalUnitLengthFieldLength,
+                stripNonBaseLayerNals = profile == 7
             )
             if (stripped != null) {
                 lastTransformedLength = stripped.size

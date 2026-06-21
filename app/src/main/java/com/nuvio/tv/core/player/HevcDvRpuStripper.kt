@@ -21,7 +21,8 @@ internal object HevcDvRpuStripper {
     fun stripRpuLengthDelimited(
         sample: ByteArray,
         sampleLen: Int,
-        nalLengthFieldLength: Int
+        nalLengthFieldLength: Int,
+        stripNonBaseLayerNals: Boolean = false
     ): ByteArray? {
         if (sampleLen < nalLengthFieldLength) return null
         val out = ByteArrayOutputStream(sampleLen)
@@ -35,8 +36,12 @@ internal object HevcDvRpuStripper {
             val nalStart = pos + nalLengthFieldLength
             if (nalSize <= 0 || nalStart + nalSize > sampleLen) return null
             val nalType = (sample[nalStart].toInt() ushr 1) and 0x3F
-            if (nalType == NAL_TYPE_DV_RPU || nalType == NAL_TYPE_DV_EL) {
-                // Drop this NAL entirely — don't write start code or payload
+            val layerId = if (nalSize >= 2)
+                ((sample[nalStart].toInt() and 0x01) shl 5) or
+                        ((sample[nalStart + 1].toInt() and 0xF8) ushr 3)
+            else 0
+            if (nalType == NAL_TYPE_DV_RPU || nalType == NAL_TYPE_DV_EL ||
+                (stripNonBaseLayerNals && layerId > 0)) {       // <-- added
                 changed = true
             } else {
                 // Keep: write length prefix + NAL data
