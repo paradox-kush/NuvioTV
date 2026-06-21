@@ -43,8 +43,10 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -362,7 +364,9 @@ class TraktProgressService @Inject constructor(
         cachedEpisodesPlayback = null
         forceRefreshUntilMs = System.currentTimeMillis() + 30_000L
         lastManualRefreshSignalMs = 0L
-        refreshSignals.emit(Unit)
+        if (SystemClock.elapsedRealtime() - serviceStartedAtMs > 5_000L) {
+            refreshSignals.emit(Unit)
+        }
     }
 
     suspend fun getCachedStats(forceRefresh: Boolean = false): TraktCachedStats? {
@@ -1058,14 +1062,16 @@ class TraktProgressService @Inject constructor(
                 try { it.await() } catch (_: Exception) { }
             }
 
-            if (snapshot.isNotEmpty() || remoteProgress.value.isNotEmpty()) {
+            if (snapshot.isNotEmpty()) {
                 remoteProgress.value = snapshot
                 hasLoadedRemoteProgress.value = true
                 reconcileOptimistic(snapshot)
                 hydrateMetadata(snapshot)
-            } else {
+            } else if (remoteProgress.value.isEmpty()) {
                 // Don't mark as loaded with empty data — let retry handle it
                 throw IOException("Progress snapshot empty after fetch failure")
+            } else {
+                Log.d(TAG, "refreshRemoteSnapshot: empty snapshot, preserving existing ${remoteProgress.value.size} items")
             }
         }
     }
@@ -2725,7 +2731,8 @@ class TraktProgressService @Inject constructor(
             for (candidateId in idCandidates) {
                 val result = withTimeoutOrNull(3500) {
                     metaRepository.getMetaFromAllAddons(type = type, id = candidateId)
-                        .first { it !is NetworkResult.Loading }
+                        .dropWhile { it is NetworkResult.Loading }
+                        .firstOrNull()
                 } ?: continue
 
                 val meta = (result as? NetworkResult.Success)?.data ?: continue

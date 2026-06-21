@@ -7,11 +7,9 @@ import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.repository.MetaRepository
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
@@ -403,24 +401,11 @@ class TraktEpisodeMappingService @Inject constructor(
                 val result = try {
                     withTimeoutOrNull(8000) {
                         metaRepository.getMetaFromAllAddons(type = type, id = candidateId)
-                            .first { it !is NetworkResult.Loading }
+                            .dropWhile { it is NetworkResult.Loading }
+                            .firstOrNull()
                     }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException &&
-                        currentCoroutineContext()[kotlinx.coroutines.Job]?.isActive == true) {
-                        // Flow cancelled (likely addon manifest refresh) but our job is
-                        // still active. Retry once after letting the refresh settle.
-                        delay(1500)
-                        try {
-                            withTimeoutOrNull(8000) {
-                                metaRepository.getMetaFromAllAddons(type = type, id = candidateId)
-                                    .first { it !is NetworkResult.Loading }
-                            }
-                        } catch (_: Exception) { null }
-                    } else if (e is kotlinx.coroutines.CancellationException) {
-                        // Parent coroutine cancelled (e.g. profile switch) - propagate
-                        throw e
-                    } else null
+                } catch (_: Exception) {
+                    null
                 } ?: continue
                 val meta = (result as? NetworkResult.Success)?.data ?: continue
                 if (meta.videos.any { it.season != null && it.episode != null }) {
