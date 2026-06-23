@@ -134,7 +134,7 @@ internal class DolbyVisionMatroskaTransformer(
         dolbyVisionConfigBytes: ByteArray?
     ): String? {
         if (stripRpuOnly) {
-            return downgradeDolbyVisionCodecStringToHevc(codecs)
+            return null
         }
         val profile = resolveProfile(codecs, dolbyVisionConfigBytes)
         if (!config.shouldConvert(profile)) return null
