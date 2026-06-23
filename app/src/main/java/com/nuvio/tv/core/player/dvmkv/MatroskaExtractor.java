@@ -2106,14 +2106,13 @@ public class MatroskaExtractor implements Extractor {
       }
 
       if (deferSupplementalMainSampleSizePrefix) {
-        byte[] annexBSample =
-            convertLengthDelimitedSampleToAnnexB(
-                payloadToWrite, payloadLength, track.nalUnitLengthFieldLength, track.codecId);
-        writeSupplementalMainSampleSizePrefix(output, annexBSample.length);
+        int annexBSize = getAnnexBSize(payloadToWrite, payloadLength, track.nalUnitLengthFieldLength);
+        writeSupplementalMainSampleSizePrefix(output, annexBSize);
         sampleBytesWritten += 4;
-        ParsableByteArray annexBData = new ParsableByteArray(annexBSample);
-        output.sampleData(annexBData, annexBSample.length);
-        sampleBytesWritten += annexBSample.length;
+        int bytesWritten =
+            writeLengthDelimitedSampleAsAnnexB(
+                output, payloadToWrite, payloadLength, track.nalUnitLengthFieldLength, track.codecId);
+        sampleBytesWritten += bytesWritten;
       } else {
         int bytesWritten =
             writeLengthDelimitedSampleAsAnnexB(
@@ -2222,6 +2221,27 @@ public class MatroskaExtractor implements Extractor {
     }
 
     return bytesWritten;
+  }
+
+  private static int getAnnexBSize(
+      byte[] sampleLengthDelimitedData, int dataLength, int nalUnitLengthFieldLength) {
+    if (nalUnitLengthFieldLength == 4) {
+      return dataLength;
+    }
+    int annexBSize = 0;
+    int offset = 0;
+    while (offset + nalUnitLengthFieldLength <= dataLength) {
+      int nalLength = 0;
+      for (int i = 0; i < nalUnitLengthFieldLength; i++) {
+        nalLength = (nalLength << 8) | (sampleLengthDelimitedData[offset + i] & 0xFF);
+      }
+      if (nalLength < 0 || offset + nalUnitLengthFieldLength + nalLength > dataLength) {
+        break; // Stop parsing if data is malformed to prevent OutOfBounds
+      }
+      annexBSize += 4 + nalLength;
+      offset += nalUnitLengthFieldLength + nalLength;
+    }
+    return annexBSize;
   }
 
   private byte[] convertLengthDelimitedSampleToAnnexB(
