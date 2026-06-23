@@ -1313,6 +1313,7 @@ internal fun PlayerRuntimeController.switchToEpisodeStream(
     skipIntervals = emptyList()
     skipIntroFetchedKey = null
     lastActiveSkipType = null
+    autoSkippedIntervalKeys.clear()
 
     fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
     fetchSkipIntervals(contentId, currentSeason, currentEpisode)
@@ -1407,6 +1408,7 @@ private fun PlayerRuntimeController.switchToEpisodeStreamCommon(
     skipIntervals = emptyList()
     skipIntroFetchedKey = null
     lastActiveSkipType = null
+    autoSkippedIntervalKeys.clear()
 
     fetchParentalGuide(contentId, contentType, currentSeason, currentEpisode)
     fetchSkipIntervals(contentId, currentSeason, currentEpisode)
