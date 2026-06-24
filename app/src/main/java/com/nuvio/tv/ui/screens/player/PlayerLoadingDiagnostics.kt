@@ -106,7 +106,7 @@ internal fun PlayerRuntimeController.scheduleLoadingIssueReportAvailability() {
     startupLoadingReportJob = scope.launch {
         delay(LOADING_ISSUE_REPORT_DELAY_MS)
         val state = _uiState.value
-        if (!hasRenderedFirstFrame && state.error == null && state.showLoadingOverlay) {
+        if (state.playbackIssueReportsEnabled && !hasRenderedFirstFrame && state.error == null && state.showLoadingOverlay) {
             val elapsedMs = (System.currentTimeMillis() - loadingDiagnosticsStartedAtMs).coerceAtLeast(0L)
             _uiState.update {
                 it.copy(

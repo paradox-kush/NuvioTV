@@ -316,8 +316,11 @@ internal fun PlayerRuntimeController.stopWatchProgressSaving() {
 }
 
 internal fun PlayerRuntimeController.submitPlaybackIssueReport() {
-    if (_uiState.value.playbackIssueReportStatus == PlaybackIssueReportStatus.Sending) return
     val state = _uiState.value
+    if (!state.playbackIssueReportsEnabled) return
+    if (state.playbackIssueReportStatus == PlaybackIssueReportStatus.Sending ||
+        state.playbackIssueReportStatus == PlaybackIssueReportStatus.Sent
+    ) return
     val timeline = _playbackTimeline.value
     val diagnostics = lastPlaybackDiagnosticsForReport.takeIf { it.timestampMs > 0L }
         ?: LastPlaybackDiagnostics(
