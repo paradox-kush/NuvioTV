@@ -12,6 +12,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer
 import com.nuvio.tv.core.player.BitrateAwareLoadControl
+import com.nuvio.tv.core.player.LastPlaybackDiagnostics
 import com.nuvio.tv.core.debrid.DirectDebridResolver
 import com.nuvio.tv.core.debrid.DirectDebridStreamPreparer
 import com.nuvio.tv.core.plugin.PluginManager
@@ -29,6 +30,8 @@ import com.nuvio.tv.data.local.StreamBadgeSettingsDataStore
 import com.nuvio.tv.data.local.BingeGroupCacheDataStore
 import com.nuvio.tv.data.local.StreamAutoPlayMode
 import com.nuvio.tv.data.repository.ParentalGuideRepository
+import com.nuvio.tv.data.repository.PlaybackIssueErrorInput
+import com.nuvio.tv.data.repository.PlaybackIssueReportRepository
 import com.nuvio.tv.data.repository.SkipIntroRepository
 import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.data.repository.EpisodeMappingEntry
@@ -86,6 +89,7 @@ class PlayerRuntimeController(
     internal val directDebridResolver: DirectDebridResolver,
     internal val directDebridStreamPreparer: DirectDebridStreamPreparer,
     internal val streamBadgePresentation: com.nuvio.tv.core.streams.StreamBadgePresentation,
+    internal val playbackIssueReportRepository: PlaybackIssueReportRepository,
     savedStateHandle: SavedStateHandle,
     internal val scope: CoroutineScope
 ) {
@@ -285,6 +289,7 @@ class PlayerRuntimeController(
     internal var nextEpisodeAutoPlayJob: Job? = null
     internal var debridResolveJob: Job? = null
     internal var stillWatchingPromptJob: Job? = null
+    internal var startupLoadingReportJob: Job? = null
     internal var sourceStreamsJob: Job? = null
     internal var sourceBadgeJob: Job? = null
     internal var sourceBadgedAddonNames: Set<String> = emptySet()
@@ -296,6 +301,17 @@ class PlayerRuntimeController(
     internal var sourceStreamsFetchCompleted: Boolean = false
     internal var hostActivityRef: WeakReference<Activity>? = null
     internal var initialPlaybackStarted: Boolean = false
+    internal var lastPlaybackDiagnosticsForReport: LastPlaybackDiagnostics =
+        LastPlaybackDiagnostics.EMPTY
+    internal var lastPlaybackIssueError: PlaybackIssueErrorInput? = null
+    internal val playbackAnalyticsDiagnostics = PlayerPlaybackAnalyticsDiagnostics()
+    internal val loadingDiagnosticEvents: ArrayDeque<PlayerLoadingDiagnosticEvent> = ArrayDeque()
+    internal var loadingDiagnosticsStartedAtMs: Long = 0L
+    internal var currentLoadingPhase: String = "idle"
+    internal var currentLoadingPhaseStartedAtMs: Long = 0L
+    internal var currentLoadingMessageForReport: String? = null
+    internal var currentLoadingProgressForReport: Float? = null
+    internal var lastLoadingDiagnosticSignature: String = ""
 
     internal var lastSavedPosition: Long = 0L
     internal val saveThresholdMs = 5000L
@@ -550,6 +566,7 @@ class PlayerRuntimeController(
     fun onCleared() {
         releasePlayer()
         stopTorrentStream()
+        startupLoadingReportJob?.cancel()
         vodTelemetryJob?.cancel()
         mediaSourceFactory.shutdown()
         sourceChipErrorDismissJob?.cancel()

@@ -708,6 +708,20 @@ fun PlayerScreen(
                 .zIndex(2f)
         )
 
+        if (uiState.showLoadingOverlay && uiState.error == null && uiState.loadingIssueReportVisible) {
+            LoadingIssueReportAction(
+                elapsedMs = uiState.loadingIssueElapsedMs,
+                reportStatus = uiState.playbackIssueReportStatus,
+                reportId = uiState.playbackIssueReportId,
+                reportError = uiState.playbackIssueReportError,
+                onReport = { viewModel.onEvent(PlayerEvent.OnReportPlaybackIssue) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 72.dp)
+                    .zIndex(2.4f)
+            )
+        }
+
         PauseOverlay(
             visible = uiState.showPauseOverlay && uiState.error == null && !uiState.showLoadingOverlay,
             onClose = { viewModel.onEvent(PlayerEvent.OnDismissPauseOverlay) },
@@ -763,6 +777,10 @@ fun PlayerScreen(
         if (uiState.error != null) {
             ErrorOverlay(
                 message = uiState.error!!,
+                reportStatus = uiState.playbackIssueReportStatus,
+                reportId = uiState.playbackIssueReportId,
+                reportError = uiState.playbackIssueReportError,
+                onReport = { viewModel.onEvent(PlayerEvent.OnReportPlaybackIssue) },
                 onBack = exitPlayerFromError
             )
         }
@@ -2507,8 +2525,63 @@ private fun rememberRawSvgPainter(@RawRes iconRes: Int): Painter {
 }
 
 @Composable
+private fun LoadingIssueReportAction(
+    elapsedMs: Long,
+    reportStatus: PlaybackIssueReportStatus,
+    reportId: String?,
+    reportError: String?,
+    onReport: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(NuvioTheme.radii.lg))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .padding(horizontal = NuvioTheme.spacing.lg, vertical = NuvioTheme.spacing.md),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+    ) {
+        val reportMessage = when (reportStatus) {
+            PlaybackIssueReportStatus.Sent -> stringResource(R.string.player_report_issue_sent, reportId.orEmpty())
+            PlaybackIssueReportStatus.Failed -> reportError ?: stringResource(R.string.player_report_issue_failed)
+            PlaybackIssueReportStatus.Sending -> stringResource(R.string.player_report_issue_sending)
+            PlaybackIssueReportStatus.Idle -> stringResource(
+                R.string.player_report_loading_issue_prompt,
+                (elapsedMs / 1000L).coerceAtLeast(1L)
+            )
+        }
+        Text(
+            text = reportMessage,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.86f),
+            textAlign = TextAlign.Center
+        )
+        DialogButton(
+            text = when (reportStatus) {
+                PlaybackIssueReportStatus.Sending -> stringResource(R.string.player_report_issue_sending_button)
+                PlaybackIssueReportStatus.Sent -> stringResource(R.string.player_report_issue_sent_button)
+                else -> stringResource(R.string.player_report_loading_issue)
+            },
+            onClick = onReport,
+            isPrimary = false,
+            enabled = reportStatus != PlaybackIssueReportStatus.Sending &&
+                reportStatus != PlaybackIssueReportStatus.Sent,
+            modifier = Modifier.focusRequester(focusRequester)
+        )
+    }
+}
+
+@Composable
 private fun ErrorOverlay(
     message: String,
+    reportStatus: PlaybackIssueReportStatus,
+    reportId: String?,
+    reportError: String?,
+    onReport: () -> Unit,
     onBack: () -> Unit
 ) {
     val exitFocusRequester = remember { FocusRequester() }
@@ -2544,9 +2617,40 @@ private fun ErrorOverlay(
 
             Spacer(modifier = Modifier.height(NuvioTheme.spacing.lg))
 
+            val reportMessage = when (reportStatus) {
+                PlaybackIssueReportStatus.Idle -> null
+                PlaybackIssueReportStatus.Sending -> stringResource(R.string.player_report_issue_sending)
+                PlaybackIssueReportStatus.Sent -> stringResource(R.string.player_report_issue_sent, reportId.orEmpty())
+                PlaybackIssueReportStatus.Failed -> reportError ?: stringResource(R.string.player_report_issue_failed)
+            }
+            if (reportMessage != null) {
+                Text(
+                    text = reportMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when (reportStatus) {
+                        PlaybackIssueReportStatus.Sent -> NuvioTheme.colors.Secondary
+                        PlaybackIssueReportStatus.Failed -> Color(0xFFFF8A80)
+                        else -> Color.White.copy(alpha = 0.7f)
+                    },
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = NuvioTheme.spacing.xxl)
+                )
+            }
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg)
             ) {
+                DialogButton(
+                    text = when (reportStatus) {
+                        PlaybackIssueReportStatus.Sending -> stringResource(R.string.player_report_issue_sending_button)
+                        PlaybackIssueReportStatus.Sent -> stringResource(R.string.player_report_issue_sent_button)
+                        else -> stringResource(R.string.player_report_issue)
+                    },
+                    onClick = onReport,
+                    isPrimary = false,
+                    enabled = reportStatus != PlaybackIssueReportStatus.Sending &&
+                        reportStatus != PlaybackIssueReportStatus.Sent
+                )
                 DialogButton(
                     text = stringResource(R.string.player_go_back),
                     onClick = onBack,
@@ -2733,10 +2837,12 @@ internal fun DialogButton(
     text: String,
     onClick: () -> Unit,
     isPrimary: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier,
         colors = ButtonDefaults.colors(
             containerColor = if (isPrimary) NuvioTheme.colors.Secondary else NuvioTheme.colors.BackgroundCard,

@@ -1,9 +1,13 @@
 package com.nuvio.tv.ui.screens.player
 
+import android.net.Uri
 import android.util.Log
 import androidx.media3.common.Player
 import com.nuvio.tv.R
+import com.nuvio.tv.core.player.LastPlaybackDiagnostics
 import com.nuvio.tv.data.local.SubtitleStyleSettings
+import com.nuvio.tv.data.repository.PlaybackIssueErrorInput
+import com.nuvio.tv.data.repository.PlaybackIssueReportInput
 import com.nuvio.tv.data.repository.SkipInterval
 import com.nuvio.tv.data.repository.TraktScrobbleItem
 import com.nuvio.tv.data.repository.extractYear
@@ -157,15 +161,16 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                     val playingNow = view.isPlayingNow()
                     val cacheBuffering = view.isPausedForCacheNow() || view.isCoreIdleNow()
                     var firstFrameReady = hasRenderedFirstFrame
-                    if (!firstFrameReady) {
-                        firstFrameReady = pos > 0L || (playingNow && !cacheBuffering && playerDuration > 0L)
-                        if (firstFrameReady) {
-                            hasRenderedFirstFrame = true
-                            if (_uiState.value.postPlayDismissedForCurrentEpisode) {
-                                _uiState.update { it.copy(postPlayDismissedForCurrentEpisode = false) }
+                        if (!firstFrameReady) {
+                            firstFrameReady = pos > 0L || (playingNow && !cacheBuffering && playerDuration > 0L)
+                            if (firstFrameReady) {
+                                hasRenderedFirstFrame = true
+                                finishLoadingDiagnostics("mpv_first_frame_ready")
+                                if (_uiState.value.postPlayDismissedForCurrentEpisode) {
+                                    _uiState.update { it.copy(postPlayDismissedForCurrentEpisode = false) }
+                                }
                             }
                         }
-                    }
                     if (playerDuration > lastKnownDuration) {
                         lastKnownDuration = playerDuration
                     }
@@ -215,6 +220,10 @@ internal fun PlayerRuntimeController.startProgressUpdates() {
                     currentPosition = displayPosition,
                     duration = playerDuration.coerceAtLeast(0L),
                     bufferedPosition = player.bufferedPosition.coerceAtLeast(displayPosition)
+                )
+                playbackAnalyticsDiagnostics.recordProgressSnapshot(
+                    player = player,
+                    hasRenderedFirstFrame = hasRenderedFirstFrame
                 )
                 // Update torrent rebuffer progress from ExoPlayer's buffer state
                 if (isTorrentStream && _uiState.value.isBuffering && hasRenderedFirstFrame) {
@@ -304,6 +313,114 @@ internal fun PlayerRuntimeController.startWatchProgressSaving() {
 internal fun PlayerRuntimeController.stopWatchProgressSaving() {
     watchProgressSaveJob?.cancel()
     watchProgressSaveJob = null
+}
+
+internal fun PlayerRuntimeController.submitPlaybackIssueReport() {
+    if (_uiState.value.playbackIssueReportStatus == PlaybackIssueReportStatus.Sending) return
+    val state = _uiState.value
+    val timeline = _playbackTimeline.value
+    val diagnostics = lastPlaybackDiagnosticsForReport.takeIf { it.timestampMs > 0L }
+        ?: LastPlaybackDiagnostics(
+            timestampMs = System.currentTimeMillis(),
+            host = currentStreamUrl.reportSafeHost(),
+            result = state.error?.let { "Error: $it" } ?: "Pending"
+        )
+    val reportError = lastPlaybackIssueError
+        ?: PlaybackIssueErrorInput(
+            displayMessage = state.error,
+            errorCode = null,
+            errorCodeName = null,
+            exceptionClass = null,
+            causeClass = null,
+            causeMessage = null,
+            httpStatus = null
+        )
+    val audioTrack = state.audioTracks.reportTrackLabel(state.selectedAudioTrackIndex)
+    val subtitleTrack = state.subtitleTracks.reportTrackLabel(state.selectedSubtitleTrackIndex)
+    val reportReason = if (state.error == null && state.showLoadingOverlay && !hasRenderedFirstFrame) {
+        "loading_stall"
+    } else {
+        "playback_error"
+    }
+    val input = PlaybackIssueReportInput(
+        diagnostics = diagnostics,
+        error = reportError,
+        title = title,
+        contentName = contentName,
+        contentId = contentId,
+        contentType = contentType,
+        videoId = currentVideoId,
+        season = currentSeason,
+        episode = currentEpisode,
+        episodeTitle = currentEpisodeTitle,
+        releaseYear = year,
+        streamUrl = currentStreamUrl,
+        streamMimeType = currentStreamMimeType,
+        streamName = state.currentStreamName,
+        addonName = currentAddonName,
+        videoHash = currentVideoHash,
+        videoSize = currentVideoSize,
+        requestHeaders = currentHeaders,
+        responseHeaders = currentStreamResponseHeaders,
+        playerEngine = currentInternalPlayerEngine.name,
+        loading = buildPlaybackIssueLoadingInput(reportReason),
+        positionMs = timeline.currentPosition.takeIf { it > 0L },
+        durationMs = timeline.duration.takeIf { it > 0L },
+        bufferedPositionMs = timeline.bufferedPosition.takeIf { it > 0L },
+        selectedAudioTrack = audioTrack,
+        selectedSubtitleTrack = subtitleTrack,
+        isTorrentStream = isTorrentStream,
+        playbackAnalytics = playbackAnalyticsDiagnostics.snapshot(
+            player = _exoPlayer,
+            hasRenderedFirstFrame = hasRenderedFirstFrame,
+            rebufferCount = rebufferCount,
+            rebufferTotalMs = rebufferTotalMs,
+            rebufferStartedAtMs = rebufferStartedAtMs
+        )
+    )
+
+    _uiState.update {
+        it.copy(
+            playbackIssueReportStatus = PlaybackIssueReportStatus.Sending,
+            playbackIssueReportId = null,
+            playbackIssueReportError = null
+        )
+    }
+    scope.launch {
+        val result = playbackIssueReportRepository.submit(input)
+        _uiState.update { current ->
+            result.fold(
+                onSuccess = { reportId ->
+                    current.copy(
+                        playbackIssueReportStatus = PlaybackIssueReportStatus.Sent,
+                        playbackIssueReportId = reportId,
+                        playbackIssueReportError = null
+                    )
+                },
+                onFailure = { error ->
+                    current.copy(
+                        playbackIssueReportStatus = PlaybackIssueReportStatus.Failed,
+                        playbackIssueReportId = null,
+                        playbackIssueReportError = error.message ?: "Unable to send report"
+                    )
+                }
+            )
+        }
+    }
+}
+
+private fun List<TrackInfo>.reportTrackLabel(selectedIndex: Int): String? {
+    val track = firstOrNull { it.index == selectedIndex } ?: getOrNull(selectedIndex) ?: return null
+    return buildString {
+        append(track.name)
+        track.language?.takeIf { it.isNotBlank() }?.let { append(" | ").append(it) }
+        track.codec?.takeIf { it.isNotBlank() }?.let { append(" | ").append(it) }
+        track.channelCount?.let { append(" | ").append(it).append("ch") }
+    }
+}
+
+private fun String.reportSafeHost(): String {
+    return runCatching { Uri.parse(this).host ?: "unknown" }.getOrDefault("unknown")
 }
 
 internal fun PlayerRuntimeController.saveWatchProgressIfNeeded() {
@@ -1128,11 +1245,17 @@ fun PlayerRuntimeController.onEvent(event: PlayerEvent) {
             hasRenderedFirstFrame = false
             hasRetriedCurrentStreamAfter416 = false
             resetErrorRetryState()
+            lastPlaybackIssueError = null
             clearPendingEngineSwitchTrackPreference()
             resetPostPlayOverlayState(clearEpisode = false)
             _uiState.update { state ->
                 state.copy(
                     error = null,
+                    playbackIssueReportStatus = PlaybackIssueReportStatus.Idle,
+                    playbackIssueReportId = null,
+                    playbackIssueReportError = null,
+                    loadingIssueReportVisible = false,
+                    loadingIssueElapsedMs = 0L,
                     showLoadingOverlay = state.loadingOverlayEnabled,
                     showSubtitleTimingDialog = false,
                     showSubtitleDelayOverlay = false
@@ -1162,6 +1285,9 @@ fun PlayerRuntimeController.onEvent(event: PlayerEvent) {
                 releasePlayer()
                 initializePlayer(currentStreamUrl, currentHeaders)
             }
+        }
+        PlayerEvent.OnReportPlaybackIssue -> {
+            submitPlaybackIssueReport()
         }
         PlayerEvent.OnParentalGuideHide -> {
             _uiState.update { it.copy(showParentalGuide = false) }

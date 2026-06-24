@@ -1452,6 +1452,14 @@
     <string name="player_subtitle_delay">Subtitles Delay</string>
     <string name="player_error_title">Playback Error</string>
     <string name="player_go_back">Go Back</string>
+    <string name="player_report_issue">Report Issue</string>
+    <string name="player_report_issue_sending">Sending playback report...</string>
+    <string name="player_report_issue_sending_button">Sending...</string>
+    <string name="player_report_issue_sent">Report sent: %1$s</string>
+    <string name="player_report_issue_sent_button">Report Sent</string>
+    <string name="player_report_issue_failed">Unable to send report</string>
+    <string name="player_report_loading_issue">Report Loading Issue</string>
+    <string name="player_report_loading_issue_prompt">Still loading after %1$d sec</string>
     <string name="player_speed_title">Playback Speed</string>
     <string name="player_more_actions_title">More Actions</string>
     <string name="player_more_speed">Playback Speed</string>
