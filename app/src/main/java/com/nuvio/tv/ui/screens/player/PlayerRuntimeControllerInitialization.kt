@@ -1770,10 +1770,17 @@ internal suspend fun PlayerRuntimeController.prepareStartupSubtitles(
         )
     }
 
-    _uiState.update { it.copy(isLoadingAddonSubtitles = true, addonSubtitlesError = null) }
-    setLoadingStatus(
+    val loadingSubtitlesMessage = context.getString(R.string.player_loading_subtitles)
+    _uiState.update {
+        it.copy(
+            isLoadingAddonSubtitles = true,
+            addonSubtitlesError = null,
+            loadingMessage = loadingSubtitlesMessage
+        )
+    }
+    recordLoadingDiagnosticEvent(
         phase = "fetching_subtitles",
-        message = context.getString(R.string.player_loading_subtitles)
+        message = loadingSubtitlesMessage
     )
 
     val fetchedSubtitles = withTimeoutOrNull(STARTUP_SUBTITLE_PREFETCH_TIMEOUT_MS) {
@@ -1786,7 +1793,8 @@ internal suspend fun PlayerRuntimeController.prepareStartupSubtitles(
                 } else {
                     context.getString(R.string.player_loading_subtitles_progress, completed, total)
                 }
-                setLoadingStatus(
+                _uiState.update { it.copy(loadingMessage = msg) }
+                recordLoadingDiagnosticEvent(
                     phase = "fetching_subtitles",
                     message = msg,
                     progress = if (total > 0) completed.toFloat() / total.toFloat() else null,
