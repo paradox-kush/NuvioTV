@@ -1455,12 +1455,31 @@ internal suspend fun PlayerRuntimeController.resolveDirectDebridStreamIfNeeded(
     season: Int?,
     episode: Int?
 ): Stream? {
+    recordLoadingDiagnosticEvent(
+        phase = "resolving_debrid",
+        message = context.getString(com.nuvio.tv.R.string.player_loading_preparing),
+        detail = stream.addonName
+    )
     return when (val result = directDebridResolver.resolveToPlayableStream(stream, season, episode)) {
-        is DirectDebridPlayableResult.Success -> result.stream
+        is DirectDebridPlayableResult.Success -> {
+            recordLoadingDiagnosticEvent(
+                phase = "resolving_debrid_done",
+                message = context.getString(com.nuvio.tv.R.string.player_loading_preparing),
+                detail = stream.addonName
+            )
+            result.stream
+        }
         DirectDebridPlayableResult.MissingApiKey,
         DirectDebridPlayableResult.NotCached,
         DirectDebridPlayableResult.Stale,
-        DirectDebridPlayableResult.Error -> null
+        DirectDebridPlayableResult.Error -> {
+            recordLoadingDiagnosticEvent(
+                phase = "resolving_debrid_failed",
+                message = context.getString(com.nuvio.tv.R.string.player_loading_preparing),
+                detail = result.javaClass.simpleName
+            )
+            null
+        }
     }
 }
 

@@ -466,6 +466,8 @@
     <string name="network_connection_offline">Offline</string>
     <string name="advanced_section_performance">Performance &amp; navigation</string>
     <string name="advanced_section_diagnostics">Diagnostics</string>
+    <string name="advanced_playback_issue_reports">Playback issue reports</string>
+    <string name="advanced_playback_issue_reports_subtitle">Show report buttons during playback, long loading, and playback errors</string>
     <string name="advanced_section_cache">Cache</string>
     <string name="advanced_section_dv_diagnostics" translatable="false">DV Diagnostics</string>
     <string name="advanced_fast_horizontal_navigation">Fast Horizontal Navigation</string>
@@ -1452,6 +1454,17 @@
     <string name="player_subtitle_delay">Subtitles Delay</string>
     <string name="player_error_title">Playback Error</string>
     <string name="player_go_back">Go Back</string>
+    <string name="player_report_issue">Report Issue</string>
+    <string name="player_report_issue_sending">Sending playback report...</string>
+    <string name="player_report_issue_sending_button">Sending...</string>
+    <string name="player_report_issue_sent">Report sent: %1$s</string>
+    <string name="player_report_issue_sent_button">Report Sent</string>
+    <string name="player_report_issue_failed">Unable to send report</string>
+    <string name="player_report_loading_issue">Report Loading Issue</string>
+    <plurals name="player_report_loading_issue_prompt">
+        <item quantity="one">Still loading after %1$d second</item>
+        <item quantity="other">Still loading after %1$d seconds</item>
+    </plurals>
     <string name="player_speed_title">Playback Speed</string>
     <string name="player_more_actions_title">More Actions</string>
     <string name="player_more_speed">Playback Speed</string>
