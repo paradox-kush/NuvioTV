@@ -2863,8 +2863,10 @@ public class MatroskaExtractor implements Extractor {
               }
             }
             if (MimeTypes.VIDEO_DOLBY_VISION.equals(mimeType) && hevcCodecsString != null) {
-              mimeType = MimeTypes.VIDEO_H265;
-              codecs = hevcCodecsString;
+              if (DolbyVisionCompatibility.isHdr10BaseLayerModeActive()) {
+                mimeType = MimeTypes.VIDEO_H265;
+                codecs = hevcCodecsString;
+              }
             }
           }
         }
