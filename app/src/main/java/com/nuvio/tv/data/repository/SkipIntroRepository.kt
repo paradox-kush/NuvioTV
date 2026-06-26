@@ -40,72 +40,41 @@ class SkipIntroRepository @Inject constructor(
         val cacheKey = "$imdbId:$season:$episode"
         cache[cacheKey]?.let { return it }
 
-        if (introDbConfigured) {
-            val result = fetchFromIntroDb(imdbId, season, episode)
-            if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-        }
-
+        val introDb = if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
         val entries = resolveImdbEntries(imdbId)
+        val animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
         val malId = entries.getOrNull(season - 1)?.myanimelist?.toString()
             ?: entries.firstOrNull()?.myanimelist?.toString()
-        if (malId != null) {
-            val result = fetchFromAniSkip(malId, episode)
-            if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-        }
+        val aniSkip = if (malId != null) fetchFromAniSkip(malId, episode) else emptyList()
 
-        // AnimeSkip: try season-specific AniList ID first, then season-1 as fallback with season filter
-        val seasonAnilistId = entries.getOrNull(season - 1)?.anilist?.toString()
-        val fallbackAnilistId = entries.firstOrNull()?.anilist?.toString()
-        for ((anilistId, seasonFilter) in listOfNotNull(
-            seasonAnilistId?.let { it to null },
-            if (fallbackAnilistId != null && fallbackAnilistId != seasonAnilistId) fallbackAnilistId to season else null
-        )) {
-            val result = fetchFromAnimeSkip(anilistId, episode, season = seasonFilter)
-            if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-        }
-
-        return emptyList<SkipInterval>().also { cache[cacheKey] = it }
+        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
     }
 
     suspend fun getSkipIntervalsForMal(malId: String, episode: Int): List<SkipInterval> {
         val cacheKey = "mal:$malId:$episode"
         cache[cacheKey]?.let { return it }
 
-        val aniSkipResult = fetchFromAniSkip(malId, episode)
-        if (aniSkipResult.isNotEmpty()) return aniSkipResult.also { cache[cacheKey] = it }
+        val aniSkip = fetchFromAniSkip(malId, episode)
 
         val imdbId = try {
             armApi.resolveMalToImdb(malId = malId).takeIf { it.isSuccessful }?.body()?.imdb
         } catch (e: Exception) { null }
 
+        var introDb = emptyList<SkipInterval>()
+        var animeSkip = emptyList<SkipInterval>()
         if (imdbId != null) {
             val entries = resolveImdbEntries(imdbId)
             val season = entries.indexOfFirst { it.myanimelist == malId.toIntOrNull() } + 1
-
-            if (introDbConfigured) {
-                val result = fetchFromIntroDb(imdbId, season, episode)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
-            val seasonAnilistId = entries.getOrNull(season - 1)?.anilist?.toString()
-            val fallbackAnilistId = entries.firstOrNull()?.anilist?.toString()
-            for ((anilistId, seasonFilter) in listOfNotNull(
-                seasonAnilistId?.let { it to null },
-                if (fallbackAnilistId != null && fallbackAnilistId != seasonAnilistId) fallbackAnilistId to season else null
-            )) {
-                val result = fetchFromAnimeSkip(anilistId, episode, season = seasonFilter)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
+            if (introDbConfigured) introDb = fetchFromIntroDb(imdbId, season, episode)
+            animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
         } else {
             val anilistId = try {
                 armApi.resolveMalToAnilist(malId = malId).takeIf { it.isSuccessful }?.body()?.anilist?.toString()
             } catch (e: Exception) { null }
-            if (anilistId != null) {
-                val result = fetchFromAnimeSkip(anilistId, episode, season = null)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
+            if (anilistId != null) animeSkip = fetchFromAnimeSkip(anilistId, episode, season = null)
         }
 
-        return emptyList<SkipInterval>().also { cache[cacheKey] = it }
+        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
     }
 
     suspend fun getSkipIntervalsForKitsu(kitsuId: String, episode: Int): List<SkipInterval> {
@@ -116,44 +85,69 @@ class SkipIntroRepository @Inject constructor(
             armApi.resolveKitsuToMal(kitsuId = kitsuId)
                 .takeIf { it.isSuccessful }?.body()?.myanimelist?.toString()
         } catch (e: Exception) { null }
-
-        if (malId != null) {
-            val result = fetchFromAniSkip(malId, episode)
-            if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-        }
+        val aniSkip = if (malId != null) fetchFromAniSkip(malId, episode) else emptyList()
 
         val imdbId = try {
             armApi.resolveKitsuToImdb(kitsuId = kitsuId).takeIf { it.isSuccessful }?.body()?.imdb
         } catch (e: Exception) { null }
 
+        var introDb = emptyList<SkipInterval>()
+        var animeSkip = emptyList<SkipInterval>()
         if (imdbId != null) {
             val entries = resolveImdbEntries(imdbId)
             val season = entries.indexOfFirst { it.kitsu == kitsuId.toIntOrNull() } + 1
-
-            if (introDbConfigured) {
-                val result = fetchFromIntroDb(imdbId, season, episode)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
-            val seasonAnilistId = entries.getOrNull(season - 1)?.anilist?.toString()
-            val fallbackAnilistId = entries.firstOrNull()?.anilist?.toString()
-            for ((anilistId, seasonFilter) in listOfNotNull(
-                seasonAnilistId?.let { it to null },
-                if (fallbackAnilistId != null && fallbackAnilistId != seasonAnilistId) fallbackAnilistId to season else null
-            )) {
-                val result = fetchFromAnimeSkip(anilistId, episode, season = seasonFilter)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
+            if (introDbConfigured) introDb = fetchFromIntroDb(imdbId, season, episode)
+            animeSkip = fetchAnimeSkipForEntries(entries, season, episode)
         } else {
             val anilistId = try {
                 armApi.resolveKitsuToAnilist(kitsuId = kitsuId).takeIf { it.isSuccessful }?.body()?.anilist?.toString()
             } catch (e: Exception) { null }
-            if (anilistId != null) {
-                val result = fetchFromAnimeSkip(anilistId, episode, season = null)
-                if (result.isNotEmpty()) return result.also { cache[cacheKey] = it }
-            }
+            if (anilistId != null) animeSkip = fetchFromAnimeSkip(anilistId, episode, season = null)
         }
 
-        return emptyList<SkipInterval>().also { cache[cacheKey] = it }
+        return mergeByPriority(introDb, animeSkip, aniSkip).also { cache[cacheKey] = it }
+    }
+
+    /**
+     * Merge provider results into one best-of: fill each segment category (opening / ending /
+     * recap) from the highest-priority provider that has it. Arguments MUST be passed in priority
+     * order (IntroDB has the broadest coverage, then Anime-Skip, then AniSkip), so a partial
+     * result from one provider never shadows a complete segment from another.
+     */
+    private fun mergeByPriority(vararg providerResults: List<SkipInterval>): List<SkipInterval> {
+        val chosen = LinkedHashMap<String, SkipInterval>()
+        for (result in providerResults) {
+            for (interval in result) {
+                val category = segmentCategory(interval.type) ?: continue
+                chosen.putIfAbsent(category, interval)
+            }
+        }
+        return chosen.values.toList()
+    }
+
+    private fun segmentCategory(type: String): String? = when (type.lowercase()) {
+        "intro", "op", "mixed-op" -> "opening"
+        "outro", "ed", "mixed-ed", "credits", "ending" -> "ending"
+        "recap" -> "recap"
+        else -> null
+    }
+
+    // AnimeSkip: season-specific AniList ID first, then season-1 as a season-filtered fallback.
+    private suspend fun fetchAnimeSkipForEntries(
+        entries: List<ArmEntry>,
+        season: Int,
+        episode: Int
+    ): List<SkipInterval> {
+        val seasonAnilistId = entries.getOrNull(season - 1)?.anilist?.toString()
+        val fallbackAnilistId = entries.firstOrNull()?.anilist?.toString()
+        for ((anilistId, seasonFilter) in listOfNotNull(
+            seasonAnilistId?.let { it to null },
+            if (fallbackAnilistId != null && fallbackAnilistId != seasonAnilistId) fallbackAnilistId to season else null
+        )) {
+            val result = fetchFromAnimeSkip(anilistId, episode, season = seasonFilter)
+            if (result.isNotEmpty()) return result
+        }
+        return emptyList()
     }
 
     private suspend fun fetchFromIntroDb(imdbId: String, season: Int, episode: Int): List<SkipInterval> {
