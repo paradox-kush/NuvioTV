@@ -1212,7 +1212,7 @@
     <string name="stream_type_torrent">טורנט</string>
     <string name="stream_type_youtube">יוטיוב</string>
     <string name="p2p_consent_title">סטרימינג P2P</string>
-    <string name="p2p_consent_enable">הפעל P2P</string>
+    <string name="p2p_consent_enable">P2P הפעל</string>
     <string name="p2p_consent_cancel">ביטול</string>
     <string name="stream_type_external">חיצוני</string>
     <string name="stream_player_picker_title">איזה נגן להשתמש?</string>
@@ -1756,10 +1756,6 @@
     <string name="cd_nuvio">Nuvio</string>
 
     <string name="debug_signin_success">ההתחברות הצליחה</string>
-    <string name="debug_generate_description">Debug-generated %1$s item #%2$d</string>
-    <string name="debug_generate_result_failed">Failed: %1$s</string>
-    <string name="debug_generate_library_result_added">Added %1$d items to library</string>
-
     <!-- Collection Management -->
     <string name="collections_header">אוספים</string>
     <string name="collections_delete_confirm_title">למחוק אוסף?</string>
@@ -1816,7 +1812,6 @@
     <string name="collections_editor_source">מקור</string>
     <string name="collections_editor_view_mode_tabs">לשוניות</string>
     <string name="collections_editor_view_mode_rows">שורות</string>
-    <string name="collections_editor_view_mode_follow">Follow Home Layout</string>
     <string name="collections_editor_shape_poster">פוסטר</string>
     <string name="collections_editor_shape_wide">רוחב</string>
     <string name="collections_editor_shape_square">מרובע</string>
@@ -1919,15 +1914,6 @@
     <string name="debrid_picker_preferred_resolutions_title">רזולוציות מועדפות</string>
 
     <!-- Debrid: selection count + size range labels -->
-    <string name="debrid_selection_count_any">Any</string>
-    <plurals name="debrid_selection_count_value">
-        <item quantity="one">%d selected</item>
-        <item quantity="other">%d selected</item>
-    </plurals>
-    <string name="debrid_size_range_any">Any</string>
-    <string name="debrid_size_range_up_to">Up to %1$dGB</string>
-    <string name="debrid_size_range_min_plus">%1$dGB+</string>
-    <string name="debrid_size_range_min_max">%1$d-%2$dGB</string>
 
     <!-- Subtitle selection: unknown language fallback -->
     <string name="subtitle_language_unknown">לא ידוע</string>
@@ -1961,7 +1947,6 @@
     <string name="playback_buffer_initial_sub">כמה תוכן יש לאחסן במאגר לפני שההפעלה מתחילה. ערכים נמוכים יותר מתחילים מהר יותר אך עלולים לגרום לגמגום ראשוני בחיבורים איטיים.</string>
     <string name="playback_buffer_back">משך המאגר האחורי</string>
     <string name="playback_cache_auto_size">גודל אוטומטי</string>
-    <string name="playback_cache_vod_size">VOD Cache Size</string>
     <string name="playback_cache_info_range">טווח: %1$d-%2$d MB.</string>
     <string name="playback_reset_to_default">אפס לברירת מחדל</string>
     <string name="playback_net_custom">רשת מותאמת אישית</string>
@@ -1971,8 +1956,6 @@
     <string name="playback_net_chunk_size">גודל מקטע</string>
 
     <!-- Playback diagnostics card -->
-    <string name="diag_last_playback_title">Last Playback Diagnostics</string>
-    <string name="diag_no_data">No playback data yet. Play a stream and return here to see DV decision details for that playback.</string>
     <string name="diag_section_source_hardware">מקור וחומרה</string>
     <string name="diag_section_source_hardware_sub">צלם תמונה של כרטיס זה אם אתה מדווח על בעיה.</string>
     <string name="diag_label_host">מארח</string>
@@ -1981,13 +1964,6 @@
     <string name="diag_label_display">תצוגה</string>
     <string name="diag_label_dv7_decoder">מפענח DV7</string>
     <string name="diag_label_dv_decoder">מפענח DV</string>
-    <string name="diag_label_dv_bridge">DV Bridge</string>
-    <string name="diag_label_bridge_version">Bridge Version</string>
-    <string name="diag_label_bridge_reason">Bridge Reason</string>
-    <string name="diag_section_decision_settings">Decision &amp; Settings</string>
-    <string name="diag_label_dv_mode_requested">DV Mode (requested)</string>
-    <string name="diag_label_dv_mode_effective">DV Mode (effective)</string>
-    <string name="diag_label_auto_decision">AUTO Decision</string>
     <string name="diag_label_source_profile">פרופיל מקור</string>
     <string name="diag_label_conversions">המרות</string>
     <string name="diag_label_signal_rewrites">שכתובי אות</string>
@@ -2001,22 +1977,12 @@
     <string name="diag_value_on">פעיל</string>
     <string name="diag_value_off">כבוי</string>
     <string name="diag_value_conversions_fmt">%1$d מתוך %2$d הצליחו</string>
-    <string name="diag_value_never_rendered">Never rendered</string>
 
     <!-- Player errors -->
-    <string name="player_error_play_stream_failed">Failed to play selected stream</string>
 
     <!-- Size and speed units -->
-    <string name="unit_size_b">%1$d B</string>
-    <string name="unit_size_kb">%1$s KB</string>
-    <string name="unit_size_mb">%1$s MB</string>
-    <string name="unit_size_gb">%1$s GB</string>
-    <string name="unit_speed_b_s">%1$d B/s</string>
-    <string name="unit_speed_kb_s">%1$s KB/s</string>
-    <string name="unit_speed_mb_s">%1$s MB/s</string>
 
     <!-- Misc fallbacks -->
-    <string name="playback_estimated_memory_usage">Estimated memory usage: %1$d / %2$d MB</string>
     <string name="profile_default_name">פרופיל %1$d</string>
     <string name="detail_tmdb_fallback_title">TMDB %1$d</string>
     <string name="collections_editor_tmdb_collection_fallback">TMDB Collection %1$d</string>
