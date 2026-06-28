@@ -159,8 +159,10 @@ internal class ParallelRangeDataSource(
 
         // Check if we can do parallel range requests
         val responseHeaders = probeSource.responseHeaders
-        val acceptsRanges = responseHeaders["Accept-Ranges"]?.any { it.contains("bytes") } == true ||
-                responseHeaders["Content-Range"]?.isNotEmpty() == true
+        val acceptRangesHeader = responseHeaders.entries.firstOrNull { it.key.equals("Accept-Ranges", ignoreCase = true) }?.value
+        val contentRangeHeader = responseHeaders.entries.firstOrNull { it.key.equals("Content-Range", ignoreCase = true) }?.value
+        val acceptsRanges = acceptRangesHeader?.any { it.contains("bytes") } == true ||
+                contentRangeHeader?.isNotEmpty() == true
 
         if (openLength == C.LENGTH_UNSET.toLong() || !acceptsRanges) {
             // Can't determine length or server doesn't support ranges — reuse probe as single connection
