@@ -941,7 +941,7 @@ internal fun PlayerRuntimeController.initializePlayer(
                 // Exception: tunneled playback bypasses the normal video
                 // rendering pipeline so onRenderedFirstFrame() never fires.
                 // In that case we fall back to starting on STATE_READY.
-                playWhenReady = false
+                playWhenReady = !startPaused && !userPausedManually
                 prepare()
 
                 addListener(object : Player.Listener {
