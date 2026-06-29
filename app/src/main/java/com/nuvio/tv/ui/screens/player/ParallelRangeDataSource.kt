@@ -166,6 +166,37 @@ internal class ParallelRangeDataSource(
     private var fallbackSource: OkHttpDataSource? = null
 
     override fun open(dataSpec: DataSpec): Long {
+        val isSubtitle = dataSpec.uri.getQueryParameter("nuvio_type") == "subtitle"
+        if (isSubtitle) {
+            closed.set(false)
+            cancelAllChunks()
+            
+            // Clean the custom query parameter from the subtitle URL before requesting
+            val cleanedUri = dataSpec.uri.buildUpon().clearQuery().let { builder ->
+                dataSpec.uri.queryParameterNames.forEach { name ->
+                    if (name != "nuvio_type") {
+                        dataSpec.uri.getQueryParameters(name).forEach { value ->
+                            builder.appendQueryParameter(name, value)
+                        }
+                    }
+                }
+                builder.build()
+            }
+            val cleanedDataSpec = dataSpec.withUri(cleanedUri)
+            
+            val probeSource = upstreamFactory.createDataSource()
+            transferListeners.forEach { probeSource.addTransferListener(it) }
+            fallbackSource = probeSource
+            val openLength = probeSource.open(cleanedDataSpec)
+            
+            totalFileLength = openLength
+            bytesRemaining = openLength
+            position = dataSpec.position
+            
+            Log.d(TAG, "Subtitle request detected. Bypassing parallel mode for single-connection download: ${cleanedUri.host}")
+            return openLength
+        }
+
         val wasClosed = closed.get()
         val isReopen = !wasClosed && 
                        originalDataSpec != null && 
@@ -281,7 +312,14 @@ internal class ParallelRangeDataSource(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         // Fallback mode: delegate to single upstream
-        fallbackSource?.let { return it.read(buffer, offset, length) }
+        fallbackSource?.let { source ->
+            val read = source.read(buffer, offset, length)
+            if (read > 0) {
+                position += read
+                bytesRemaining = (bytesRemaining - read).coerceAtLeast(0L)
+            }
+            return read
+        }
 
         if (bytesRemaining == 0L) return C.RESULT_END_OF_INPUT
 
@@ -664,6 +702,8 @@ internal class ParallelRangeDataSource(
             val read = source.read(temp, 0, temp.size)
             if (read > 0) {
                 buffer.put(temp, 0, read)
+                position += read
+                bytesRemaining = (bytesRemaining - read).coerceAtLeast(0L)
             }
             return read
         }
