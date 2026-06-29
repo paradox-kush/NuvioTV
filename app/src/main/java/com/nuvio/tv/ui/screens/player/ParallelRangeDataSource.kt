@@ -166,11 +166,14 @@ internal class ParallelRangeDataSource(
     private var fallbackSource: OkHttpDataSource? = null
 
     override fun open(dataSpec: DataSpec): Long {
-        closed.set(false)
-        val isReopen = originalDataSpec != null && 
+        val wasClosed = closed.get()
+        val isReopen = !wasClosed && 
+                       originalDataSpec != null && 
                        originalDataSpec?.uri == dataSpec.uri && 
                        position == dataSpec.position &&
                        totalFileLength != C.LENGTH_UNSET.toLong()
+
+        closed.set(false)
 
         if (isReopen) {
             position = dataSpec.position
