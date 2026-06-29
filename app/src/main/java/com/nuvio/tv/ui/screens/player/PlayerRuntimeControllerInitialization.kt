@@ -480,7 +480,12 @@ internal fun PlayerRuntimeController.initializePlayer(
                             "budgetMb=$budgetMbEffective host=${url.safeHost()}"
                 )
                 effectiveBackBufferDurationMs = backBufferMsAtBuild
-                val allocator = androidx.media3.exoplayer.upstream.DefaultAllocator(true, C.DEFAULT_BUFFER_SEGMENT_SIZE, 64)
+                val allocator = androidx.media3.exoplayer.upstream.DefaultAllocator(
+                    true,
+                    C.DEFAULT_BUFFER_SEGMENT_SIZE,
+                    64,
+                    playerSettings.nuvioPerformanceModeEnabled
+                )
                 BitrateAwareLoadControl(
                     minBufferMs = bufferSettings.minBufferMs,
                     maxBufferMs = bufferSettings.maxBufferMs,

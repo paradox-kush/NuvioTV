@@ -422,17 +422,32 @@ internal class ParallelRangeDataSource(
         val tempArray = readBufferLocal.get()!!
         var totalRead = 0
         try {
+            val byteBufferReader = if (useNativeMemory && ds is androidx.media3.common.ByteBufferDataReader && ds.supportsByteBufferRead()) {
+                ds
+            } else {
+                null
+            }
+
             while (!closed.get()) {
                 if (future.isCancelled) {
                     throw IOException("Chunk download cancelled")
                 }
                 val maxRead = minOf(buffer.byteBuffer.capacity() - totalRead, READ_BUFFER_SIZE)
                 if (maxRead <= 0) break
-                val read = ds.read(tempArray, 0, maxRead)
+
+                val read = if (byteBufferReader != null) {
+                    buffer.byteBuffer.position(totalRead)
+                    byteBufferReader.read(buffer.byteBuffer, maxRead)
+                } else {
+                    val r = ds.read(tempArray, 0, maxRead)
+                    if (r != C.RESULT_END_OF_INPUT) {
+                        buffer.byteBuffer.position(totalRead)
+                        buffer.byteBuffer.put(tempArray, 0, r)
+                    }
+                    r
+                }
+
                 if (read == C.RESULT_END_OF_INPUT) break
-                
-                buffer.byteBuffer.position(totalRead)
-                buffer.byteBuffer.put(tempArray, 0, read)
                 totalRead += read
             }
         } catch (e: Exception) {

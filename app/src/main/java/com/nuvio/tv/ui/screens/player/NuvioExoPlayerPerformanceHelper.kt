@@ -260,7 +260,7 @@ object NuvioExoPlayerPerformanceHelper {
                 .coerceAtMost(Int.MAX_VALUE.toLong())
                 .toInt()
             DefaultLoadControl.Builder()
-                .setAllocator(DefaultAllocator(true, DEFAULT_NUVIO_ALLOCATOR_SEGMENT_SIZE, 64))
+                .setAllocator(DefaultAllocator(true, DEFAULT_NUVIO_ALLOCATOR_SEGMENT_SIZE, 64, enabled))
                 .setTargetBufferBytes(targetBufferBytes)
                 .setBufferDurationsMs(
                     minBufferMs,
