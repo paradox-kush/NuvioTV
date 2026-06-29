@@ -718,7 +718,7 @@ internal fun PlayerRuntimeController.maybeScheduleStallWatchdog() {
 internal fun PlayerRuntimeController.maybeScheduleFirstFrameWatchdog() {
     if (hasRenderedFirstFrame || !currentStreamHasVideoTrack) return
     val player = _exoPlayer ?: return
-    if (player.playbackState != Player.STATE_READY || !player.playWhenReady) return
+    if (player.playbackState != Player.STATE_READY) return
     if (firstFrameWatchdogJob?.isActive == true) return
 
     firstFrameWatchdogJob = scope.launch {
@@ -726,11 +726,16 @@ internal fun PlayerRuntimeController.maybeScheduleFirstFrameWatchdog() {
 
         val livePlayer = _exoPlayer ?: return@launch
         if (hasRenderedFirstFrame) return@launch
-        if (livePlayer.playbackState != Player.STATE_READY || !livePlayer.playWhenReady) return@launch
+        if (livePlayer.playbackState != Player.STATE_READY) return@launch
+
+        if (!livePlayer.playWhenReady && !userPausedManually) {
+            livePlayer.playWhenReady = true
+            livePlayer.play()
+            return@launch
+        }
+        if (!livePlayer.playWhenReady) return@launch
 
         val currentPosition = livePlayer.currentPosition
-        // Manual Convert-to-DV8.1 mode 2 produced no first frame (e.g. black
-        // screen): retry the stream at libdovi mode 1 before other fallbacks.
         if (isManualDv81Mode2ActiveForCurrentPlayback &&
             !dv7Mode1ForcedStreamUrls.contains(currentStreamUrl)
         ) {
