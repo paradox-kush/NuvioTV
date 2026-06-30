@@ -87,10 +87,29 @@ fun AuthQrSignInScreen(
         uiState.qrLoginStatus?.contains("approved", ignoreCase = true) == true
     }
     var onboardingTransitionHandled by remember(isOnboardingMode) { mutableStateOf(false) }
+    var exitRequested by remember { mutableStateOf(false) }
 
-    BackHandler {
+    fun leaveAuthScreen() {
+        exitRequested = true
         viewModel.clearQrLoginSession()
         onBackPress()
+    }
+
+    fun continueFromAuthScreen() {
+        exitRequested = true
+        if (onContinue != null && !isSignedIn) {
+            viewModel.signOut()
+        }
+        viewModel.clearQrLoginSession()
+        if (onContinue != null) {
+            onContinue()
+        } else {
+            onBackPress()
+        }
+    }
+
+    BackHandler {
+        leaveAuthScreen()
     }
 
     DisposableEffect(Unit) {
@@ -99,8 +118,9 @@ fun AuthQrSignInScreen(
         }
     }
 
-    LaunchedEffect(uiState.authState, isSignedIn, uiState.qrLoginCode, uiState.isLoading) {
+    LaunchedEffect(uiState.authState, isSignedIn, uiState.qrLoginCode, uiState.isLoading, exitRequested) {
         if (
+            !exitRequested &&
             uiState.authState !is AuthState.Loading &&
             !isSignedIn &&
             uiState.qrLoginCode.isNullOrBlank() &&
@@ -126,6 +146,7 @@ fun AuthQrSignInScreen(
         if (!isOnboardingMode || onboardingTransitionHandled) return@LaunchedEffect
         if (isSignedIn) {
             onboardingTransitionHandled = true
+            exitRequested = true
             viewModel.clearQrLoginSession()
             onContinue.invoke()
         }
@@ -185,14 +206,10 @@ fun AuthQrSignInScreen(
                     }
                 },
                 onBackOrContinue = {
-                    if (onContinue != null && !isSignedIn) {
-                        viewModel.signOut()
-                    }
-                    viewModel.clearQrLoginSession()
-                    if (onContinue != null) {
-                        onContinue()
+                    if (isOnboardingMode) {
+                        continueFromAuthScreen()
                     } else {
-                        onBackPress()
+                        leaveAuthScreen()
                     }
                 }
             )
