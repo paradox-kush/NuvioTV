@@ -298,11 +298,8 @@ internal class ParallelRangeDataSource(
                         createdAtUptimeMs = SystemClock.uptimeMillis()
                     )
                 )
-                probeSource.close()
-            } else {
-                continuationSource = probeSource
-                continuationEndPositionExclusive = minOf((firstChunkIndex + 1L) * chunkSize, totalFileLength)
             }
+            probeSource.close()
         } else {
             probeSource.close()
         }
