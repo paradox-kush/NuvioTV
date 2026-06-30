@@ -22,9 +22,29 @@ jobs:
         with:
           script: |
             const run = context.payload.workflow_run;
-            const pr = run.pull_requests?.[0];
+            let pr = run.pull_requests?.[0];
+            if (!pr && run.head_sha) {
+              const associatedPulls = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: run.head_sha,
+                per_page: 100
+              });
+              pr = associatedPulls.find((item) => item.state === "open") || associatedPulls[0];
+            }
+            if (!pr && run.head_repository?.owner?.login && run.head_branch) {
+              const head = `${run.head_repository.owner.login}:${run.head_branch}`;
+              const branchPulls = await github.paginate(github.rest.pulls.list, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "open",
+                head,
+                per_page: 100
+              });
+              pr = branchPulls.find((item) => item.head?.sha === run.head_sha) || branchPulls[0];
+            }
             if (!pr) {
-              core.info("No pull request was associated with this workflow run.");
+              core.info(`No pull request was associated with workflow run ${run.id} at ${run.head_sha}.`);
               return;
             }
 
