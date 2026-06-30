@@ -322,6 +322,33 @@ class WatchProgressSyncService @Inject constructor(
         }
     }
 
+    suspend fun syncSnapshotFromRemote(
+        profileId: Int = profileManager.activeProfileId.value
+    ): Result<WatchProgressRemoteSyncResult> = withContext(Dispatchers.IO) {
+        deltaSyncMutex.withLock {
+            try {
+                if (!shouldUseSupabaseWatchProgressSync()) {
+                    Log.d(TAG, "Using Trakt watch progress, skipping watch progress snapshot pull")
+                    return@withLock Result.success(WatchProgressRemoteSyncResult(0, 0, usedSnapshot = false, preservedLocalItems = false))
+                }
+                val cursorBeforeSnapshot = try {
+                    fetchDeltaCursor(profileId)
+                } catch (e: Exception) {
+                    Log.w(TAG, "syncSnapshotFromRemote: delta cursor unavailable, applying snapshot without initialized cursor for profile $profileId", e)
+                    null
+                }
+                val result = pullSnapshotFromRemote(profileId, resetDeltaState = cursorBeforeSnapshot == null)
+                if (cursorBeforeSnapshot != null) {
+                    watchProgressPreferences.setDeltaState(cursorBeforeSnapshot, initialized = true, profileId = profileId)
+                }
+                Result.success(result)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to pull watch progress snapshot from remote", e)
+                Result.failure(e)
+            }
+        }
+    }
+
     private suspend fun syncDeltaFromRemoteLocked(
         profileId: Int
     ): Result<WatchProgressRemoteSyncResult> {
