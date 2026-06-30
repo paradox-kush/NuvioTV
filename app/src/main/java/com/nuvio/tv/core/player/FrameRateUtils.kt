@@ -45,6 +45,55 @@ object FrameRateUtils {
 
     private var originalModeId: Int? = null
 
+    private const val FRAME_RATE_CACHE_SIZE = 64
+    private val frameRateCache = object : LinkedHashMap<String, FrameRateDetection>(FRAME_RATE_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, FrameRateDetection>?): Boolean {
+            return size > FRAME_RATE_CACHE_SIZE
+        }
+    }
+
+    private fun sanitizeHeaders(headers: Map<String, String>?): Map<String, String> {
+        val raw = headers ?: return emptyMap()
+        if (raw.isEmpty()) return emptyMap()
+        val sanitized = LinkedHashMap<String, String>(raw.size)
+        raw.forEach { (key, value) ->
+            val k = key.trim()
+            val v = value.trim()
+            if (k.isNotEmpty() && v.isNotEmpty() && !k.equals("Range", ignoreCase = true)) {
+                sanitized[k] = v
+            }
+        }
+        return sanitized
+    }
+
+    private fun buildCacheKey(url: String, headers: Map<String, String>): String {
+        val sanitized = sanitizeHeaders(headers)
+        if (sanitized.isEmpty()) return url
+        return buildString {
+            append(url)
+            sanitized.toSortedMap(String.CASE_INSENSITIVE_ORDER).forEach { (key, value) ->
+                append('|')
+                append(key)
+                append('=')
+                append(value)
+            }
+        }
+    }
+
+    fun getCachedFrameRate(url: String, headers: Map<String, String>): FrameRateDetection? {
+        val key = buildCacheKey(url, headers)
+        return synchronized(frameRateCache) {
+            frameRateCache[key]
+        }
+    }
+
+    fun cacheFrameRate(url: String, headers: Map<String, String>, detection: FrameRateDetection) {
+        val key = buildCacheKey(url, headers)
+        synchronized(frameRateCache) {
+            frameRateCache[key] = detection
+        }
+    }
+
     data class FrameRateDetection(
         val raw: Float,
         val snapped: Float,
@@ -519,6 +568,13 @@ object FrameRateUtils {
         if (sourceUrl.isBlank()) return false
         if (isLiveStreamUrl(sourceUrl)) return false
         if (isMkvSource(sourceUrl)) return true
+
+        // Custom headers indicate authenticated/premium streams (e.g. RealDebrid).
+        // Skip NextLib probe since its MediaInfoBuilder does not accept headers, preventing 403 errors and delays.
+        val hasCustomHeaders = headers.any { (k, v) -> 
+            v.isNotBlank() && !k.equals("Range", ignoreCase = true)
+        }
+        if (hasCustomHeaders) return false
 
         val scheme = Uri.parse(sourceUrl).scheme?.lowercase(Locale.ROOT)
         return when (scheme) {
