@@ -315,11 +315,13 @@ internal class DolbyVisionMatroskaTransformer(
     }
 
     private fun resolveProfile(codecs: String?, configBytes: ByteArray?): Int? {
-        resolveProfileFromCodecString(codecs)?.let { return it }
-        if (configBytes == null || configBytes.isEmpty()) return null
-        return runCatching {
-            DolbyVisionConfig.parse(ParsableByteArray(configBytes))?.profile
-        }.getOrNull()
+        if (configBytes != null && configBytes.isNotEmpty()) {
+            val parsedProfile = runCatching {
+                DolbyVisionConfig.parse(ParsableByteArray(configBytes))?.profile
+            }.getOrNull()
+            if (parsedProfile != null) return parsedProfile
+        }
+        return resolveProfileFromCodecString(codecs)
     }
 
     private fun resolveProfileFromCodecString(codecs: String?): Int? {
