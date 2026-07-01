@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
     <string name="type_movie">फ़िल्म</string>
     <string name="type_series">सीरीज़</string>
     <string name="type_unknown">अज्ञात</string>
@@ -217,12 +217,12 @@
 
     <!-- SupportersContributorsScreen -->
     <string name="supporters_contributors_title">समर्थक और योगदानकर्ता</string>
-    <string name="supporters_contributors_subtitle">वे लोग जो Nuvio को समर्थन देते हैं और TV व मोबाइल पर इसे बनाने में योगदान करते हैं।</string>
+    <string name="supporters_contributors_subtitle">वे लोग जो Tuvora को समर्थन देते हैं और TV व मोबाइल पर इसे बनाने में योगदान करते हैं।</string>
     <string name="supporters_contributors_supporters_copy">समर्थक और दानकर्ता प्रोजेक्ट को आगे बढ़ाने, इंफ्रास्ट्रक्चर फंड करने और नए फीचर्स के लिए मदद करते हैं।</string>
-    <string name="supporters_contributors_donate_copy">Nuvio हमेशा मुफ्त और ओपन सोर्स रहेगा। यदि आप प्रोजेक्ट का समर्थन करना चाहते हैं, तो आप इसके विकास और इंफ्रास्ट्रक्चर में मदद कर सकते हैं।</string>
-    <string name="supporters_contributors_donate_button">Nuvio को डोनेट करें</string>
+    <string name="supporters_contributors_donate_copy">Tuvora हमेशा मुफ्त और ओपन सोर्स रहेगा। यदि आप प्रोजेक्ट का समर्थन करना चाहते हैं, तो आप इसके विकास और इंफ्रास्ट्रक्चर में मदद कर सकते हैं।</string>
+    <string name="supporters_contributors_donate_button">Tuvora को डोनेट करें</string>
     <string name="supporters_contributors_qr_title">डोनेट करने के लिए स्कैन करें</string>
-    <string name="supporters_contributors_qr_subtitle">अपने फोन पर लिंक खोलें और Ko-fi के माध्यम से Nuvio को सपोर्ट करें।</string>
+    <string name="supporters_contributors_qr_subtitle">अपने फोन पर लिंक खोलें और Ko-fi के माध्यम से Tuvora को सपोर्ट करें।</string>
     <string name="supporters_contributors_qr_hint">QR कोड स्कैन करने के लिए कैमरा इस्तेमाल करें या नीचे दिए बटन का उपयोग करें।</string>
     <string name="supporters_contributors_back_button">डिटेल्स पर वापस जाएँ</string>
     <string name="supporters_tab">समर्थक</string>
@@ -572,7 +572,7 @@
     <string name="trakt_stat_watched_hours">देखे गए घंटे</string>
     <string name="trakt_disconnect">डिस्कनेक्ट</string>
     <string name="trakt_disconnect_title">Trakt डिस्कनेक्ट करें?</string>
-    <string name="trakt_disconnect_subtitle">यह आपके Trakt अकाउंट को Nuvio से डिस्कनेक्ट कर देगा।</string>
+    <string name="trakt_disconnect_subtitle">यह आपके Trakt अकाउंट को Tuvora से डिस्कनेक्ट कर देगा।</string>
     <string name="trakt_login">लॉगिन</string>
     <string name="trakt_retry">फिर से कोशिश करें</string>
     <string name="trakt_back">वापस</string>
@@ -944,7 +944,7 @@
     <string name="catalog_see_all_empty_subtitle">कोई दूसरा कैटलॉग आज़माएँ या बाद में देखें</string>
 
     <!-- LayoutSelectionScreen -->
-    <string name="layout_selection_welcome">Nuvio में आपका स्वागत है</string>
+    <string name="layout_selection_welcome">Tuvora में आपका स्वागत है</string>
     <string name="layout_selection_subtitle">अपना होम स्क्रीन लेआउट चुनें</string>
     <string name="layout_selection_continue">जारी रखें</string>
 

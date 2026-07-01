@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
     <string name="tv_channel_continue_watching">Pokračovat ve sledování</string>
     <string name="type_movie">Film</string>
     <string name="type_movies">Filmy</string>
@@ -100,7 +100,7 @@
     <!-- HomeScreen -->
     <string name="home_no_addons">Nejsou nainstalovány žádné doplňky. Přidejte jeden pro začátek.</string>
     <string name="home_no_catalog_addons">Nejsou nainstalovány žádné katalogové doplňky. Nainstalujte katalogový doplněk pro zobrazení obsahu.</string>
-    <string name="auth_notice_nuvio_logged_out">Byli jste odhlášeni z Nuvio. Přihlaste se prosím znovu.</string>
+    <string name="auth_notice_nuvio_logged_out">Byli jste odhlášeni z Tuvora. Přihlaste se prosím znovu.</string>
     <string name="auth_notice_trakt_logged_out">Byli jste odhlášeni z Trakt. Připojte se prosím znovu.</string>
     <string name="error_generic">Došlo k chybě</string>
 
@@ -414,8 +414,8 @@
 <string name="advanced_section_cache">Mezipaměť</string>
 <string name="advanced_fast_horizontal_navigation">Rychlá horizontální navigace</string>
 <string name="advanced_fast_horizontal_navigation_subtitle">Zvýšit rychlost opakování D-padu v řádcích při zachování omezení opakování.</string>
-<string name="advanced_nuvio_focus_scroll">Nuvio Focus Scrolling</string>
-<string name="advanced_nuvio_focus_scroll_subtitle">Použít vlastní globální animaci a umístění posunu fokusu Nuvio.</string>
+<string name="advanced_nuvio_focus_scroll">Tuvora Focus Scrolling</string>
+<string name="advanced_nuvio_focus_scroll_subtitle">Použít vlastní globální animaci a umístění posunu fokusu Tuvora.</string>
 <string name="advanced_memory_only_vertical_scroll">Vertikální posun pouze v paměti</string>
 <string name="advanced_memory_only_vertical_scroll_subtitle">Přeskočit požadavky na obrázky z disku a sítě při vertikálním posouvání domovských řádků.</string>
 <string name="advanced_compose_highlighter">Compose Highlighter</string>
@@ -453,12 +453,12 @@
 
 <!-- SupportersContributorsScreen -->
 <string name="supporters_contributors_title">Podporovatelé a přispěvatelé</string>
-<string name="supporters_contributors_subtitle">Lidé podporující Nuvio a přispěvatelé, kteří jej budují napříč TV a mobilem.</string>
+<string name="supporters_contributors_subtitle">Lidé podporující Tuvora a přispěvatelé, kteří jej budují napříč TV a mobilem.</string>
 <string name="supporters_contributors_supporters_copy">Podporovatelé a dárci pomáhají udržet projekt v pohybu, financují infrastrukturu a vytvářejí prostor pro ambiciózní funkce.</string>
-<string name="supporters_contributors_donate_copy">Nuvio zůstane zdarma a open source. Pokud chcete projekt podpořit, můžete pomoci pokrýt čas a infrastrukturu za ním.</string>
-<string name="supporters_contributors_donate_button">Přispět Nuvio</string>
+<string name="supporters_contributors_donate_copy">Tuvora zůstane zdarma a open source. Pokud chcete projekt podpořit, můžete pomoci pokrýt čas a infrastrukturu za ním.</string>
+<string name="supporters_contributors_donate_button">Přispět Tuvora</string>
 <string name="supporters_contributors_qr_title">Naskenujte pro darování</string>
-<string name="supporters_contributors_qr_subtitle">Otevřete odkaz na telefonu a podpořte Nuvio přes Ko-fi.</string>
+<string name="supporters_contributors_qr_subtitle">Otevřete odkaz na telefonu a podpořte Tuvora přes Ko-fi.</string>
 <string name="supporters_contributors_qr_hint">Namiřte fotoaparát na QR kód nebo použijte tlačítko níže.</string>
 <string name="supporters_contributors_back_button">Zpět na podrobnosti</string>
 <string name="supporters_tab">Podporovatelé</string>
@@ -472,7 +472,7 @@
 <string name="sponsors_loading">Načítání sponzorů…</string>
 <string name="sponsors_empty">Zatím žádní sponzoři nenalezeni.</string>
 <string name="sponsors_error_title">Nepodařilo se načíst sponzory</string>
-<string name="sponsors_detail_copy">Sponzoři pomáhají posunout Nuvio vpřed podporou napříč různými částmi vývoje.</string>
+<string name="sponsors_detail_copy">Sponzoři pomáhají posunout Tuvora vpřed podporou napříč různými částmi vývoje.</string>
 <string name="sponsors_channel_unavailable">Kanál sponzora nedostupný.</string>
 <string name="sponsors_open_channel">Otevřít kanál sponzora</string>
 <string name="contributors_loading">Načítání GitHub přispěvatelů…</string>
@@ -563,8 +563,8 @@
 <string name="playback_player_ask_desc">Vybrat přehrávač pokaždé</string>
 <string name="playback_player_auto">Auto (Nejlepší pro obsah)</string>
 <string name="playback_player_auto_desc">ExoPlayer pro filmy a seriály · MPV pro anime</string>
-<string name="playback_engine_exoplayer_desc">Nejlepší kompatibilita s aktuálními funkcemi Nuvio.</string>
-<string name="playback_engine_mvplayer_desc">Používá libmpv s OSD ovládacími prvky Nuvio. Experimentální.</string>
+<string name="playback_engine_exoplayer_desc">Nejlepší kompatibilita s aktuálními funkcemi Tuvora.</string>
+<string name="playback_engine_mvplayer_desc">Používá libmpv s OSD ovládacími prvky Tuvora. Experimentální.</string>
 
 <!-- PlaybackAudioSettings -->
 <string name="audio_lang_original">Původní jazyk</string>
@@ -886,21 +886,21 @@
 <string name="trakt_watch_progress_title">Postup sledování</string>
 <string name="trakt_watch_progress_subtitle">Vyberte, který zdroj postupu pohání pokračování a pokračovat ve sledování</string>
 <string name="trakt_watch_progress_dialog_title">Postup sledování</string>
-<string name="trakt_watch_progress_dialog_subtitle">Vyberte, zda má pokračování a pokračovat ve sledování používat Trakt nebo Nuvio Sync, zatímco scrobblování Trakt zůstává aktivní.</string>
+<string name="trakt_watch_progress_dialog_subtitle">Vyberte, zda má pokračování a pokračovat ve sledování používat Trakt nebo Tuvora Sync, zatímco scrobblování Trakt zůstává aktivní.</string>
 <string name="trakt_watch_progress_source_trakt">Trakt</string>
-<string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+<string name="trakt_watch_progress_source_nuvio">Tuvora Sync</string>
 <string name="trakt_library_source_title">Zdroj knihovny</string>
 <string name="trakt_library_source_subtitle">Vyberte, kterou knihovnu použít pro ukládání a prohlížení vaší sbírky</string>
 <string name="trakt_library_source_dialog_title">Zdroj knihovny</string>
 <string name="trakt_library_source_dialog_subtitle">Vyberte, kam ukládat a spravovat položky knihovny</string>
 <string name="trakt_library_source_trakt">Trakt</string>
-<string name="trakt_library_source_nuvio">Nuvio knihovna</string>
+<string name="trakt_library_source_nuvio">Tuvora knihovna</string>
 <string name="trakt_library_source_trakt_selected">Vybrána knihovna Trakt</string>
-<string name="trakt_library_source_nuvio_selected">Vybrána knihovna Nuvio</string>
+<string name="trakt_library_source_nuvio_selected">Vybrána knihovna Tuvora</string>
 <string name="trakt_setting_on">Zapnuto</string>
 <string name="trakt_setting_off">Vypnuto</string>
 <string name="trakt_watch_progress_trakt_selected">Zdroj postupu sledování nastaven na Trakt</string>
-<string name="trakt_watch_progress_nuvio_selected">Zdroj postupu sledování nastaven na Nuvio Sync</string>
+<string name="trakt_watch_progress_nuvio_selected">Zdroj postupu sledování nastaven na Tuvora Sync</string>
 <string name="trakt_continue_watching_window">Okno Pokračovat ve sledování</string>
 <string name="trakt_continue_watching_subtitle">Historie Trakt zvažovaná pro pokračovat ve sledování</string>
 <string name="trakt_unaired_next_up">Nevysílané epizody Další díl</string>
@@ -922,7 +922,7 @@
 <string name="trakt_stat_watched_hours">Zhlédnuté hodiny</string>
 <string name="trakt_disconnect">Odpojit</string>
 <string name="trakt_disconnect_title">Odpojit Trakt?</string>
-<string name="trakt_disconnect_subtitle">Toto odpojí váš účet Trakt od Nuvio.</string>
+<string name="trakt_disconnect_subtitle">Toto odpojí váš účet Trakt od Tuvora.</string>
 <string name="trakt_login">Přihlásit</string>
 <string name="trakt_retry">Opakovat</string>
 <string name="trakt_back">Zpět</string>
@@ -988,7 +988,7 @@
 <string name="profile_addons">doplňky</string>
 <string name="profile_plugins">pluginy</string>
 <string name="profile_choose_avatar">Vybrat avatar</string>
-<string name="profile_custom_avatar_web_panel_note">Vlastní URL avatarů lze konfigurovat z webového panelu Nuvio.</string>
+<string name="profile_custom_avatar_web_panel_note">Vlastní URL avatarů lze konfigurovat z webového panelu Tuvora.</string>
 <string name="profile_avatar_none_selected">Není vybrán žádný avatar</string>
 <string name="profile_avatar_focus_hint">Zaměřte avatara pro zobrazení jeho jména</string>
 <string name="profile_avatar_category_all">Vše</string>
@@ -1031,7 +1031,7 @@
 <string name="profile_pin_overlay_set_support">Tento PIN bude vyžadován před otevřením tohoto profilu.</string>
 <string name="profile_pin_overlay_confirm_support">Zadejte znovu stejné 4 číslice pro dokončení nastavení.</string>
 <string name="profile_pin_overlay_mismatch">PINy se neshodovaly. Zadejte nový PIN znovu.</string>
-<string name="profile_pin_overlay_forgot_hint">Zapomněli jste PIN? Resetujte jej ze svého účtu Nuvio na webu nuvio.</string>
+<string name="profile_pin_overlay_forgot_hint">Zapomněli jste PIN? Resetujte jej ze svého účtu Tuvora na webu nuvio.</string>
 <string name="profile_pin_overlay_back_hint">Stiskněte zpět pro zrušení</string>
 
 <!-- AddonManagerScreen -->
@@ -1091,7 +1091,7 @@
 <string name="stream_type_torrent">Torrent</string>
 <string name="stream_type_youtube">YouTube</string>
 <string name="p2p_consent_title">P2P streamování</string>
-<string name="p2p_consent_body">Tento stream používá technologii peer-to-peer (P2P). Povolením P2P berete na vědomí a souhlasíte, že:\n\n\u2022 Vaše IP adresa bude viditelná pro ostatní peer v síti\n\u2022 Jste výhradně odpovědní za obsah, ke kterému přistupujete\n\u2022 Potvrzujete, že máte zákonné právo streamovat tento obsah ve vaší jurisdikci\n\u2022 Nuvio nehostuje, nedistribuuje ani nekontroluje žádný P2P obsah\n\u2022 Nuvio nenese žádnou odpovědnost za jakékoli právní důsledky vyplývající z vašeho použití P2P streamování\n\nTuto funkci používáte výhradně na vlastní riziko. P2P lze kdykoli zakázat v Nastavení.</string>
+<string name="p2p_consent_body">Tento stream používá technologii peer-to-peer (P2P). Povolením P2P berete na vědomí a souhlasíte, že:\n\n\u2022 Vaše IP adresa bude viditelná pro ostatní peer v síti\n\u2022 Jste výhradně odpovědní za obsah, ke kterému přistupujete\n\u2022 Potvrzujete, že máte zákonné právo streamovat tento obsah ve vaší jurisdikci\n\u2022 Tuvora nehostuje, nedistribuuje ani nekontroluje žádný P2P obsah\n\u2022 Tuvora nenese žádnou odpovědnost za jakékoli právní důsledky vyplývající z vašeho použití P2P streamování\n\nTuto funkci používáte výhradně na vlastní riziko. P2P lze kdykoli zakázat v Nastavení.</string>
 <string name="p2p_consent_enable">Povolit P2P</string>
 <string name="p2p_consent_cancel">Zrušit</string>
 <string name="settings_p2p_title">P2P streamování</string>
@@ -1471,7 +1471,7 @@
 <string name="catalog_see_all_empty_subtitle">Zkuste jiný katalog nebo to zkontrolujte později</string>
 
 <!-- LayoutSelectionScreen -->
-<string name="layout_selection_welcome">Vítejte v Nuvio</string>
+<string name="layout_selection_welcome">Vítejte v Tuvora</string>
 <string name="layout_selection_subtitle">Vyberte rozvržení domovské obrazovky</string>
 <string name="layout_selection_continue">Pokračovat</string>
 
@@ -1484,7 +1484,7 @@
 
 <!-- AccountScreen -->
 <string name="account_title">Účet</string>
-<string name="account_sign_in_description">Přihlaste se k synchronizaci knihovny, postupu sledování, doplňků a pluginů napříč zařízeními. Synchronizace knihovny používá Nuvio Sync, když Trakt není připojen, a postup sledování může používat buď Trakt, nebo Nuvio Sync.</string>
+<string name="account_sign_in_description">Přihlaste se k synchronizaci knihovny, postupu sledování, doplňků a pluginů napříč zařízeními. Synchronizace knihovny používá Tuvora Sync, když Trakt není připojen, a postup sledování může používat buď Trakt, nebo Tuvora Sync.</string>
 <string name="account_sync_code_title">Synchronizační kód</string>
 <string name="account_sync_code_description">Synchronizovat napříč zařízeními bez vytvoření účtu.</string>
 <string name="account_linked_devices">Propojená zařízení (%1$d)</string>
@@ -1688,7 +1688,7 @@
     <string name="cd_preview">Náhled</string>
     <string name="cd_test">Test</string>
     <string name="cd_unlink">Odpojit</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">Tuvora</string>
     <string name="cd_trakt_logo">Logo Trakt</string>
     <string name="cd_trakt_qr">QR kód aktivace Trakt</string>
     <string name="cd_imdb">IMDb</string>
@@ -1699,7 +1699,7 @@
     <string name="cd_expand">Rozbalit %1$s</string>
     <string name="cd_collapse">Sbalit %1$s</string>
     <string name="cd_qr_login">QR přihlašovací kód</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">Tuvora</string>
 
     <!-- Debug -->
     <string name="debug_signin_success">Úspěšně přihlášeno</string>
@@ -1839,7 +1839,7 @@
     <string name="collections_editor_tmdb_list_helper">Příklad: https://www.themoviedb.org/list/8504994 nebo 8504994.</string>
     <string name="collections_editor_tmdb_person_id">ID osoby</string>
     <string name="collections_editor_tmdb_person_helper">Příklad: https://www.themoviedb.org/person/31-tom-hanks nebo 31.</string>
-    <string name="collections_editor_tmdb_title_helper">Zobrazuje se jako název řádku/karty. Pokud je prázdné, Nuvio jej vytvoří ze zdroje.</string>
+    <string name="collections_editor_tmdb_title_helper">Zobrazuje se jako název řádku/karty. Pokud je prázdné, Tuvora jej vytvoří ze zdroje.</string>
     <string name="collections_editor_tmdb_quick_genres">Rychlé žánry</string>
     <string name="collections_editor_tmdb_quick_languages">Rychlé jazyky</string>
     <string name="collections_editor_tmdb_quick_countries">Rychlé země</string>

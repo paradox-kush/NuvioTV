@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
     <string name="tv_channel_continue_watching">继续观看</string>
     <string name="type_movie">电影</string>
     <string name="type_movies">电影</string>
@@ -98,7 +98,7 @@
 
     <string name="home_no_addons">未安装扩展。请添加一个以开始使用。</string>
     <string name="home_no_catalog_addons">未安装目录扩展。请安装目录扩展以浏览内容。</string>
-    <string name="auth_notice_nuvio_logged_out">您已登出 Nuvio。请重新登录。</string>
+    <string name="auth_notice_nuvio_logged_out">您已登出 Tuvora。请重新登录。</string>
     <string name="auth_notice_trakt_logged_out">您已登出 Trakt。请重新连接。</string>
     <string name="error_generic">出错了</string>
 
@@ -388,7 +388,7 @@
     <string name="settings_advanced_subtitle">性能、导航、缓存与诊断</string>
     <string name="experience_mode_essential">基础模式</string>
     <string name="experience_mode_advanced">高级模式</string>
-    <string name="experience_mode_choose_title">选择您的 Nuvio 使用体验</string>
+    <string name="experience_mode_choose_title">选择您的 Tuvora 使用体验</string>
     <string name="experience_mode_choose_subtitle">从简洁开始或解锁所有自定义选项。您随时可以切换。</string>
     <string name="experience_mode_essential_card_subtitle">专注于设置、扩展、播放基础、Trakt 和账户设置。</string>
     <string name="experience_mode_advanced_card_subtitle">完整设置、布局控制、目录顺序、收藏、插件和诊断。</string>
@@ -470,8 +470,8 @@
     <string name="advanced_section_dv_diagnostics" translatable="false">DV Diagnostics</string>
     <string name="advanced_fast_horizontal_navigation">快速水平导航</string>
     <string name="advanced_fast_horizontal_navigation_subtitle">提高 D-pad 在行内的重复速度，同时保留重复节流功能。</string>
-    <string name="advanced_nuvio_focus_scroll">Nuvio 焦点滚动</string>
-    <string name="advanced_nuvio_focus_scroll_subtitle">使用 Nuvio 的自定义全局焦点滚动动画和定位。</string>
+    <string name="advanced_nuvio_focus_scroll">Tuvora 焦点滚动</string>
+    <string name="advanced_nuvio_focus_scroll_subtitle">使用 Tuvora 的自定义全局焦点滚动动画和定位。</string>
     <string name="advanced_memory_only_vertical_scroll">仅内存垂直滚动</string>
     <string name="advanced_memory_only_vertical_scroll_subtitle">在垂直滚动首页行时跳过磁盘和网络的图片请求。</string>
     <string name="advanced_compose_highlighter">Compose 高亮器</string>
@@ -508,12 +508,12 @@
     <string name="action_close">关闭</string>
 
     <string name="supporters_contributors_title">支持者与贡献者</string>
-    <string name="supporters_contributors_subtitle">支持 Nuvio 的人们，以及在电视和移动设备上共同构建的贡献者。</string>
+    <string name="supporters_contributors_subtitle">支持 Tuvora 的人们，以及在电视和移动设备上共同构建的贡献者。</string>
     <string name="supporters_contributors_supporters_copy">支持者和捐赠者帮助项目持续推进，资助基础设施，并为雄心勃勃的功能创造空间。</string>
-    <string name="supporters_contributors_donate_copy">Nuvio 将保持免费和开源。如果您想支持项目，可以帮助支付其背后的时间和基础设施费用。</string>
-    <string name="supporters_contributors_donate_button">赞助 Nuvio</string>
+    <string name="supporters_contributors_donate_copy">Tuvora 将保持免费和开源。如果您想支持项目，可以帮助支付其背后的时间和基础设施费用。</string>
+    <string name="supporters_contributors_donate_button">赞助 Tuvora</string>
     <string name="supporters_contributors_qr_title">扫描以赞助</string>
-    <string name="supporters_contributors_qr_subtitle">在手机上打开链接，通过 Ko-fi 支持 Nuvio。</string>
+    <string name="supporters_contributors_qr_subtitle">在手机上打开链接，通过 Ko-fi 支持 Tuvora。</string>
     <string name="supporters_contributors_qr_hint">将相机对准 QR 码或使用下方的按钮。</string>
     <string name="supporters_contributors_back_button">返回详情</string>
     <string name="supporters_tab">支持者</string>
@@ -527,7 +527,7 @@
     <string name="sponsors_loading">正在加载赞助商…</string>
     <string name="sponsors_empty">尚未找到赞助商。</string>
     <string name="sponsors_error_title">无法加载赞助商</string>
-    <string name="sponsors_detail_copy">赞助商通过支持开发的各个方面来帮助 Nuvio 前进。</string>
+    <string name="sponsors_detail_copy">赞助商通过支持开发的各个方面来帮助 Tuvora 前进。</string>
     <string name="sponsors_channel_unavailable">赞助商频道不可用。</string>
     <string name="sponsors_open_channel">打开赞助商频道</string>
     <string name="contributors_loading">正在加载 GitHub 贡献者…</string>
@@ -599,8 +599,8 @@
     <string name="playback_player_ask_desc">每次都选择播放器</string>
     <string name="playback_player_auto">自动 (最适合内容)</string>
     <string name="playback_player_auto_desc">电影与电视剧使用 ExoPlayer · 动画使用 MPV</string>
-    <string name="playback_engine_exoplayer_desc">与目前 Nuvio 功能兼容性最佳。</string>
-    <string name="playback_engine_mvplayer_desc">使用带有 Nuvio OSD 控制的 libmpv。实验性功能。</string>
+    <string name="playback_engine_exoplayer_desc">与目前 Tuvora 功能兼容性最佳。</string>
+    <string name="playback_engine_mvplayer_desc">使用带有 Tuvora OSD 控制的 libmpv。实验性功能。</string>
 
     <string name="video_section">视频</string>
     <string name="audio_trailer_section">预告片</string>
@@ -959,7 +959,7 @@
     <string name="debrid_disconnect">断开连接</string>
     <string name="debrid_device_auth_connected">%1$s 已在此设备上连接。</string>
     <string name="debrid_device_auth_starting">正在启动安全登录…</string>
-    <string name="debrid_device_auth_instructions">扫描 QR 码并输入此代码以批准 Nuvio。</string>
+    <string name="debrid_device_auth_instructions">扫描 QR 码并输入此代码以批准 Tuvora。</string>
     <string name="debrid_device_auth_code_copied">代码已复制。</string>
     <string name="debrid_device_auth_waiting">正在等待批准…</string>
     <string name="debrid_device_auth_failed">无法启动登录。</string>
@@ -1151,21 +1151,21 @@
     <string name="trakt_watch_progress_title">观看进度</string>
     <string name="trakt_watch_progress_subtitle">选择哪个进度来源提供继续播放和继续观看功能</string>
     <string name="trakt_watch_progress_dialog_title">观看进度</string>
-    <string name="trakt_watch_progress_dialog_subtitle">选择继续播放和继续观看应使用 Trakt 还是 Nuvio Sync，同时 Trakt 记录保持启用。</string>
+    <string name="trakt_watch_progress_dialog_subtitle">选择继续播放和继续观看应使用 Trakt 还是 Tuvora Sync，同时 Trakt 记录保持启用。</string>
     <string name="trakt_watch_progress_source_trakt">Trakt</string>
-    <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+    <string name="trakt_watch_progress_source_nuvio">Tuvora Sync</string>
     <string name="trakt_library_source_title">媒体库来源</string>
     <string name="trakt_library_source_subtitle">选择用于存储和查看收藏的媒体库</string>
     <string name="trakt_library_source_dialog_title">媒体库来源</string>
     <string name="trakt_library_source_dialog_subtitle">选择存储和管理媒体库项目的位置</string>
     <string name="trakt_library_source_trakt">Trakt</string>
-    <string name="trakt_library_source_nuvio">Nuvio 媒体库</string>
+    <string name="trakt_library_source_nuvio">Tuvora 媒体库</string>
     <string name="trakt_library_source_trakt_selected">已选择 Trakt 媒体库</string>
-    <string name="trakt_library_source_nuvio_selected">已选择 Nuvio 媒体库</string>
+    <string name="trakt_library_source_nuvio_selected">已选择 Tuvora 媒体库</string>
     <string name="trakt_setting_on">开启</string>
     <string name="trakt_setting_off">关闭</string>
     <string name="trakt_watch_progress_trakt_selected">观看进度来源设为 Trakt</string>
-    <string name="trakt_watch_progress_nuvio_selected">观看进度来源设为 Nuvio Sync</string>
+    <string name="trakt_watch_progress_nuvio_selected">观看进度来源设为 Tuvora Sync</string>
     <string name="trakt_continue_watching_window">继续观看范围</string>
     <string name="trakt_continue_watching_subtitle">纳入继续观看的 Trakt 历史记录</string>
     <string name="trakt_unaired_next_up">未播出的下一集</string>
@@ -1193,7 +1193,7 @@
     <string name="trakt_stat_watched_hours">观看小时数</string>
     <string name="trakt_disconnect">断开连接</string>
     <string name="trakt_disconnect_title">断开 Trakt 连接？</string>
-    <string name="trakt_disconnect_subtitle">这将断开您的 Trakt 账户与 Nuvio 的连接。</string>
+    <string name="trakt_disconnect_subtitle">这将断开您的 Trakt 账户与 Tuvora 的连接。</string>
     <string name="trakt_login">登录</string>
     <string name="trakt_retry">重试</string>
     <string name="trakt_back">返回</string>
@@ -1259,7 +1259,7 @@
     <string name="profile_addons">扩展</string>
     <string name="profile_plugins">插件</string>
     <string name="profile_choose_avatar">选择头像</string>
-    <string name="profile_custom_avatar_web_panel_note">自定义头像网址可从 Nuvio 网页面板配置。</string>
+    <string name="profile_custom_avatar_web_panel_note">自定义头像网址可从 Tuvora 网页面板配置。</string>
     <string name="profile_avatar_none_selected">未选择头像</string>
     <string name="profile_avatar_focus_hint">聚焦头像以查看其名称</string>
     <string name="profile_avatar_category_all">全部</string>
@@ -1302,7 +1302,7 @@
     <string name="profile_pin_overlay_set_support">打开此个人资料前将需要此 PIN。</string>
     <string name="profile_pin_overlay_confirm_support">重新输入相同的 4 位数字以完成设置。</string>
     <string name="profile_pin_overlay_mismatch">PIN 码不匹配。请重新输入新的 PIN。</string>
-    <string name="profile_pin_overlay_forgot_hint">忘记 PIN？请从 nuvio 网站上的 Nuvio 账户重置。</string>
+    <string name="profile_pin_overlay_forgot_hint">忘记 PIN？请从 nuvio 网站上的 Tuvora 账户重置。</string>
     <string name="profile_pin_overlay_back_hint">按返回键取消</string>
 
 
@@ -1379,7 +1379,7 @@
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">P2P 流</string>
-    <string name="p2p_consent_body">此流使用点对点 (P2P) 技术。启用 P2P 即表示您知悉并同意：\n\n\u2022 您的 IP 地址将对网络中的其他对等节点可见\n\u2022 您对所访问的内容负全部责任\n\u2022 您确认在您的司法管辖区内拥有流式传输此内容的合法权利\n\u2022 Nuvio 不托管、分发或控制任何 P2P 内容\n\u2022 Nuvio 对您因使用 P2P 流而产生的任何法律后果不承担任何责任\n\n您完全自行承担使用此功能的风险。P2P 可随时在设置中禁用。</string>
+    <string name="p2p_consent_body">此流使用点对点 (P2P) 技术。启用 P2P 即表示您知悉并同意：\n\n\u2022 您的 IP 地址将对网络中的其他对等节点可见\n\u2022 您对所访问的内容负全部责任\n\u2022 您确认在您的司法管辖区内拥有流式传输此内容的合法权利\n\u2022 Tuvora 不托管、分发或控制任何 P2P 内容\n\u2022 Tuvora 对您因使用 P2P 流而产生的任何法律后果不承担任何责任\n\n您完全自行承担使用此功能的风险。P2P 可随时在设置中禁用。</string>
     <string name="p2p_consent_enable">启用 P2P</string>
     <string name="p2p_consent_cancel">取消</string>
     <string name="settings_p2p_title">P2P 流</string>
@@ -1833,7 +1833,7 @@
     <string name="catalog_see_all_empty_title">没有可用的项目</string>
     <string name="catalog_see_all_empty_subtitle">请尝试其他目录或稍后再查看</string>
 
-    <string name="layout_selection_welcome">欢迎使用 Nuvio</string>
+    <string name="layout_selection_welcome">欢迎使用 Tuvora</string>
     <string name="layout_selection_subtitle">选择您的首页画面布局</string>
     <string name="layout_selection_continue">继续</string>
 
@@ -1844,7 +1844,7 @@
     <string name="update_unknown_sources">允许从未知来源安装以继续。</string>
     <!-- AccountScreen -->
     <string name="account_title">账户</string>
-    <string name="account_sign_in_description">登录以在设备间同步您的媒体库、观看进度、扩展和插件。当 Trakt 未连接时，媒体库同步使用 Nuvio Sync，观看进度可使用 Trakt 或 Nuvio Sync。</string>
+    <string name="account_sign_in_description">登录以在设备间同步您的媒体库、观看进度、扩展和插件。当 Trakt 未连接时，媒体库同步使用 Tuvora Sync，观看进度可使用 Trakt 或 Tuvora Sync。</string>
     <string name="account_sync_code_title">同步码</string>
     <string name="account_sync_code_description">无需创建账户即可跨设备同步。</string>
     <string name="account_linked_devices">已链接的设备 (%1$d)</string>
@@ -2011,7 +2011,7 @@
     <string name="cd_preview">预览</string>
     <string name="cd_test">测试</string>
     <string name="cd_unlink">取消链接</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">Tuvora</string>
     <string name="cd_trakt_logo">Trakt 标志</string>
     <string name="cd_trakt_qr">Trakt 启用 QR</string>
     <string name="cd_imdb">IMDb</string>
@@ -2022,7 +2022,7 @@
     <string name="cd_expand">展开 %1$s</string>
     <string name="cd_collapse">折叠 %1$s</string>
     <string name="cd_qr_login">QR 码登录</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">Tuvora</string>
 
     <string name="debug_signin_success">登录成功</string>
     <string name="debug_generate_description">调试生成的 %1$s 项目 #%2$d</string>
@@ -2164,7 +2164,7 @@
     <string name="collections_editor_tmdb_list_helper">示例：https://www.themoviedb.org/list/8504994 或 8504994。</string>
     <string name="collections_editor_tmdb_person_id">人物 ID</string>
     <string name="collections_editor_tmdb_person_helper">示例：https://www.themoviedb.org/person/31-tom-hanks 或 31。</string>
-    <string name="collections_editor_tmdb_title_helper">显示为行/标签名称。若留空，Nuvio 会从来源自动创建。</string>
+    <string name="collections_editor_tmdb_title_helper">显示为行/标签名称。若留空，Tuvora 会从来源自动创建。</string>
     <string name="collections_editor_tmdb_quick_genres">快速类型</string>
     <string name="collections_editor_tmdb_quick_languages">快速语言</string>
     <string name="collections_editor_tmdb_quick_countries">快速国家</string>
@@ -2337,7 +2337,7 @@
     <string name="autoplay_regex_preset_no_remux_hdr">无 REMUX/HDR</string>
 
     <!-- 播放设置区段 -->
-    <string name="playback_player_internal_desc">使用 NuvioTV 的内置播放器</string>
+    <string name="playback_player_internal_desc">使用 Tuvora 的内置播放器</string>
 
     <!-- 播放器运行时：torrent 覆盖层 + 音轨 -->
     <string name="player_torrent_peer_info">%1$d 个种子 · %2$d 个对等节点</string>

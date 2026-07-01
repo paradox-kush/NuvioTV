@@ -88,8 +88,21 @@ object ThemeColors {
         backgroundCard = NuvioPrimitives.neutral850
     )
 
+    val Marigold = ThemeColorPalette(
+        secondary = NuvioPrimitives.marigoldAccent,
+        secondaryVariant = NuvioPrimitives.marigoldAccentVariant,
+        onSecondary = NuvioPrimitives.marigoldInk,
+        onSecondaryVariant = NuvioPrimitives.marigoldInk,
+        focusRing = NuvioPrimitives.marigoldAccent,
+        focusBackground = Color(0xFF3D2E0A),
+        background = NuvioPrimitives.marigoldInk,
+        backgroundElevated = Color(0xFF1A1712),
+        backgroundCard = Color(0xFF201C14)
+    )
+
     fun getColorPalette(theme: AppTheme): ThemeColorPalette {
         return when (theme) {
+            AppTheme.MARIGOLD -> Marigold
             AppTheme.CRIMSON -> Crimson
             AppTheme.OCEAN -> Ocean
             AppTheme.VIOLET -> Violet

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
     <string name="tv_channel_continue_watching">Продовжити перегляд</string>
     <string name="type_movie">Фільм</string>
     <string name="type_movies">Фільми</string>
@@ -99,7 +99,7 @@
 
     <string name="home_no_addons">Немає встановлених адонів. Додайте один для початку.</string>
     <string name="home_no_catalog_addons">Немає встановлених адонів каталогу. Встановіть адон каталогу, щоб побачити контент.</string>
-    <string name="auth_notice_nuvio_logged_out">Ви вийшли з системи Nuvio. Будь ласка, увійдіть знову.</string>
+    <string name="auth_notice_nuvio_logged_out">Ви вийшли з системи Tuvora. Будь ласка, увійдіть знову.</string>
     <string name="auth_notice_trakt_logged_out">Ви вийшли з системи Trakt. Будь ласка, підключіться знову.</string>
     <string name="error_generic">Сталася помилка</string>
 
@@ -387,7 +387,7 @@
     <string name="settings_advanced_subtitle">Запуск діагностики швидкості мережі</string>
     <string name="experience_mode_essential">Базовий</string>
     <string name="experience_mode_advanced">Розширений</string>
-    <string name="experience_mode_choose_title">Оберіть свій режим Nuvio</string>
+    <string name="experience_mode_choose_title">Оберіть свій режим Tuvora</string>
     <string name="experience_mode_choose_subtitle">Почніть з простого або розблокуйте всі налаштування. Можна змінювати в будь-який час.</string>
     <string name="experience_mode_essential_card_subtitle">Спрощене налаштування: адони, базове відтворення, Trakt та акаунт.</string>
     <string name="experience_mode_advanced_card_subtitle">Повні налаштування: інтерфейс, порядок каталогів, колекції, плагіни та діагностика.</string>
@@ -469,8 +469,8 @@
     <string name="advanced_section_dv_diagnostics" translatable="false">DV Diagnostics</string>
     <string name="advanced_fast_horizontal_navigation">Швидка горизонтальна навігація</string>
     <string name="advanced_fast_horizontal_navigation_subtitle">Збільшити швидкість повторення D-pad у рядках зі збереженням дроселювання повторень.</string>
-    <string name="advanced_nuvio_focus_scroll">Прокручування фокусу Nuvio</string>
-    <string name="advanced_nuvio_focus_scroll_subtitle">Використовувати власну глобальну анімацію прокручування та позиціонування фокусу Nuvio.</string>
+    <string name="advanced_nuvio_focus_scroll">Прокручування фокусу Tuvora</string>
+    <string name="advanced_nuvio_focus_scroll_subtitle">Використовувати власну глобальну анімацію прокручування та позиціонування фокусу Tuvora.</string>
     <string name="advanced_memory_only_vertical_scroll">Вертикальне прокручування тільки з пам\'яті</string>
     <string name="advanced_memory_only_vertical_scroll_subtitle">Пропускати запити зображень з диска та мережі при вертикальному прокручуванні рядків головного екрана.</string>
     <string name="advanced_compose_highlighter">Підсвічування Compose</string>
@@ -507,12 +507,12 @@
     <string name="action_close">Закрити</string>
 
     <string name="supporters_contributors_title">Спонсори та учасники</string>
-    <string name="supporters_contributors_subtitle">Люди, які підтримують Nuvio, та контриб\'ютори, які створюють його для ТВ і мобільних пристроїв.</string>
+    <string name="supporters_contributors_subtitle">Люди, які підтримують Tuvora, та контриб\'ютори, які створюють його для ТВ і мобільних пристроїв.</string>
     <string name="supporters_contributors_supporters_copy">Спонсори та донатери допомагають проєкту рухатися вперед, фінансувати інфраструктуру та реалізовувати амбітні функції.</string>
-    <string name="supporters_contributors_donate_copy">Nuvio завжди буде безкоштовним і відкритим. Якщо ви хочете підтримати проєкт, ви можете допомогти покрити витрати на час та інфраструктуру.</string>
-    <string name="supporters_contributors_donate_button">Підтримати Nuvio</string>
+    <string name="supporters_contributors_donate_copy">Tuvora завжди буде безкоштовним і відкритим. Якщо ви хочете підтримати проєкт, ви можете допомогти покрити витрати на час та інфраструктуру.</string>
+    <string name="supporters_contributors_donate_button">Підтримати Tuvora</string>
     <string name="supporters_contributors_qr_title">Відскануйте для пожертви</string>
-    <string name="supporters_contributors_qr_subtitle">Відкрийте посилання на телефоні та підтримайте Nuvio через Ko-fi.</string>
+    <string name="supporters_contributors_qr_subtitle">Відкрийте посилання на телефоні та підтримайте Tuvora через Ko-fi.</string>
     <string name="supporters_contributors_qr_hint">Наведіть камеру на QR-код або використайте кнопку нижче.</string>
     <string name="supporters_contributors_back_button">Назад до деталей</string>
     <string name="supporters_tab">Спонсори</string>
@@ -526,7 +526,7 @@
     <string name="sponsors_loading">Завантаження спонсорів…</string>
     <string name="sponsors_empty">Поки що немає спонсорів.</string>
     <string name="sponsors_error_title">Не вдалося завантажити спонсорів</string>
-    <string name="sponsors_detail_copy">Спонсори допомагають розвивати Nuvio через підтримку різних аспектів розробки.</string>
+    <string name="sponsors_detail_copy">Спонсори допомагають розвивати Tuvora через підтримку різних аспектів розробки.</string>
     <string name="sponsors_channel_unavailable">Канал спонсора недоступний.</string>
     <string name="sponsors_open_channel">Відкрити канал спонсора</string>
     <string name="contributors_loading">Завантаження учасників GitHub…</string>
@@ -598,8 +598,8 @@
     <string name="playback_player_ask_desc">Обирати плеєр щоразу</string>
     <string name="playback_player_auto">Авто (Найкраще для контенту)</string>
     <string name="playback_player_auto_desc">ExoPlayer для фільмів та серіалів · MPV для аніме</string>
-    <string name="playback_engine_exoplayer_desc">Найкраща сумісність з поточними функціями Nuvio.</string>
-    <string name="playback_engine_mvplayer_desc">Використовує libmpv з інтерфейсом керування Nuvio. Експериментальний.</string>
+    <string name="playback_engine_exoplayer_desc">Найкраща сумісність з поточними функціями Tuvora.</string>
+    <string name="playback_engine_mvplayer_desc">Використовує libmpv з інтерфейсом керування Tuvora. Експериментальний.</string>
 
     <string name="video_section">Відео</string>
     <string name="audio_trailer_section">Трейлер</string>
@@ -954,7 +954,7 @@
     <string name="debrid_disconnect">Відключити</string>
     <string name="debrid_device_auth_connected">%1$s підключено на цьому пристрої.</string>
     <string name="debrid_device_auth_starting">Запуск безпечного входу...</string>
-    <string name="debrid_device_auth_instructions">Відскануйте QR та введіть цей код для підтвердження Nuvio.</string>
+    <string name="debrid_device_auth_instructions">Відскануйте QR та введіть цей код для підтвердження Tuvora.</string>
     <string name="debrid_device_auth_code_copied">Код скопійовано.</string>
     <string name="debrid_device_auth_waiting">Очікування підтвердження...</string>
     <string name="debrid_device_auth_failed">Не вдалося запустити вхід.</string>
@@ -1143,21 +1143,21 @@
     <string name="trakt_watch_progress_title">Прогрес перегляду</string>
     <string name="trakt_watch_progress_subtitle">Оберіть джерело прогресу для продовження перегляду</string>
     <string name="trakt_watch_progress_dialog_title">Прогрес перегляду</string>
-    <string name="trakt_watch_progress_dialog_subtitle">Оберіть, чи повинен розділ «Продовжити перегляд» використовувати Trakt або Nuvio Sync (скроблінг у Trakt залишиться активним).</string>
+    <string name="trakt_watch_progress_dialog_subtitle">Оберіть, чи повинен розділ «Продовжити перегляд» використовувати Trakt або Tuvora Sync (скроблінг у Trakt залишиться активним).</string>
     <string name="trakt_watch_progress_source_trakt">Trakt</string>
-    <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+    <string name="trakt_watch_progress_source_nuvio">Tuvora Sync</string>
     <string name="trakt_library_source_title">Джерело бібліотеки</string>
     <string name="trakt_library_source_subtitle">Оберіть бібліотеку для збереження та перегляду колекції</string>
     <string name="trakt_library_source_dialog_title">Джерело бібліотеки</string>
     <string name="trakt_library_source_dialog_subtitle">Оберіть, де зберігати та керувати елементами бібліотеки</string>
     <string name="trakt_library_source_trakt">Trakt</string>
-    <string name="trakt_library_source_nuvio">Бібліотека Nuvio</string>
+    <string name="trakt_library_source_nuvio">Бібліотека Tuvora</string>
     <string name="trakt_library_source_trakt_selected">Обрано бібліотеку Trakt</string>
-    <string name="trakt_library_source_nuvio_selected">Обрано бібліотеку Nuvio</string>
+    <string name="trakt_library_source_nuvio_selected">Обрано бібліотеку Tuvora</string>
     <string name="trakt_setting_on">Увімк</string>
     <string name="trakt_setting_off">Вимк</string>
     <string name="trakt_watch_progress_trakt_selected">Джерело прогресу перегляду встановлено на Trakt</string>
-    <string name="trakt_watch_progress_nuvio_selected">Джерело прогресу перегляду встановлено на Nuvio Sync</string>
+    <string name="trakt_watch_progress_nuvio_selected">Джерело прогресу перегляду встановлено на Tuvora Sync</string>
     <string name="trakt_continue_watching_window">Вікно «Продовжити перегляд»</string>
     <string name="trakt_continue_watching_subtitle">Історія Trakt, що враховується для розділу «Продовжити перегляд»</string>
     <string name="trakt_unaired_next_up">Невипущені епізоди «На черзі»</string>
@@ -1185,7 +1185,7 @@
     <string name="trakt_stat_watched_hours">Годин переглянуто</string>
     <string name="trakt_disconnect">Відключити</string>
     <string name="trakt_disconnect_title">Відключити Trakt?</string>
-    <string name="trakt_disconnect_subtitle">Це відключить ваш акаунт Trakt від Nuvio.</string>
+    <string name="trakt_disconnect_subtitle">Це відключить ваш акаунт Trakt від Tuvora.</string>
     <string name="trakt_login">Увійти</string>
     <string name="trakt_retry">Повторити</string>
     <string name="trakt_back">Назад</string>
@@ -1251,7 +1251,7 @@
     <string name="profile_addons">адони</string>
     <string name="profile_plugins">плагіни</string>
     <string name="profile_choose_avatar">Обрати аватар</string>
-    <string name="profile_custom_avatar_web_panel_note">Користувацькі URL аватарів можна налаштувати у веб-панелі Nuvio.</string>
+    <string name="profile_custom_avatar_web_panel_note">Користувацькі URL аватарів можна налаштувати у веб-панелі Tuvora.</string>
     <string name="profile_avatar_none_selected">Аватар не обрано</string>
     <string name="profile_avatar_focus_hint">Сфокусуйтесь на аватарі, щоб побачити його назву</string>
     <string name="profile_avatar_category_all">Всі</string>
@@ -1294,7 +1294,7 @@
     <string name="profile_pin_overlay_set_support">Цей PIN-код запитуватиметься перед відкриттям цього профілю.</string>
     <string name="profile_pin_overlay_confirm_support">Введіть ті самі 4 цифри ще раз для завершення налаштування.</string>
     <string name="profile_pin_overlay_mismatch">PIN-коди не збіглися. Введіть новий PIN-код ще раз.</string>
-    <string name="profile_pin_overlay_forgot_hint">Забули PIN? Скиньте його у вашому акаунті Nuvio на веб-сайті Nuvio.</string>
+    <string name="profile_pin_overlay_forgot_hint">Забули PIN? Скиньте його у вашому акаунті Tuvora на веб-сайті Tuvora.</string>
     <string name="profile_pin_overlay_back_hint">Натисніть «Назад» для скасування</string>
 
 
@@ -1371,7 +1371,7 @@
     <string name="stream_type_torrent">Торент</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">P2P Стримінг</string>
-    <string name="p2p_consent_body">Цей потік використовує технологію P2P. Вмикаючи P2P, ви визнаєте та погоджуєтесь з тим, що:\n\n\u2022 Ваша IP-адреса буде видима іншим учасникам мережі\n\u2022 Ви несете повну відповідальність за контент, до якого звертаєтесь\n\u2022 Ви підтверджуєте законність стримінгу у вашій юрисдикції\n\u2022 Nuvio не розміщує, не розповсюджує та не контролює P2P-контент\n\u2022 Nuvio не несе відповідальності за юридичні наслідки\n\nВи використовуєте цю функцію на власний ризик. P2P можна вимкнути в Налаштуваннях.</string>
+    <string name="p2p_consent_body">Цей потік використовує технологію P2P. Вмикаючи P2P, ви визнаєте та погоджуєтесь з тим, що:\n\n\u2022 Ваша IP-адреса буде видима іншим учасникам мережі\n\u2022 Ви несете повну відповідальність за контент, до якого звертаєтесь\n\u2022 Ви підтверджуєте законність стримінгу у вашій юрисдикції\n\u2022 Tuvora не розміщує, не розповсюджує та не контролює P2P-контент\n\u2022 Tuvora не несе відповідальності за юридичні наслідки\n\nВи використовуєте цю функцію на власний ризик. P2P можна вимкнути в Налаштуваннях.</string>
     <string name="p2p_consent_enable">Увімкнути P2P</string>
     <string name="p2p_consent_cancel">Скасувати</string>
     <string name="settings_p2p_title">P2P Стримінг</string>
@@ -1825,7 +1825,7 @@
     <string name="catalog_see_all_empty_title">Немає доступних елементів</string>
     <string name="catalog_see_all_empty_subtitle">Спробуйте інший каталог або зайдіть пізніше</string>
 
-    <string name="layout_selection_welcome">Ласкаво просимо до Nuvio</string>
+    <string name="layout_selection_welcome">Ласкаво просимо до Tuvora</string>
     <string name="layout_selection_subtitle">Оберіть макет вашого головного екрана</string>
     <string name="layout_selection_continue">Продовжити</string>
 
@@ -1836,7 +1836,7 @@
     <string name="update_unknown_sources">Дозвольте встановлення з невідомих джерел для продовження.</string>
     <!-- AccountScreen -->
     <string name="account_title">Акаунт</string>
-    <string name="account_sign_in_description">Увійдіть, щоб синхронізувати вашу бібліотеку, прогрес, адони та плагіни між пристроями. Синхронізація бібліотеки використовує Nuvio Sync, коли Trakt не підключено, а для прогресу перегляду можна використовувати Trakt або Nuvio Sync.</string>
+    <string name="account_sign_in_description">Увійдіть, щоб синхронізувати вашу бібліотеку, прогрес, адони та плагіни між пристроями. Синхронізація бібліотеки використовує Tuvora Sync, коли Trakt не підключено, а для прогресу перегляду можна використовувати Trakt або Tuvora Sync.</string>
     <string name="account_sync_code_title">Код синхронізації</string>
     <string name="account_sync_code_description">Синхронізуйтеся між пристроями без створення акаунту.</string>
     <string name="account_linked_devices">Зв\'язані пристрої (%1$d)</string>
@@ -2003,7 +2003,7 @@
     <string name="cd_preview">Попередній перегляд</string>
     <string name="cd_test">Тест</string>
     <string name="cd_unlink">Від\'єднати</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">Tuvora</string>
     <string name="cd_trakt_logo">Логотип Trakt</string>
     <string name="cd_trakt_qr">QR-код активації Trakt</string>
     <string name="cd_imdb">IMDb</string>
@@ -2014,7 +2014,7 @@
     <string name="cd_expand">Розгорнути %1$s</string>
     <string name="cd_collapse">Згорнути %1$s</string>
     <string name="cd_qr_login">QR-код входу</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">Tuvora</string>
 
     <string name="debug_signin_success">Вхід успішно виконано</string>
     <string name="debug_generate_description">Згенерований налагодженням елемент %1$s #%2$d</string>
@@ -2156,7 +2156,7 @@
     <string name="collections_editor_tmdb_list_helper">Приклад: https://www.themoviedb.org/list/8504994 або 8504994.</string>
     <string name="collections_editor_tmdb_person_id">ID персони</string>
     <string name="collections_editor_tmdb_person_helper">Приклад: https://www.themoviedb.org/person/31-tom-hanks або 31.</string>
-    <string name="collections_editor_tmdb_title_helper">Відображається як назва рядка/вкладки. Якщо порожньо, Nuvio створить назву з джерела.</string>
+    <string name="collections_editor_tmdb_title_helper">Відображається як назва рядка/вкладки. Якщо порожньо, Tuvora створить назву з джерела.</string>
     <string name="collections_editor_tmdb_quick_genres">Швидкі жанри</string>
     <string name="collections_editor_tmdb_quick_languages">Швидкі мови</string>
     <string name="collections_editor_tmdb_quick_countries">Швидкі країни</string>
@@ -2329,7 +2329,7 @@
     <string name="autoplay_regex_preset_no_remux_hdr">Без REMUX/HDR</string>
 
     <!-- Playback settings sections -->
-    <string name="playback_player_internal_desc">Використовувати вбудований плеєр NuvioTV</string>
+    <string name="playback_player_internal_desc">Використовувати вбудований плеєр Tuvora</string>
 
     <!-- Player runtime: torrent overlay + tracks -->
     <string name="player_torrent_peer_info">%1$d сідів · %2$d пірів</string>

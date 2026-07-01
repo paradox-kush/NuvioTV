@@ -50,4 +50,12 @@ object NuvioPrimitives {
     val tmdb = Color(0xFF01B4E4)
     val imdb = Color(0xFFF5C518)
     val mdblist = Color(0xFF7DD3FC)
+
+    // Tuvora brand (marigold)
+    val marigoldAccent = Color(0xFFF5B301)
+    val marigoldAccentVariant = Color(0xFFD99A00)
+    val marigoldLive = Color(0xFFE4572E)
+    val marigoldInk = Color(0xFF0E0E10)
+    val marigoldCloud = Color(0xFFFAF8F2)
+    val marigoldAsh = Color(0xFF8A8578)
 }

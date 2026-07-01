@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
     <string name="tv_channel_continue_watching">Lanjutkan Menonton</string>
     <string name="type_movie">Film</string>
     <string name="type_movies">Film</string>
@@ -100,7 +100,7 @@
     <!-- HomeScreen -->
     <string name="home_no_addons">Tidak ada addon terpasang. Tambahkan satu untuk memulai.</string>
     <string name="home_no_catalog_addons">Tidak ada addon katalog terpasang. Pasang addon katalog untuk melihat konten.</string>
-    <string name="auth_notice_nuvio_logged_out">Anda telah keluar dari Nuvio. Silakan masuk kembali.</string>
+    <string name="auth_notice_nuvio_logged_out">Anda telah keluar dari Tuvora. Silakan masuk kembali.</string>
     <string name="auth_notice_trakt_logged_out">Anda telah keluar dari Trakt. Silakan sambungkan kembali.</string>
     <string name="error_generic">Terjadi kesalahan</string>
 
@@ -393,7 +393,7 @@
     <string name="settings_advanced_subtitle">Performa, navigasi, cache, dan diagnostik</string>
     <string name="experience_mode_essential">Esensial</string>
     <string name="experience_mode_advanced">Lanjutan</string>
-    <string name="experience_mode_choose_title">Pilih pengalaman Nuvio Anda</string>
+    <string name="experience_mode_choose_title">Pilih pengalaman Tuvora Anda</string>
     <string name="experience_mode_choose_subtitle">Mulai sederhana atau buka semua kustomisasi. Anda bisa beralih kapan saja.</string>
     <string name="experience_mode_essential_card_subtitle">Pengaturan terfokus, add-on, dasar pemutaran, Trakt, dan pengaturan akun.</string>
     <string name="experience_mode_advanced_card_subtitle">Pengaturan lengkap, kontrol tata letak, urutan katalog, koleksi, plug-in, dan diagnostik.</string>
@@ -473,8 +473,8 @@
     <string name="advanced_section_cache">Cache</string>
     <string name="advanced_fast_horizontal_navigation">Navigasi Horizontal Cepat</string>
     <string name="advanced_fast_horizontal_navigation_subtitle">Tingkatkan kecepatan pengulangan D-pad di baris sambil menjaga pembatasan pengulangan tetap aktif.</string>
-    <string name="advanced_nuvio_focus_scroll">Gulir Fokus Nuvio</string>
-    <string name="advanced_nuvio_focus_scroll_subtitle">Gunakan animasi dan posisi gulir fokus global kustom Nuvio.</string>
+    <string name="advanced_nuvio_focus_scroll">Gulir Fokus Tuvora</string>
+    <string name="advanced_nuvio_focus_scroll_subtitle">Gunakan animasi dan posisi gulir fokus global kustom Tuvora.</string>
     <string name="advanced_memory_only_vertical_scroll">Gulir Vertikal Hanya-Memori</string>
     <string name="advanced_memory_only_vertical_scroll_subtitle">Lewati permintaan gambar dari disk dan jaringan saat menggulir vertikal baris beranda.</string>
     <string name="advanced_compose_highlighter">Penyorot Compose</string>
@@ -513,12 +513,12 @@
 
     <!-- SupportersContributorsScreen -->
     <string name="supporters_contributors_title">Kontributor &amp; Donatur</string>
-    <string name="supporters_contributors_subtitle">Orang-orang yang mendukung Nuvio dan kontributor yang membangunnya di TV dan mobile.</string>
+    <string name="supporters_contributors_subtitle">Orang-orang yang mendukung Tuvora dan kontributor yang membangunnya di TV dan mobile.</string>
     <string name="supporters_contributors_supporters_copy">Pendukung dan donatur membantu proyek terus berjalan, mendanai infrastruktur, dan membuka ruang untuk fitur-fitur ambisius.</string>
-    <string name="supporters_contributors_donate_copy">Nuvio akan tetap gratis dan open source. Jika Anda ingin mendukung proyek ini, Anda bisa membantu menutup waktu dan infrastruktur di baliknya.</string>
-    <string name="supporters_contributors_donate_button">Donasi ke Nuvio</string>
+    <string name="supporters_contributors_donate_copy">Tuvora akan tetap gratis dan open source. Jika Anda ingin mendukung proyek ini, Anda bisa membantu menutup waktu dan infrastruktur di baliknya.</string>
+    <string name="supporters_contributors_donate_button">Donasi ke Tuvora</string>
     <string name="supporters_contributors_qr_title">Pindai untuk donasi</string>
-    <string name="supporters_contributors_qr_subtitle">Buka tautannya di ponsel Anda dan dukung Nuvio melalui Ko-fi.</string>
+    <string name="supporters_contributors_qr_subtitle">Buka tautannya di ponsel Anda dan dukung Tuvora melalui Ko-fi.</string>
     <string name="supporters_contributors_qr_hint">Arahkan kamera ke kode QR atau gunakan tombol di bawah.</string>
     <string name="supporters_contributors_back_button">Kembali ke detail</string>
     <string name="supporters_tab">Donatur</string>
@@ -532,7 +532,7 @@
     <string name="sponsors_loading">Memuat sponsor…</string>
     <string name="sponsors_empty">Belum ada sponsor ditemukan.</string>
     <string name="sponsors_error_title">Tidak dapat memuat sponsor</string>
-    <string name="sponsors_detail_copy">Sponsor membantu memajukan Nuvio melalui dukungan di berbagai bagian pengembangan.</string>
+    <string name="sponsors_detail_copy">Sponsor membantu memajukan Tuvora melalui dukungan di berbagai bagian pengembangan.</string>
     <string name="sponsors_channel_unavailable">Saluran sponsor tidak tersedia.</string>
     <string name="sponsors_open_channel">Buka saluran sponsor</string>
     <string name="contributors_loading">Memuat kontributor GitHub…</string>
@@ -603,8 +603,8 @@
     <string name="playback_player_ask_desc">Pilih pemutar setiap kali</string>
     <string name="playback_player_auto">Otomatis (Terbaik untuk Konten)</string>
     <string name="playback_player_auto_desc">ExoPlayer untuk Film &amp; Serial TV · MPV untuk Anime</string>
-    <string name="playback_engine_exoplayer_desc">Kompatibilitas terbaik dengan fitur Nuvio saat ini.</string>
-    <string name="playback_engine_mvplayer_desc">Menggunakan libmpv dengan kontrol OSD Nuvio. Eksperimental.</string>
+    <string name="playback_engine_exoplayer_desc">Kompatibilitas terbaik dengan fitur Tuvora saat ini.</string>
+    <string name="playback_engine_mvplayer_desc">Menggunakan libmpv dengan kontrol OSD Tuvora. Eksperimental.</string>
 
     <!-- PlaybackAudioSettings -->
     <string name="audio_trailer_section">Trailer</string>
@@ -930,7 +930,7 @@
     <string name="debrid_disconnect">Terputus</string>
     <string name="debrid_device_auth_connected">%1$s telah terhubung di perangkat ini.</string>
     <string name="debrid_device_auth_starting">Memulai sign-in dengan aman...</string>
-    <string name="debrid_device_auth_instructions">Scan QR dan masukkan kode ini untuk mengizinkan Nuvio.</string>
+    <string name="debrid_device_auth_instructions">Scan QR dan masukkan kode ini untuk mengizinkan Tuvora.</string>
     <string name="debrid_device_auth_code_copied">Kode tersalin.</string>
     <string name="debrid_device_auth_waiting">Menunggu persetujuan...</string>
     <string name="debrid_device_auth_failed">Tidak dapat memulai sign-in.</string>
@@ -1086,21 +1086,21 @@
     <string name="trakt_watch_progress_title">Progres Tonton</string>
     <string name="trakt_watch_progress_subtitle">Pilih sumber progres mana yang menggerakkan lanjutkan dan continue watching</string>
     <string name="trakt_watch_progress_dialog_title">Progres Tonton</string>
-    <string name="trakt_watch_progress_dialog_subtitle">Pilih apakah lanjutkan dan continue watching harus menggunakan Trakt atau Nuvio Sync sementara scrobbling Trakt tetap aktif.</string>
+    <string name="trakt_watch_progress_dialog_subtitle">Pilih apakah lanjutkan dan continue watching harus menggunakan Trakt atau Tuvora Sync sementara scrobbling Trakt tetap aktif.</string>
     <string name="trakt_watch_progress_source_trakt">Trakt</string>
-    <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+    <string name="trakt_watch_progress_source_nuvio">Tuvora Sync</string>
     <string name="trakt_library_source_title">Sumber Pustaka</string>
     <string name="trakt_library_source_subtitle">Pilih pustaka mana yang digunakan untuk menyimpan dan melihat koleksi Anda</string>
     <string name="trakt_library_source_dialog_title">Sumber Pustaka</string>
     <string name="trakt_library_source_dialog_subtitle">Pilih di mana menyimpan dan mengelola item pustaka Anda</string>
     <string name="trakt_library_source_trakt">Trakt</string>
-    <string name="trakt_library_source_nuvio">Pustaka Nuvio</string>
+    <string name="trakt_library_source_nuvio">Pustaka Tuvora</string>
     <string name="trakt_library_source_trakt_selected">Pustaka Trakt dipilih</string>
-    <string name="trakt_library_source_nuvio_selected">Pustaka Nuvio dipilih</string>
+    <string name="trakt_library_source_nuvio_selected">Pustaka Tuvora dipilih</string>
     <string name="trakt_setting_on">Aktif</string>
     <string name="trakt_setting_off">Nonaktif</string>
     <string name="trakt_watch_progress_trakt_selected">Sumber progres tonton diatur ke Trakt</string>
-    <string name="trakt_watch_progress_nuvio_selected">Sumber progres tonton diatur ke Nuvio Sync</string>
+    <string name="trakt_watch_progress_nuvio_selected">Sumber progres tonton diatur ke Tuvora Sync</string>
     <string name="trakt_continue_watching_window">Jendela Lanjutkan Menonton</string>
     <string name="trakt_continue_watching_subtitle">Riwayat Trakt yang dipertimbangkan untuk lanjutkan menonton</string>
     <string name="trakt_unaired_next_up">Episode Selanjutnya yang Belum Tayang</string>
@@ -1128,7 +1128,7 @@
     <string name="trakt_stat_watched_hours">Jam Ditonton</string>
     <string name="trakt_disconnect">Putuskan</string>
     <string name="trakt_disconnect_title">Putuskan Trakt?</string>
-    <string name="trakt_disconnect_subtitle">Ini akan memutuskan akun Trakt Anda dari Nuvio.</string>
+    <string name="trakt_disconnect_subtitle">Ini akan memutuskan akun Trakt Anda dari Tuvora.</string>
     <string name="trakt_login">Masuk</string>
     <string name="trakt_retry">Coba Lagi</string>
     <string name="trakt_back">Kembali</string>
@@ -1194,7 +1194,7 @@
     <string name="profile_addons">addon</string>
     <string name="profile_plugins">plugin</string>
     <string name="profile_choose_avatar">Pilih Avatar</string>
-    <string name="profile_custom_avatar_web_panel_note">URL avatar kustom dapat dikonfigurasi dari panel web Nuvio.</string>
+    <string name="profile_custom_avatar_web_panel_note">URL avatar kustom dapat dikonfigurasi dari panel web Tuvora.</string>
     <string name="profile_avatar_none_selected">Tidak ada avatar dipilih</string>
     <string name="profile_avatar_focus_hint">Fokuskan avatar untuk melihat namanya</string>
     <string name="profile_avatar_category_all">Semua</string>
@@ -1237,7 +1237,7 @@
     <string name="profile_pin_overlay_set_support">PIN ini akan diperlukan sebelum membuka profil ini.</string>
     <string name="profile_pin_overlay_confirm_support">Masukkan ulang 4 digit yang sama untuk menyelesaikan pengaturan.</string>
     <string name="profile_pin_overlay_mismatch">PIN tidak cocok. Masukkan PIN baru lagi.</string>
-    <string name="profile_pin_overlay_forgot_hint">Lupa PIN? Setel ulang dari akun Nuvio Anda di situs web nuvio.</string>
+    <string name="profile_pin_overlay_forgot_hint">Lupa PIN? Setel ulang dari akun Tuvora Anda di situs web nuvio.</string>
     <string name="profile_pin_overlay_back_hint">Tekan kembali untuk membatalkan</string>
 
 
@@ -1313,7 +1313,7 @@
     <string name="stream_type_torrent">Torrent</string>
     <string name="stream_type_youtube">YouTube</string>
     <string name="p2p_consent_title">Streaming P2P</string>
-    <string name="p2p_consent_body">Stream ini menggunakan teknologi peer-to-peer (P2P). Dengan mengaktifkan P2P, Anda mengakui dan menyetujui bahwa:\n\n\u2022 Alamat IP Anda akan terlihat oleh peer lain di jaringan\n\u2022 Anda sepenuhnya bertanggung jawab atas konten yang Anda akses\n\u2022 Anda mengonfirmasi bahwa Anda memiliki hak hukum untuk streaming konten ini di yurisdiksi Anda\n\u2022 Nuvio tidak menyelenggarakan, mendistribusikan, atau mengontrol konten P2P apa pun\n\u2022 Nuvio tidak bertanggung jawab atas konsekuensi hukum apa pun yang timbul dari penggunaan streaming P2P Anda\n\nAnda menggunakan fitur ini sepenuhnya atas risiko Anda sendiri. P2P dapat dinonaktifkan kapan saja di Pengaturan.</string>
+    <string name="p2p_consent_body">Stream ini menggunakan teknologi peer-to-peer (P2P). Dengan mengaktifkan P2P, Anda mengakui dan menyetujui bahwa:\n\n\u2022 Alamat IP Anda akan terlihat oleh peer lain di jaringan\n\u2022 Anda sepenuhnya bertanggung jawab atas konten yang Anda akses\n\u2022 Anda mengonfirmasi bahwa Anda memiliki hak hukum untuk streaming konten ini di yurisdiksi Anda\n\u2022 Tuvora tidak menyelenggarakan, mendistribusikan, atau mengontrol konten P2P apa pun\n\u2022 Tuvora tidak bertanggung jawab atas konsekuensi hukum apa pun yang timbul dari penggunaan streaming P2P Anda\n\nAnda menggunakan fitur ini sepenuhnya atas risiko Anda sendiri. P2P dapat dinonaktifkan kapan saja di Pengaturan.</string>
     <string name="p2p_consent_enable">Aktifkan P2P</string>
     <string name="p2p_consent_cancel">Batal</string>
     <string name="settings_p2p_title">Streaming P2P</string>
@@ -1749,7 +1749,7 @@
     <string name="catalog_see_all_empty_subtitle">Coba katalog lain atau periksa kembali nanti</string>
 
     <!-- LayoutSelectionScreen -->
-    <string name="layout_selection_welcome">Selamat datang di Nuvio</string>
+    <string name="layout_selection_welcome">Selamat datang di Tuvora</string>
     <string name="layout_selection_subtitle">Pilih tata letak layar beranda Anda</string>
     <string name="layout_selection_continue">Lanjutkan</string>
 
@@ -1761,7 +1761,7 @@
     <string name="update_unknown_sources">Izinkan pemasangan dari sumber tidak dikenal untuk melanjutkan.</string>
     <!-- AccountScreen -->
     <string name="account_title">Akun</string>
-    <string name="account_sign_in_description">Masuk untuk menyinkronkan pustaka, progres tonton, addon, dan plugin di semua perangkat. Sinkronisasi pustaka menggunakan Nuvio Sync saat Trakt tidak terhubung, dan progres tonton dapat menggunakan Trakt atau Nuvio Sync.</string>
+    <string name="account_sign_in_description">Masuk untuk menyinkronkan pustaka, progres tonton, addon, dan plugin di semua perangkat. Sinkronisasi pustaka menggunakan Tuvora Sync saat Trakt tidak terhubung, dan progres tonton dapat menggunakan Trakt atau Tuvora Sync.</string>
     <string name="account_sync_code_title">Kode Sinkronisasi</string>
     <string name="account_sync_code_description">Sinkronkan di semua perangkat tanpa membuat akun.</string>
     <string name="account_linked_devices">Perangkat Tertaut (%1$d)</string>
@@ -1965,7 +1965,7 @@
     <string name="cd_preview">Pratinjau</string>
     <string name="cd_test">Tes</string>
     <string name="cd_unlink">Putuskan Tautan</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">Tuvora</string>
     <string name="cd_trakt_logo">Logo Trakt</string>
     <string name="cd_trakt_qr">QR aktivasi Trakt</string>
     <string name="cd_imdb">IMDb</string>
@@ -1976,7 +1976,7 @@
     <string name="cd_expand">Luaskan %1$s</string>
     <string name="cd_collapse">Ciutkan %1$s</string>
     <string name="cd_qr_login">Kode login QR</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">Tuvora</string>
 
     <!-- Debug -->
     <string name="debug_signin_success">Berhasil masuk</string>
@@ -2119,7 +2119,7 @@
     <string name="collections_editor_tmdb_list_helper">Contoh: https://www.themoviedb.org/list/8504994 atau 8504994.</string>
     <string name="collections_editor_tmdb_person_id">ID Orang</string>
     <string name="collections_editor_tmdb_person_helper">Contoh: https://www.themoviedb.org/person/31-tom-hanks atau 31.</string>
-    <string name="collections_editor_tmdb_title_helper">Ditampilkan sebagai nama baris/tab. Jika kosong, Nuvio akan membuatnya dari sumber.</string>
+    <string name="collections_editor_tmdb_title_helper">Ditampilkan sebagai nama baris/tab. Jika kosong, Tuvora akan membuatnya dari sumber.</string>
     <string name="collections_editor_tmdb_quick_genres">Pintasan Genre</string>
     <string name="collections_editor_tmdb_quick_languages">Pintasan Bahasa</string>
     <string name="collections_editor_tmdb_quick_countries">Pintasan Negara</string>
@@ -2292,7 +2292,7 @@
     <string name="autoplay_regex_preset_no_remux_hdr">Tanpa REMUX/HDR</string>
 
     <!-- Playback settings sections -->
-    <string name="playback_player_internal_desc">Gunakan pemutar bawaan NuvioTV</string>
+    <string name="playback_player_internal_desc">Gunakan pemutar bawaan Tuvora</string>
 
     <!-- Player runtime: torrent overlay + tracks -->
     <string name="player_torrent_peer_info">%1$d seed · %2$d peer</string>

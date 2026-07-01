@@ -6,7 +6,7 @@
     <!-- HomeScreen -->
     <string name="home_no_addons">Inga tillägg installerade. Lägg till ett tillägg för att komma igång.</string>
     <string name="home_no_catalog_addons">Inga tillägg med kataloger installerade. Installera ett katalogtillägg för att se innehåll.</string>
-    <string name="auth_notice_nuvio_logged_out">Du har loggats ut från Nuvio. Logga in igen.</string>
+    <string name="auth_notice_nuvio_logged_out">Du har loggats ut från Tuvora. Logga in igen.</string>
     <string name="auth_notice_trakt_logged_out">Du har loggats ut från Trakt. Anslut igen.</string>
     <string name="error_generic">Ett fel uppstod</string>
 
@@ -220,12 +220,12 @@
 
     <!-- SupportersContributorsScreen -->
     <string name="supporters_contributors_title">Supportrar &amp; bidragsgivare</string>
-    <string name="supporters_contributors_subtitle">Människorna bakom Nuvio och bidragsgivarna som bygger det för TV och mobil.</string>
+    <string name="supporters_contributors_subtitle">Människorna bakom Tuvora och bidragsgivarna som bygger det för TV och mobil.</string>
     <string name="supporters_contributors_supporters_copy">Supportrar och donatorer hjälper projektet framåt, finansierar infrastruktur och skapar utrymme för ambitiösa funktioner.</string>
-    <string name="supporters_contributors_donate_copy">Nuvio förblir gratis och öppen källkod. Om du vill stödja projektet kan du hjälpa till att täcka tiden och infrastrukturen bakom det.</string>
-    <string name="supporters_contributors_donate_button">Donera till Nuvio</string>
+    <string name="supporters_contributors_donate_copy">Tuvora förblir gratis och öppen källkod. Om du vill stödja projektet kan du hjälpa till att täcka tiden och infrastrukturen bakom det.</string>
+    <string name="supporters_contributors_donate_button">Donera till Tuvora</string>
     <string name="supporters_contributors_qr_title">Skanna för att donera</string>
-    <string name="supporters_contributors_qr_subtitle">Öppna länken på din telefon och stöd Nuvio via Ko-fi.</string>
+    <string name="supporters_contributors_qr_subtitle">Öppna länken på din telefon och stöd Tuvora via Ko-fi.</string>
     <string name="supporters_contributors_qr_hint">Rikta kameran mot QR-koden eller använd knappen nedan.</string>
     <string name="supporters_contributors_back_button">Tillbaka till detaljer</string>
     <string name="supporters_tab">Supportrar</string>
@@ -563,11 +563,11 @@
     <string name="trakt_watch_progress_title">Tittarframsteg</string>
     <string name="trakt_watch_progress_subtitle">Välj vilken framstegskälla som styr återupptagning och fortsätt titta</string>
     <string name="trakt_watch_progress_dialog_title">Tittarframsteg</string>
-    <string name="trakt_watch_progress_dialog_subtitle">Välj om återupptagning och fortsätt titta ska använda Trakt eller Nuvio Sync medan Trakt-scrobbling förblir aktiv.</string>
+    <string name="trakt_watch_progress_dialog_subtitle">Välj om återupptagning och fortsätt titta ska använda Trakt eller Tuvora Sync medan Trakt-scrobbling förblir aktiv.</string>
     <string name="trakt_watch_progress_source_trakt">Trakt</string>
-    <string name="trakt_watch_progress_source_nuvio">Nuvio Sync</string>
+    <string name="trakt_watch_progress_source_nuvio">Tuvora Sync</string>
     <string name="trakt_watch_progress_trakt_selected">Tittarframstegskälla satt till Trakt</string>
-    <string name="trakt_watch_progress_nuvio_selected">Tittarframstegskälla satt till Nuvio Sync</string>
+    <string name="trakt_watch_progress_nuvio_selected">Tittarframstegskälla satt till Tuvora Sync</string>
     <string name="trakt_continue_watching_window">Fortsätt titta-fönster</string>
     <string name="trakt_continue_watching_subtitle">Trakt-historik som beaktas för fortsätt titta</string>
     <string name="trakt_unaired_next_up">Osända nästa avsnitt</string>
@@ -583,7 +583,7 @@
     <string name="trakt_stat_watched_hours">Tittade timmar</string>
     <string name="trakt_disconnect">Koppla från</string>
     <string name="trakt_disconnect_title">Koppla från Trakt?</string>
-    <string name="trakt_disconnect_subtitle">Detta kopplar från ditt Trakt-konto från Nuvio.</string>
+    <string name="trakt_disconnect_subtitle">Detta kopplar från ditt Trakt-konto från Tuvora.</string>
     <string name="trakt_login">Logga in</string>
     <string name="trakt_retry">Försök igen</string>
     <string name="trakt_back">Tillbaka</string>
@@ -999,7 +999,7 @@
     <string name="catalog_see_all_empty_subtitle">Prova en annan katalog eller kom tillbaka senare</string>
 
     <!-- LayoutSelectionScreen -->
-    <string name="layout_selection_welcome">Välkommen till Nuvio</string>
+    <string name="layout_selection_welcome">Välkommen till Tuvora</string>
     <string name="layout_selection_subtitle">Välj din hemskärmslayout</string>
     <string name="layout_selection_continue">Fortsätt</string>
 
@@ -1011,7 +1011,7 @@
     <string name="update_unknown_sources">Tillåt installation från okända källor för att fortsätta.</string>
     <!-- AccountScreen -->
     <string name="account_title">Konto</string>
-    <string name="account_sign_in_description">Logga in för att synkronisera ditt bibliotek, tittarframsteg, tillägg och plugins mellan enheter. Bibliotekssynk använder Nuvio Sync när Trakt inte är anslutet, och tittarframsteg kan använda antingen Trakt eller Nuvio Sync.</string>
+    <string name="account_sign_in_description">Logga in för att synkronisera ditt bibliotek, tittarframsteg, tillägg och plugins mellan enheter. Bibliotekssynk använder Tuvora Sync när Trakt inte är anslutet, och tittarframsteg kan använda antingen Trakt eller Tuvora Sync.</string>
     <string name="account_sync_code_title">Synkkod</string>
     <string name="account_sync_code_description">Synkronisera mellan enheter utan att skapa ett konto.</string>
     <string name="account_linked_devices">Länkade enheter (%1$d)</string>
@@ -1200,7 +1200,7 @@
     <string name="profile_pin_overlay_set_support">Denna PIN krävs innan denna profil öppnas.</string>
     <string name="profile_pin_overlay_confirm_support">Ange samma 4 siffror igen för att slutföra.</string>
     <string name="profile_pin_overlay_mismatch">PIN-koderna matchade inte. Ange en ny PIN igen.</string>
-    <string name="profile_pin_overlay_forgot_hint">Glömt PIN? Återställ den från ditt Nuvio-konto på Nuvios webbplats.</string>
+    <string name="profile_pin_overlay_forgot_hint">Glömt PIN? Återställ den från ditt Tuvora-konto på Tuvoras webbplats.</string>
     <string name="profile_pin_overlay_back_hint">Tryck tillbaka för att avbryta</string>
 
     <!-- Missing: Debug library -->
@@ -1224,7 +1224,7 @@
     <string name="playback_player_auto_desc">ExoPlayer för filmer och serier · MPV för anime</string>
 
     <!-- App name -->
-    <string name="app_name">Nuvio</string>
+    <string name="app_name">Tuvora</string>
 
     <!-- WebConfigServers -->
     <string name="web_manage_addons_title">Hantera tillägg</string>
@@ -1316,8 +1316,8 @@
     <string name="playback_afr_capability_disable_button">Inaktivera AFR</string>
     <string name="playback_afr_capability_disable_resolution_button">Inaktivera upplösningsmatchning</string>
     <string name="playback_afr_capability_disable_both_button">Inaktivera båda</string>
-    <string name="playback_engine_exoplayer_desc">Bästa kompatibilitet med nuvarande Nuvio-funktioner.</string>
-    <string name="playback_engine_mvplayer_desc">Använder libmpv med Nuvios OSD-kontroller. Experimentellt.</string>
+    <string name="playback_engine_exoplayer_desc">Bästa kompatibilitet med nuvarande Tuvora-funktioner.</string>
+    <string name="playback_engine_mvplayer_desc">Använder libmpv med Tuvoras OSD-kontroller. Experimentellt.</string>
 
     <!-- PlaybackAudioSettings -->
     <string name="audio_lang_original">Originalspråk</string>
@@ -1359,9 +1359,9 @@
     <string name="trakt_library_source_dialog_title">Bibliotekskälla</string>
     <string name="trakt_library_source_dialog_subtitle">Välj var du vill spara och hantera dina biblioteksobjekt</string>
     <string name="trakt_library_source_trakt">Trakt</string>
-    <string name="trakt_library_source_nuvio">Nuvio-bibliotek</string>
+    <string name="trakt_library_source_nuvio">Tuvora-bibliotek</string>
     <string name="trakt_library_source_trakt_selected">Trakt-bibliotek valt</string>
-    <string name="trakt_library_source_nuvio_selected">Nuvio-bibliotek valt</string>
+    <string name="trakt_library_source_nuvio_selected">Tuvora-bibliotek valt</string>
 
     <!-- ProfileSettingsContent -->
     <string name="profile_edit_header">Redigera profil</string>
@@ -1372,7 +1372,7 @@
 
     <!-- StreamScreen / P2P -->
     <string name="p2p_consent_title">P2P-streaming</string>
-    <string name="p2p_consent_body">Denna ström använder peer-to-peer (P2P)-teknik. Genom att aktivera P2P bekräftar och godkänner du att:\n\n• Din IP-adress kommer att vara synlig för andra peers i nätverket\n• Du är ensam ansvarig för det innehåll du ser\n• Du bekräftar att du har laglig rätt att se detta innehåll i din jurisdiktion\n• Nuvio är inte värd för, distribuerar eller kontrollerar något P2P-innehåll\n• Nuvio bär inget ansvar för rättsliga konsekvenser som uppstår vid din användning av P2P-streaming\n\nDu använder denna funktion helt på egen risk. P2P kan inaktiveras när som helst i Inställningar.</string>
+    <string name="p2p_consent_body">Denna ström använder peer-to-peer (P2P)-teknik. Genom att aktivera P2P bekräftar och godkänner du att:\n\n• Din IP-adress kommer att vara synlig för andra peers i nätverket\n• Du är ensam ansvarig för det innehåll du ser\n• Du bekräftar att du har laglig rätt att se detta innehåll i din jurisdiktion\n• Tuvora är inte värd för, distribuerar eller kontrollerar något P2P-innehåll\n• Tuvora bär inget ansvar för rättsliga konsekvenser som uppstår vid din användning av P2P-streaming\n\nDu använder denna funktion helt på egen risk. P2P kan inaktiveras när som helst i Inställningar.</string>
     <string name="p2p_consent_enable">Aktivera P2P</string>
     <string name="p2p_consent_cancel">Avbryt</string>
     <string name="settings_p2p_title">P2P-streaming</string>
@@ -1533,7 +1533,7 @@
     <string name="cd_preview">Förhandsvisning</string>
     <string name="cd_test">Testa</string>
     <string name="cd_unlink">Avlänka</string>
-    <string name="cd_nuvio_logo">NuvioTV</string>
+    <string name="cd_nuvio_logo">Tuvora</string>
     <string name="cd_trakt_logo">Trakt-logotyp</string>
     <string name="cd_trakt_qr">Trakt-aktiverings-QR</string>
     <string name="cd_imdb">IMDb</string>
@@ -1544,7 +1544,7 @@
     <string name="cd_expand">Expandera %1$s</string>
     <string name="cd_collapse">Fäll ihop %1$s</string>
     <string name="cd_qr_login">QR-inloggningskod</string>
-    <string name="cd_nuvio">Nuvio</string>
+    <string name="cd_nuvio">Tuvora</string>
 
     <!-- Debug -->
     <string name="debug_signin_success">Inloggad</string>

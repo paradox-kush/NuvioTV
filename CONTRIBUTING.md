@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve NuvioTV.
+Thanks for helping improve Tuvora.
 
 ## Strict rules - read before opening anything
 
