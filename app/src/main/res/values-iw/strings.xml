@@ -313,7 +313,7 @@
 
     <string name="about_title">אודות</string>
     <string name="about_subtitle">מידע על האפליקציה, עדכונים וקישורים משפטיים</string>
-    <string name="about_made_with_love">נוצר באהבה ❤️ על ידי Tapframe וחברים</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">גרסה %1$s</string>
     <string name="about_check_updates">בדיקת עדכונים</string>
     <string name="about_check_updates_subtitle">הורד את הגרסה האחרונה</string>

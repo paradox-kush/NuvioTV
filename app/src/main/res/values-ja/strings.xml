@@ -326,7 +326,7 @@
 
     <string name="about_title">このアプリについて</string>
     <string name="about_subtitle">アプリ情報、アップデート、法的リンク</string>
-    <string name="about_made_with_love">Tapframe と仲間たちが ❤️ を込めて開発</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">バージョン %1$s</string>
     <string name="about_check_updates">アップデートを確認</string>
     <string name="about_check_updates_subtitle">最新リリースをダウンロード</string>

@@ -333,7 +333,7 @@
 <!-- AboutScreen -->
 <string name="about_title">O aplikaci</string>
 <string name="about_subtitle">Informace o aplikaci, aktualizace a právní odkazy</string>
-<string name="about_made_with_love">Vytvořeno s ❤️ týmem Tapframe a přáteli</string>
+<string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
 <string name="about_version">Verze %1$s</string>
 <string name="about_check_updates">Zkontrolovat aktualizace</string>
 <string name="about_check_updates_subtitle">Stáhnout nejnovější verzi</string>

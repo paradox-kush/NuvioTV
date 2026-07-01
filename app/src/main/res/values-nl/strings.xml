@@ -119,7 +119,7 @@
 <!-- AboutScreen -->
 <string name="about_title">Over</string>
 <string name="about_subtitle">App-informatie, updates en juridische links</string>
-<string name="about_made_with_love">Met ❤️ gemaakt door Tapframe en vrienden</string>
+<string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
 <string name="about_version">Versie %1$s</string>
 <string name="about_check_updates">Controleren op updates</string>
 <string name="about_check_updates_subtitle">Download de nieuwste versie</string>

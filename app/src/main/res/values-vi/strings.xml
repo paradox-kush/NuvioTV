@@ -118,7 +118,7 @@
     <!-- AboutScreen -->
     <string name="about_title">Giới thiệu</string>
     <string name="about_subtitle">Thông tin ứng dụng, cập nhật và điều khoản</string>
-    <string name="about_made_with_love">Được tạo với ❤️ bởi Tapframe và cộng đồng</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">Phiên bản %1$s</string>
     <string name="about_check_updates">Kiểm tra cập nhật</string>
     <string name="about_check_updates_subtitle">Tải phiên bản mới nhất</string>

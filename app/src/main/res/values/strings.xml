@@ -329,7 +329,7 @@
 
     <string name="about_title">About</string>
     <string name="about_subtitle">App information, updates, and legal links</string>
-    <string name="about_made_with_love">Made with ❤️ by Tapframe and friends</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_check_updates">Check for updates</string>
     <string name="about_check_updates_subtitle">Download latest release</string>

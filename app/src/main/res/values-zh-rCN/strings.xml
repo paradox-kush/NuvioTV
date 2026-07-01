@@ -326,7 +326,7 @@
 
     <string name="about_title">关于</string>
     <string name="about_subtitle">应用信息、更新和法律链接</string>
-    <string name="about_made_with_love">由 Tapframe 和朋友们 ❤️ 制作</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">版本 %1$s</string>
     <string name="about_check_updates">检查更新</string>
     <string name="about_check_updates_subtitle">下载最新版本</string>

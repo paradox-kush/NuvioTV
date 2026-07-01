@@ -329,7 +329,7 @@
 
     <string name="about_title">Про застосунок</string>
     <string name="about_subtitle">Інформація про застосунок, оновлення та посилання</string>
-    <string name="about_made_with_love">Зроблено з ❤️ командою Tapframe та друзями</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">Версія %1$s</string>
     <string name="about_check_updates">Перевірити оновлення</string>
     <string name="about_check_updates_subtitle">Завантажити останній реліз</string>

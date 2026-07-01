@@ -114,7 +114,7 @@
     <!-- AboutScreen -->
     <string name="about_title">Despre</string>
     <string name="about_subtitle">Informații despre aplicație, actualizări și legături legale</string>
-    <string name="about_made_with_love">Făcut cu ❤️ de Tapframe și prieteni</string>
+    <string name="about_made_with_love">Made with ❤️ by Nuvio · Rebranded by Paradox</string>
     <string name="about_version">Versiunea %1$s</string>
     <string name="about_check_updates">Verifică actualizările</string>
     <string name="about_check_updates_subtitle">Descarcă cea mai recentă versiune</string>
