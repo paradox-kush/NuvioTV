@@ -1,0 +1,95 @@
+name: Release
+
+# Production release. Triggered by pushing a tag like v1.2.3 (or run manually with a version).
+# Builds the SIGNED release APK + AAB and publishes them to a GitHub Release.
+#
+# Required repo secrets (set once — see the release notes):
+#   RELEASE_KEYSTORE_BASE64   base64 of your release keystore (.jks)
+#   RELEASE_STORE_PASSWORD    keystore password
+#   RELEASE_KEY_ALIAS         key alias
+#   RELEASE_KEY_PASSWORD      key password
+#   SUPABASE_URL / SUPABASE_ANON_KEY   (optional) bake login into the release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 1.2.3 (creates tag v<version>)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            V="${{ github.event.inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/release.jks"
+
+      - name: Configure local.properties
+        run: |
+          {
+            echo "NUVIO_RELEASE_STORE_FILE=$GITHUB_WORKSPACE/release.jks"
+            echo "NUVIO_RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}"
+            echo "NUVIO_RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}"
+            echo "NUVIO_RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}"
+            echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}"
+            echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}"
+          } >> local.properties
+
+      - name: Raise Gradle heap
+        run: printf '\norg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\n' >> gradle.properties
+
+      - name: Build signed release APK + AAB
+        env:
+          NUVIO_RELEASE_STORE_FILE: ${{ github.workspace }}/release.jks
+          NUVIO_RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          NUVIO_RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          NUVIO_RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew :app:assembleFullRelease :app:bundleFullRelease \
+            -PversionNameOverride="${{ steps.ver.outputs.version }}" \
+            -PversionCodeOverride="${{ github.run_number }}" --stacktrace
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          cp "$(find app/build/outputs/apk/full/release -name '*.apk' | head -1)" "dist/NuvioTV-${{ steps.ver.outputs.version }}.apk"
+          cp "$(find app/build/outputs/bundle -name '*.aab' | head -1)" "dist/NuvioTV-${{ steps.ver.outputs.version }}.aab"
+          ls -la dist
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" dist/* \
+            --title "NuvioTV ${{ steps.ver.outputs.version }}" \
+            --generate-notes || \
+          gh release upload "${{ steps.ver.outputs.tag }}" dist/* --clobber
