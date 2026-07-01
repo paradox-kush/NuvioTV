@@ -6,7 +6,7 @@ import com.nuvio.tv.core.profile.ProfileManager
 import com.nuvio.tv.data.local.PluginDataStore
 import com.nuvio.tv.data.remote.supabase.SupabasePlugin
 import com.nuvio.tv.domain.model.RemotePluginInfo
-import com.nuvio.tv.core.network.SyncBackendSupabaseProvider
+import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -21,14 +21,11 @@ private const val TAG = "PluginSyncService"
 
 @Singleton
 class PluginSyncService @Inject constructor(
-    private val supabaseProvider: SyncBackendSupabaseProvider,
+    private val postgrest: Postgrest,
     private val authManager: AuthManager,
     private val pluginDataStore: PluginDataStore,
     private val profileManager: ProfileManager
 ) {
-    private val postgrest
-        get() = supabaseProvider.postgrest
-
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
             block()

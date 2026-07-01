@@ -8,7 +8,7 @@ import com.nuvio.tv.data.remote.supabase.SupabaseProfileLockState
 import com.nuvio.tv.data.remote.supabase.SupabaseProfile
 import com.nuvio.tv.data.remote.supabase.SupabaseProfilePinVerifyResult
 import com.nuvio.tv.domain.model.UserProfile
-import com.nuvio.tv.core.network.SyncBackendSupabaseProvider
+import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.addJsonObject
@@ -29,13 +29,10 @@ sealed class SetProfilePinResult {
 @Singleton
 class ProfileSyncService @Inject constructor(
     private val authManager: AuthManager,
-    private val supabaseProvider: SyncBackendSupabaseProvider,
+    private val postgrest: Postgrest,
     private val profileDataStore: ProfileDataStore,
     private val profileManager: ProfileManager
 ) {
-    private val postgrest
-        get() = supabaseProvider.postgrest
-
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
             block()

@@ -99,20 +99,6 @@ fun AccountSettingsContent(
                 item(key = "account_sync_note_signed_out") {
                     AccountInlineNote(text = stringResource(R.string.account_sync_restart_note))
                 }
-                item(key = "account_sync_backend_signed_out") {
-                    if (uiState.debugBackendSwitchEnabled) {
-                        DebugSyncBackendSwitchCard(
-                            uiState = uiState,
-                            requireConfirmation = false,
-                            onSwitchBackend = viewModel::switchDebugBackend
-                        )
-                    } else {
-                        StatusCard(
-                            label = stringResource(R.string.account_sync_backend_label),
-                            value = uiState.syncBackendName
-                        )
-                    }
-                }
                 item(key = "account_sign_in_qr") {
                     SettingsActionButton(
                         icon = Icons.Default.VpnKey,
@@ -157,20 +143,6 @@ private fun SignedInAccountSettingsContent(
             val authState = uiState.authState as AuthState.FullAccount
             item(key = "account_status") {
                 StatusCard(label = stringResource(R.string.account_signed_in_label), value = authState.email)
-            }
-            item(key = "account_sync_backend_signed_in") {
-                if (uiState.debugBackendSwitchEnabled) {
-                    DebugSyncBackendSwitchCard(
-                        uiState = uiState,
-                        requireConfirmation = true,
-                        onSwitchBackend = viewModel::switchDebugBackend
-                    )
-                } else {
-                    StatusCard(
-                        label = stringResource(R.string.account_sync_backend_label),
-                        value = uiState.syncBackendName
-                    )
-                }
             }
             item(key = "account_sync_note_signed_in") {
                 AccountInlineNote(text = stringResource(R.string.account_sync_restart_note))

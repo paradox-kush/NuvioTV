@@ -2151,10 +2151,6 @@
     <string name="account_generate_sync_desc">Bu cihazda bir kod oluşturun, diğer cihazlar buna bağlansın.</string>
     <string name="account_enter_sync_desc">Bir senkronizasyon koduyla bu cihazı başka bir cihaza bağlayın.</string>
     <string name="account_signed_in_as">Giriş yapılan hesap</string>
-    <string name="account_sync_backend_label">Senkronizasyon sunucusu</string>
-    <string name="debug_backend_switch_confirm_title">Senkronizasyon sunucusu değiştirilsin mi?</string>
-    <string name="debug_backend_switch_confirm_message">%1$s sunucusuna geçip oturum kapatılsın mı? Seçilen senkronizasyon sunucusunda tekrar oturum açabilirsiniz.</string>
-    <string name="debug_backend_switching">Geçiş yapılıyor…</string>
     <string name="account_generate_sync_signed_in_desc">Diğer cihazların bu hesapla senkronize olması için bir kod oluşturun.</string>
     <string name="account_unknown_device">Bilinmeyen Cihaz</string>
 

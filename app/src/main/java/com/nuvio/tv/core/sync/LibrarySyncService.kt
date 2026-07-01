@@ -7,7 +7,7 @@ import com.nuvio.tv.data.local.LibraryPreferences
 import com.nuvio.tv.data.remote.supabase.SupabaseLibraryItem
 import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.domain.model.SavedLibraryItem
-import com.nuvio.tv.core.network.SyncBackendSupabaseProvider
+import io.github.jan.supabase.postgrest.Postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -25,13 +25,10 @@ private const val PULL_PAGE_SIZE = 500
 @Singleton
 class LibrarySyncService @Inject constructor(
     private val authManager: AuthManager,
-    private val supabaseProvider: SyncBackendSupabaseProvider,
+    private val postgrest: Postgrest,
     private val libraryPreferences: LibraryPreferences,
     private val profileManager: ProfileManager
 ) {
-    private val postgrest
-        get() = supabaseProvider.postgrest
-
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
             block()

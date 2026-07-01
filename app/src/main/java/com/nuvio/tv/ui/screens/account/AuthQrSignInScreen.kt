@@ -176,9 +176,7 @@ fun AuthQrSignInScreen(
                     .fillMaxHeight()
                     .padding(start = 56.dp, end = 56.dp),
                 isSignedIn = isSignedIn,
-                fullAccount = fullAccount,
-                uiState = uiState,
-                viewModel = viewModel
+                fullAccount = fullAccount
             )
 
             AuthQrLoginPane(
@@ -221,9 +219,7 @@ fun AuthQrSignInScreen(
 private fun AuthQrBrandPanel(
     modifier: Modifier,
     isSignedIn: Boolean,
-    fullAccount: AuthState.FullAccount?,
-    uiState: AccountUiState,
-    viewModel: AccountViewModel
+    fullAccount: AuthState.FullAccount?
 ) {
     Column(
         modifier = modifier,
@@ -262,14 +258,6 @@ private fun AuthQrBrandPanel(
                 fontWeight = FontWeight.Normal
             )
         )
-        if (!isSignedIn && uiState.debugBackendSwitchEnabled) {
-            Spacer(modifier = Modifier.height(24.dp))
-            DebugSyncBackendSwitchCard(
-                uiState = uiState,
-                requireConfirmation = false,
-                onSwitchBackend = viewModel::switchDebugBackend
-            )
-        }
         if (isSignedIn && fullAccount != null) {
             Spacer(modifier = Modifier.height(24.dp))
             Text(
