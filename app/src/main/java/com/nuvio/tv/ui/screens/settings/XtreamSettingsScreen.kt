@@ -245,8 +245,8 @@ private fun XtreamModeTab(label: String, selected: Boolean, onClick: () -> Unit)
                 color = if (focused) NuvioTheme.colors.Primary else NuvioTheme.colors.Border,
                 shape = RoundedCornerShape(8.dp)
             )
-            .focusable()
             .onFocusChanged { focused = it.isFocused }
+            .focusable()
             .onKeyEvent {
                 if ((it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
                         it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER) &&
@@ -324,8 +324,8 @@ private fun XtreamAddButton(isValidating: Boolean, onClick: () -> Unit) {
             .clip(RoundedCornerShape(10.dp))
             .background(if (focused) NuvioTheme.colors.Primary else NuvioTheme.colors.BackgroundElevated)
             .border(1.dp, if (focused) NuvioTheme.colors.Primary else NuvioTheme.colors.Border, RoundedCornerShape(10.dp))
-            .focusable()
             .onFocusChanged { focused = it.isFocused }
+            .focusable()
             .onKeyEvent {
                 if ((it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
                         it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER) &&

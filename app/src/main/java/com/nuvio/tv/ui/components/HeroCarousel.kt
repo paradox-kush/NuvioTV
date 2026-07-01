@@ -114,8 +114,9 @@ fun HeroCarousel(
             )
             .height(400.dp)
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .focusable()
+            // ponytail: onFocusChanged must precede focusable to observe it, else isFocused is dead.
             .onFocusChanged { isFocused = it.hasFocus || it.isFocused }
+            .focusable()
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
