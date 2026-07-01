@@ -95,6 +95,10 @@ class XtreamHubViewModel @Inject constructor(
 
     private val requested = mutableSetOf<String>()   // "accountId|section|categoryId"
 
+    // In-memory caches so switching sections/accounts and coming back is instant (no spinner, no re-fetch).
+    private val categoriesCache = mutableMapOf<String, List<XtreamCategory>>()          // "accountId|section"
+    private val itemsCache = mutableMapOf<String, List<XtreamHubItem>>()                // "accountId|section|categoryId"
+
     init {
         viewModelScope.launch {
             val accounts = store.accounts.first().filter { it.enabled }
@@ -118,6 +122,13 @@ class XtreamHubViewModel @Inject constructor(
     private fun loadCategories() {
         val acc = _uiState.value.selectedAccount ?: return
         val section = _uiState.value.section
+        val catKey = "${acc.id}|$section"
+        // Cache hit: restore categories + their already-loaded items instantly (no spinner, no re-fetch).
+        categoriesCache[catKey]?.let { cached ->
+            val items = cached.mapNotNull { c -> itemsCache["$catKey|${c.id}"]?.let { c.id to it } }.toMap()
+            _uiState.update { it.copy(categories = cached, itemsByCategory = items, loading = false, error = null) }
+            return
+        }
         _uiState.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
             val result = when (section) {
@@ -126,7 +137,7 @@ class XtreamHubViewModel @Inject constructor(
                 XtreamSection.SERIES -> client.seriesCategories(acc)
             }
             result
-                .onSuccess { cats -> _uiState.update { it.copy(categories = cats, loading = false) } }
+                .onSuccess { cats -> categoriesCache[catKey] = cats; _uiState.update { it.copy(categories = cats, loading = false) } }
                 .onFailure { e -> _uiState.update { it.copy(loading = false, error = e.message ?: "Failed to load") } }
         }
     }
@@ -135,6 +146,14 @@ class XtreamHubViewModel @Inject constructor(
         val acc = _uiState.value.selectedAccount ?: return
         val section = _uiState.value.section
         val key = "${acc.id}|$section|$categoryId"
+        // Cache hit: restore items instantly without a network round-trip.
+        itemsCache[key]?.let { cached ->
+            requested.add(key)
+            if (categoryId !in _uiState.value.itemsByCategory) {
+                _uiState.update { it.copy(itemsByCategory = it.itemsByCategory + (categoryId to cached)) }
+            }
+            return
+        }
         if (!requested.add(key)) return
         viewModelScope.launch {
             val items: List<XtreamHubItem> = when (section) {
@@ -173,6 +192,7 @@ class XtreamHubViewModel @Inject constructor(
                     XtreamHubItem(id, s.name, s.poster, isLive = false, contentId = id, streamUrl = null, detailType = "series")
                 }
             }
+            itemsCache[key] = items
             _uiState.update { it.copy(itemsByCategory = it.itemsByCategory + (categoryId to items)) }
         }
     }

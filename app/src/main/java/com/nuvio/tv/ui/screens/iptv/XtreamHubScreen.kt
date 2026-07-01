@@ -70,6 +70,8 @@ fun XtreamHubScreen(
     val firstFocus = remember { FocusRequester() }
     // Hero banner (Movies/Series): D-pad UP from row 0 lands here; UP from here lands on the tab.
     val heroFocus = remember { FocusRequester() }
+    // First content row target so D-pad DOWN from the hero lands on the posters (not stuck on the banner).
+    val firstRowFocus = remember { FocusRequester() }
 
     // Per-tab focus targets so D-pad UP from the first content row lands back on the
     // active tab, and focusRestorer restores focus to it when returning to the header.
@@ -156,8 +158,8 @@ fun XtreamHubScreen(
                             items = heroItems.map { it.toMetaPreview() }.asStable(),
                             onItemClick = { preview -> heroItems.firstOrNull { it.cardId == preview.id }?.let(onActivate) },
                             focusRequester = heroFocus,
-                            // UP from the hero returns to the active section tab.
-                            modifier = Modifier.focusProperties { up = selectedTabRequester }
+                            // UP from the hero returns to the active section tab; DOWN lands on the first poster row.
+                            modifier = Modifier.focusProperties { up = selectedTabRequester; down = firstRowFocus }
                         )
                     }
                 }
@@ -172,7 +174,9 @@ fun XtreamHubScreen(
                             title = category.name, catalogId = category.id,
                             items = items, isLoading = !loaded, onActivate = onActivate,
                             // First row routes UP to the hero when present, otherwise to the active tab.
-                            upFocusRequester = if (index == 0) (if (showHero) heroFocus else selectedTabRequester) else null
+                            upFocusRequester = if (index == 0) (if (showHero) heroFocus else selectedTabRequester) else null,
+                            // DOWN from the hero lands on this first row's LazyRow.
+                            rowFocusRequester = if (index == 0 && showHero) firstRowFocus else null
                         )
                     }
                 }
@@ -202,6 +206,7 @@ private fun HubChannelRow(
     isLoading: Boolean,
     onActivate: (XtreamHubItem) -> Unit,
     upFocusRequester: FocusRequester? = null,
+    rowFocusRequester: FocusRequester? = null,
 ) {
     CatalogRowSection(
         catalogRow = CatalogRow(
@@ -216,6 +221,7 @@ private fun HubChannelRow(
         showAddonName = false,
         showCatalogTypeSuffix = false,
         upFocusRequester = upFocusRequester,
+        rowFocusRequester = rowFocusRequester,
     )
 }
 

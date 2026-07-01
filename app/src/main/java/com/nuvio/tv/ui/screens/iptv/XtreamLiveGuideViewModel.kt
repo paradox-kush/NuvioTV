@@ -17,6 +17,7 @@ import com.nuvio.tv.domain.model.PosterShape
 import com.nuvio.tv.domain.repository.LibraryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -83,13 +84,24 @@ class XtreamLiveGuideViewModel @Inject constructor(
 
     private var account: XtreamAccount? = null
     private var channelsJob: Job? = null
+    private var epgFocusJob: Job? = null
     private val epgRequested = mutableSetOf<Int>()
+
+    // Caches so revisiting an account/category is instant (no spinner flash, no re-fetch).
+    private val categoriesCache = mutableMapOf<String, List<GuideCategory>>()   // accountId -> full list
+    private val channelsCache = mutableMapOf<String, List<GuideChannel>>()      // "accountId|categoryId"
 
     /** Called by the screen when the hub's selected account changes. */
     fun setAccount(acc: XtreamAccount) {
         if (acc.id == account?.id) return
         account = acc
         epgRequested.clear()
+        // Cache hit: show the category column immediately without re-fetching.
+        categoriesCache[acc.id]?.let { full ->
+            _uiState.update { it.copy(categories = full) }
+            selectCategory(full.firstOrNull { c -> c.special == GuideSpecial.ALL }?.id ?: full.firstOrNull()?.id)
+            return
+        }
         viewModelScope.launch {
             val cats = client.liveCategories(acc).getOrDefault(emptyList())
             val full = buildList {
@@ -98,6 +110,7 @@ class XtreamLiveGuideViewModel @Inject constructor(
                 add(GuideCategory("__all", "All channels", GuideSpecial.ALL))
                 cats.forEach { add(GuideCategory(it.id, it.name)) }
             }
+            categoriesCache[acc.id] = full
             _uiState.update { it.copy(categories = full) }
             // Default to "All channels" so the guide isn't empty for a fresh account.
             selectCategory(full.firstOrNull { c -> c.special == GuideSpecial.ALL }?.id ?: full.firstOrNull()?.id)
@@ -109,6 +122,15 @@ class XtreamLiveGuideViewModel @Inject constructor(
         val category = _uiState.value.categories.firstOrNull { it.id == categoryId } ?: return
         if (categoryId == _uiState.value.selectedCategoryId && _uiState.value.channels.isNotEmpty()) return
         channelsJob?.cancel()
+        // Cache hit for a network-backed category: swap channels in directly, skipping the empty-list
+        // + loadingChannels spinner flash on revisit. (FAVORITES/RECENT stay dynamic — not cached here.)
+        if (category.special == null || category.special == GuideSpecial.ALL) {
+            channelsCache["${acc.id}|${categoryId}"]?.let { cached ->
+                _uiState.update { it.copy(selectedCategoryId = categoryId, channels = cached, loadingChannels = false, error = null, focusedChannelId = cached.firstOrNull()?.contentId) }
+                cached.firstOrNull()?.let { ensureEpg(it.streamId) }
+                return
+            }
+        }
         _uiState.update { it.copy(selectedCategoryId = categoryId, channels = emptyList(), focusedChannelId = null, loadingChannels = true, error = null) }
         channelsJob = viewModelScope.launch {
             val channels: List<GuideChannel> = when (category.special) {
@@ -119,16 +141,36 @@ class XtreamLiveGuideViewModel @Inject constructor(
                 GuideSpecial.ALL -> fetchChannels(acc, null).take(ALL_CAP)
                 null -> fetchChannels(acc, category.id)
             }
+            // Cache network-backed lists so revisiting the category is instant.
+            if (category.special == null || category.special == GuideSpecial.ALL) {
+                channelsCache["${acc.id}|${category.id}"] = channels
+            }
             _uiState.update { it.copy(channels = channels, loadingChannels = false, focusedChannelId = channels.firstOrNull()?.contentId) }
             channels.firstOrNull()?.let { ensureEpg(it.streamId) }
         }
     }
 
-    /** Channel got D-pad focus: drive the preview + fetch its now/next EPG. */
-    fun onChannelFocused(channel: GuideChannel) {
+    /**
+     * Channel got D-pad focus: drive the preview + fetch its now/next EPG. Debounced ~250ms and
+     * prefetches the focused channel plus its ±3 neighbours so now/next is present when focus settles
+     * (instead of one get_short_epg per composed row, which made fast scrolling feel laggy).
+     */
+    fun onChannelFocused(channel: GuideChannel, index: Int = -1) {
         if (channel.contentId == _uiState.value.focusedChannelId) return
         _uiState.update { it.copy(focusedChannelId = channel.contentId) }
-        ensureEpg(channel.streamId)
+        epgFocusJob?.cancel()
+        epgFocusJob = viewModelScope.launch {
+            delay(EPG_FOCUS_DEBOUNCE_MS)
+            val channels = _uiState.value.channels
+            val center = if (index in channels.indices) index else channels.indexOfFirst { it.contentId == channel.contentId }
+            if (center < 0) { ensureEpg(channel.streamId); return@launch }
+            // Focused first, then neighbours by proximity, so the visible row resolves soonest.
+            ensureEpg(channels[center].streamId)
+            for (d in 1..EPG_PREFETCH_RADIUS) {
+                channels.getOrNull(center - d)?.let { ensureEpg(it.streamId) }
+                channels.getOrNull(center + d)?.let { ensureEpg(it.streamId) }
+            }
+        }
     }
 
     /** Add/remove a channel from the platform Library (same store as movies). */
@@ -201,5 +243,7 @@ class XtreamLiveGuideViewModel @Inject constructor(
 
     companion object {
         private const val ALL_CAP = 600   // ponytail: don't render 26k rows; categories are the real browse path
+        private const val EPG_FOCUS_DEBOUNCE_MS = 250L   // wait for focus to settle before fetching EPG
+        private const val EPG_PREFETCH_RADIUS = 3        // prefetch ±3 neighbours so scrolling has now/next ready
     }
 }
