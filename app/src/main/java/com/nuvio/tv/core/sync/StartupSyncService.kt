@@ -272,16 +272,16 @@ class StartupSyncService @Inject constructor(
                 "Watch progress sync: isTraktConnected=$isTraktConnected shouldUseSupabaseWatchProgressSync=$shouldUseSupabaseWatchProgressSync"
             )
             if (!isTraktConnected) {
-                pullWatchedItemsDelta(profileId, traktMode = false)
-                syncWatchProgressDelta(
+                pullWatchedItemsSnapshot(profileId, traktMode = false)
+                syncWatchProgressSnapshot(
                     profileId = profileId,
                     pushUnsynced = true,
                     failureMessage = "Failed to sync watch progress, continuing"
                 )
             } else if (shouldUseSupabaseWatchProgressSync) {
                 libraryRepository.hasCompletedInitialPull = true
-                pullWatchedItemsDelta(profileId, traktMode = true)
-                syncWatchProgressDelta(
+                pullWatchedItemsSnapshot(profileId, traktMode = true)
+                syncWatchProgressSnapshot(
                     profileId = profileId,
                     pushUnsynced = false,
                     failureMessage = "Failed to sync watch progress while Trakt is connected, continuing"
@@ -515,14 +515,85 @@ class StartupSyncService @Inject constructor(
         }
     }
 
+    private suspend fun pullWatchedItemsSnapshot(
+        profileId: Int,
+        traktMode: Boolean
+    ) {
+        try {
+            if (traktMode) {
+                Log.d(TAG, "Starting watched items snapshot sync for profile $profileId while Trakt is connected")
+            } else {
+                Log.d(TAG, "Starting watched items snapshot sync for profile $profileId")
+            }
+            val watchedItemsResult = watchedItemsSyncService.syncSnapshotFromRemote(profileId).getOrElse { throw it }
+            watchProgressRepository.hasCompletedInitialWatchedItemsPull = true
+            if (traktMode) {
+                Log.d(
+                    TAG,
+                    "Watched items snapshot applied ${watchedItemsResult.upsertedItems} upserts and ${watchedItemsResult.deletedItems} deletes in Trakt mode (snapshot=${watchedItemsResult.usedSnapshot})"
+                )
+            } else {
+                Log.d(
+                    TAG,
+                    "Watched items snapshot applied ${watchedItemsResult.upsertedItems} upserts and ${watchedItemsResult.deletedItems} deletes (snapshot=${watchedItemsResult.usedSnapshot})"
+                )
+            }
+            if (watchedItemsResult.preservedLocalItems) {
+                if (traktMode) {
+                    Log.d(TAG, "Detected unsynced watched items after snapshot (Trakt mode), pushing to remote")
+                } else {
+                    Log.d(TAG, "Detected unsynced watched items after snapshot, pushing to remote")
+                }
+                watchedItemsSyncService.pushToRemote()
+            }
+        } catch (e: Exception) {
+            if (traktMode) {
+                Log.e(TAG, "Failed to pull watched items snapshot, continuing with Trakt library mode", e)
+            } else {
+                Log.e(TAG, "Failed to pull watched items snapshot, continuing with other syncs", e)
+            }
+        }
+    }
+
     private suspend fun syncWatchProgressDelta(
         profileId: Int,
         pushUnsynced: Boolean,
         failureMessage: String
     ): Result<Unit> {
+        return syncWatchProgressRemote(
+            profileId = profileId,
+            pushUnsynced = pushUnsynced,
+            failureMessage = failureMessage,
+            useSnapshot = false
+        )
+    }
+
+    private suspend fun syncWatchProgressSnapshot(
+        profileId: Int,
+        pushUnsynced: Boolean,
+        failureMessage: String
+    ): Result<Unit> {
+        return syncWatchProgressRemote(
+            profileId = profileId,
+            pushUnsynced = pushUnsynced,
+            failureMessage = failureMessage,
+            useSnapshot = true
+        )
+    }
+
+    private suspend fun syncWatchProgressRemote(
+        profileId: Int,
+        pushUnsynced: Boolean,
+        failureMessage: String,
+        useSnapshot: Boolean
+    ): Result<Unit> {
         watchProgressRepository.isSyncingFromRemote = true
         try {
-            val syncResult = watchProgressSyncService.syncDeltaFromRemote(profileId).getOrElse { throw it }
+            val syncResult = if (useSnapshot) {
+                watchProgressSyncService.syncSnapshotFromRemote(profileId).getOrElse { throw it }
+            } else {
+                watchProgressSyncService.syncDeltaFromRemote(profileId).getOrElse { throw it }
+            }
             watchProgressRepository.hasCompletedInitialPull = true
             Log.d(
                 TAG,
