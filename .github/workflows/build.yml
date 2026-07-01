@@ -42,7 +42,7 @@ jobs:
           } >> local.properties
 
       - name: Raise Gradle heap for packaging
-        run: echo "org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8" >> gradle.properties
+        run: printf '\norg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\n' >> gradle.properties
 
       - name: Build debug APK
         run: ./gradlew :app:assembleFullDebug --stacktrace
