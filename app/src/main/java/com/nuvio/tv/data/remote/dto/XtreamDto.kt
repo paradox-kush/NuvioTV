@@ -45,8 +45,9 @@ object FlexIntAdapter {
 
 // player_api.php?username=U&password=P  (no action)
 data class XtreamAccountDto(
-    @Json(name = "user_info") val userInfo: XtreamUserInfoDto?,
-    @Json(name = "server_info") val serverInfo: XtreamServerInfoDto?
+    @Json(name = "user_info") val userInfo: XtreamUserInfoDto?
+    // ponytail: server_info dropped — fields were never read and panels send `port` as a
+    // bare int, which broke Moshi's String decode. Moshi ignores the unknown key.
 )
 
 data class XtreamUserInfoDto(
@@ -57,13 +58,6 @@ data class XtreamUserInfoDto(
     @Json(name = "exp_date") val expDate: String?,   // unix seconds (string) or null = unlimited
     @Json(name = "active_cons") val activeConnections: String?,
     @Json(name = "max_connections") val maxConnections: String?
-)
-
-data class XtreamServerInfoDto(
-    val url: String?,
-    val port: String?,
-    @Json(name = "https_port") val httpsPort: String?,
-    @Json(name = "server_protocol") val serverProtocol: String?   // "http" | "https"
 )
 
 data class XtreamCategoryDto(
