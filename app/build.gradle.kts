@@ -97,7 +97,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.nuvio.tv"
+        applicationId = "com.tuvora.tv"
         minSdk = 24
         targetSdk = 36
         versionCode = providers.gradleProperty("versionCodeOverride").orNull?.toIntOrNull() ?: 1029
@@ -152,7 +152,7 @@ android {
         }
         create("playstore") {
             dimension = "distribution"
-            applicationId = "com.nuvio.app"
+            applicationId = "com.tuvora.tv"
             buildConfigField("boolean", "FEATURE_PLUGINS_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_UPDATES_ENABLED", "false")
             buildConfigField("boolean", "FEATURE_IN_APP_TRAILERS_ENABLED", "false")
@@ -319,7 +319,7 @@ android {
 androidComponents {
     onVariants(selector().withBuildType("debug")) { variant ->
         val isPlaystore = variant.productFlavors.any { it.second == "playstore" }
-        variant.applicationId.set(if (isPlaystore) "com.nuvio.appdebug" else "com.nuviodebug.com")
+        variant.applicationId.set(if (isPlaystore) "com.tuvora.tv.debug" else "com.tuvora.tv.debug")
     }
 }
 
