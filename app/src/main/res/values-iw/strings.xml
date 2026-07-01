@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Nuvio</string>
     <string name="tv_channel_continue_watching">המשך צפייה</string>
     <string name="type_movie">סרט</string>
     <string name="type_movies">סרטים</string>
@@ -878,6 +879,9 @@
     <string name="mdblist_invalid_api_key">מפתח API של MDBList לא תקין</string>
 
     <string name="debrid_title">שירותים מחוברים</string>
+    <string name="debrid_provider_torbox">TorBox</string>
+    <string name="debrid_provider_available">TorBox</string>
+    <string name="debrid_api_key_title">TorBox</string>
     <string name="debrid_section_account">חשבונות</string>
     <string name="debrid_section_instant_playback">הכנת קישורים</string>
     <string name="debrid_section_filters">סינון ומיון</string>
@@ -1300,6 +1304,7 @@
     <string name="player_ends_at">מסתיים ב-%1$s</string>
     <string name="player_via">דרך %1$s</string>
     <!-- Season/episode code shown in player UI (e.g. S01E02). %1$d = season, %2$d = episode. -->
+    <string name="season_episode_format">S%1$d E%2$d</string>
     <string name="player_subtitle_delay">עיכוב כתוביות</string>
     <string name="player_error_title">שגיאת הפעלה</string>
     <string name="player_go_back">חזרה</string>
@@ -1509,6 +1514,8 @@
     <string name="library_delete_subtitle">פעולה זו מסירה את הרשימה וכל הפריטים שבה מ-Trakt.</string>
     <string name="library_delete_confirm">מחק</string>
     <string name="library_source_local">מקומי</string>
+    <string name="library_source_nuvio">NUVIO</string>
+    <string name="library_source_trakt">TRAKT</string>
     <string name="library_source_saved">נשמר</string>
     <string name="library_source_cloud">ענן</string>
     <string name="library_watchlist">רשימת צפייה</string>
@@ -1967,6 +1974,8 @@
     <string name="collections_editor_tmdb_rating_min_placeholder">7.0</string>
     <string name="collections_editor_tmdb_rating_max_placeholder">10</string>
     <string name="collections_editor_tmdb_votes_min_placeholder">100</string>
+    <string name="collections_editor_tmdb_language_placeholder">en, he, ja, hi</string>
+    <string name="collections_editor_tmdb_country_placeholder">US, IL, JP, IN</string>
     <string name="collections_editor_tmdb_year_placeholder">2024</string>
     <string name="collections_editor_language_english">אנגלית</string>
     <string name="collections_editor_language_korean">עברית</string>
