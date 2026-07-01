@@ -22,6 +22,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Cache Gradle (deps + build cache)
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -45,12 +48,18 @@ jobs:
       - name: Raise Gradle heap for packaging
         run: printf '\norg.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8\n' >> gradle.properties
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleFullDebug --stacktrace
+      - name: Build debug APK (arm64-v8a only — fast per-push validation)
+        run: ./gradlew :app:assembleFullDebug -Pandroid.injected.build.abi=arm64-v8a --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          cp "$(find app/build -path '*/full/debug/*' -name '*.apk' | head -1)" dist/
+          ls -la dist
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: nuviotv-full-debug
-          path: app/build/outputs/apk/full/debug/*.apk
+          name: nuviotv-full-debug-arm64
+          path: dist/*.apk
           if-no-files-found: error
