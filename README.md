@@ -20,11 +20,13 @@
 
 ## About
 
-Tuvora is a modern media player designed specifically for Android TV.
+Tuvora TV is a modern media player designed specifically for Android TV.
 
 It acts as a client-side playback interface that can integrate with the Stremio addon ecosystem for content discovery and source resolution through user-installed extensions.
 
 Built with Kotlin and optimized for a TV-first viewing experience.
+
+Tuvora is built on Nuvio by NuvioMedia.
 
 ## Installation
 
