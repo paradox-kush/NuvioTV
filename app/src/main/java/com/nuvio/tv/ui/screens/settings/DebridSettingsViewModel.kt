@@ -251,7 +251,7 @@ class DebridSettingsViewModel @Inject constructor(
     suspend fun startDeviceAuthorization(providerId: String): DebridDeviceAuthorization? {
         return when (DebridProviders.byId(providerId)?.id) {
             DebridProviders.TORBOX_ID -> {
-                val response = torboxApi.startDeviceAuthorization("Nuvio")
+                val response = torboxApi.startDeviceAuthorization("Tuvora")
                 val data = response.body()?.takeIf { response.isSuccessful && it.success != false }?.data
                     ?: return null
                 val deviceCode = data.deviceCode?.takeIf { it.isNotBlank() } ?: return null
