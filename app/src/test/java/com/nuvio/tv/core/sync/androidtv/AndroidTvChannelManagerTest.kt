@@ -18,14 +18,19 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.ConscryptMode
 import org.robolectric.shadows.ShadowLog
 
 // Robolectric supplies real Intent/ContentValues/Uri so the reconcile-path tests can
 // exercise buildProgramValues. application = plain Application: Robolectric instantiates
 // the manifest app class per test, and @HiltAndroidApp NuvioApplication can't boot here.
 // sdk = 35, not 36: Robolectric's SDK 36 sandbox requires Java 21; this repo builds on 17.
+// ConscryptMode OFF: the app classpath carries conscrypt-android (Android-only natives);
+// on Linux CI its OpenSSLProvider wins the classpath race over conscrypt-openjdk-uber and
+// dies with "no conscrypt_jni". These tests touch TvContract, not TLS — skip the provider.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
+@ConscryptMode(ConscryptMode.Mode.OFF)
 class AndroidTvChannelManagerTest {
 
     private val context: Context = mockk(relaxed = true)
