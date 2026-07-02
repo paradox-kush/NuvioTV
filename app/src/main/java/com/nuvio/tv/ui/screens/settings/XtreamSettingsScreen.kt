@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -23,8 +24,11 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -46,9 +50,14 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.tv.material3.Border
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.nuvio.tv.ui.screens.detail.requestFocusAfterFrames
 import com.nuvio.tv.core.iptv.XtreamAccount
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.theme.NuvioTheme
@@ -243,6 +252,9 @@ private val CONTENT_TYPES = listOf(
     XtreamAccount.TYPE_SERIES to "Series"
 )
 
+/** Matches SettingsMultiChoiceDialog's default list height so the checklist scrolls like other pickers. */
+private val SettingsDialogListMaxHeight = 420.dp
+
 /** Level 1: the three content-type rows (checkbox toggles the type, body opens its checklist). */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -254,7 +266,7 @@ private fun XtreamContentTypesDialog(
     onDismiss: () -> Unit
 ) {
     val firstRowFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstRowFocus.requestFocus() } }
+    LaunchedEffect(Unit) { firstRowFocus.requestFocusAfterFrames() }
     NuvioDialog(
         onDismiss = onDismiss,
         title = "Content & Categories",
@@ -280,7 +292,7 @@ private fun XtreamContentTypesDialog(
             )
         }
         Text(
-            text = "Checkbox shows/hides the content type. Select a type to choose its categories.",
+            text = "The toggle shows or hides a content type. Select a type to choose its categories.",
             style = MaterialTheme.typography.bodySmall,
             color = NuvioTheme.colors.TextTertiary
         )
@@ -301,7 +313,7 @@ private fun XtreamCategoryChecklistDialog(
     val label = CONTENT_TYPES.firstOrNull { it.first == type }?.second ?: type
     val selection = account.categorySelections.forType(type)
     val selectAllFocus = remember { FocusRequester() }
-    LaunchedEffect(categories != null) { runCatching { selectAllFocus.requestFocus() } }
+    LaunchedEffect(categories != null) { selectAllFocus.requestFocusAfterFrames() }
     NuvioDialog(
         onDismiss = onDismiss,
         title = "$label categories",
@@ -311,30 +323,37 @@ private fun XtreamCategoryChecklistDialog(
         }
     ) {
         if (categories == null) return@NuvioDialog
-        Row(horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)) {
-            ChecklistAction("Select All", focusRequester = selectAllFocus) { onSetSelection(null) }
-            ChecklistAction("Deselect All") { onSetSelection(emptyList()) }
-        }
-        LazyColumn(
-            modifier = Modifier.heightIn(max = 380.dp),
-            contentPadding = PaddingValues(vertical = NuvioTheme.spacing.xs)
-        ) {
-            items(categories, key = { it.id }) { category ->
-                val checked = selection == null || category.id in selection
-                CategoryCheckRow(
-                    name = category.name.ifBlank { "Other" },
-                    checked = checked,
-                    // Send the OPERATION, not a recomputed list: composed state can be stale for
-                    // a beat after a fast previous toggle, and a whole-list write would clobber
-                    // it. The VM composes the toggle against the store's latest selection.
-                    onToggle = { onToggleCategory(category.id, !checked) }
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.md)) {
+            SettingsDialogActionRow(horizontalAlignment = Alignment.Start) {
+                SettingsDialogActionButton("Select All", onClick = { onSetSelection(null) }, primary = true)
+                SettingsDialogActionButton("Deselect All", onClick = { onSetSelection(emptyList()) })
+            }
+            LazyColumn(
+                modifier = Modifier.heightIn(max = SettingsDialogListMaxHeight),
+                verticalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm),
+                contentPadding = PaddingValues(vertical = NuvioTheme.spacing.xs)
+            ) {
+                items(categories, key = { it.id }) { category ->
+                    val checked = selection == null || category.id in selection
+                    CategoryCheckRow(
+                        name = category.name.ifBlank { "Other" },
+                        checked = checked,
+                        // Send the OPERATION, not a recomputed list: composed state can be stale for
+                        // a beat after a fast previous toggle, and a whole-list write would clobber
+                        // it. The VM composes the toggle against the store's latest selection.
+                        onToggle = { onToggleCategory(category.id, !checked) }
+                    )
+                }
             }
         }
     }
 }
 
-/** A content-type row: [checkbox] toggles the type, [body] opens the category checklist. */
+/**
+ * A content-type row built on the settings Card vocabulary: the row body opens the category
+ * checklist (value + chevron, like SettingsActionRow); a trailing [SettingsTogglePill] Card
+ * toggles the type on/off. Two focus targets, both using the FocusRing border, no Primary flood.
+ */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ContentTypeRow(
@@ -345,103 +364,115 @@ private fun ContentTypeRow(
     onToggle: () -> Unit,
     onOpen: () -> Unit
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        FocusableBox(onSelect = onToggle, focusRequester = focusRequester) { focused ->
-            Text(
-                text = if (enabled) "☑" else "☐",
-                style = MaterialTheme.typography.bodyLarge,
-                color = when {
-                    focused -> NuvioTheme.colors.TextPrimary
-                    enabled -> NuvioTheme.colors.Primary
-                    else -> NuvioTheme.colors.TextTertiary
-                }
-            )
-        }
-        Spacer(Modifier.width(NuvioTheme.spacing.sm))
-        FocusableBox(onSelect = onOpen, modifier = Modifier.weight(1f)) { focused ->
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
+    ) {
+        SettingsRowCard(
+            onClick = onOpen,
+            focusRequester = focusRequester,
+            modifier = Modifier.weight(1f)
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = NuvioTheme.spacing.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = if (enabled || focused) NuvioTheme.colors.TextPrimary else NuvioTheme.colors.TextTertiary,
+                    color = NuvioTheme.colors.TextPrimary.copy(alpha = if (enabled) 1f else 0.4f),
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = "$countText  ›",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (focused) NuvioTheme.colors.TextPrimary else NuvioTheme.colors.TextSecondary
+                    text = countText,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = NuvioTheme.colors.TextSecondary
+                )
+                Spacer(Modifier.width(NuvioTheme.spacing.sm))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = NuvioTheme.colors.TextTertiary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+        SettingsRowCard(onClick = onToggle) {
+            Box(Modifier.padding(horizontal = 18.dp, vertical = NuvioTheme.spacing.md)) {
+                SettingsTogglePill(checked = enabled, enabled = true)
+            }
+        }
+    }
+}
+
+/** A category row using the SettingsMultiChoiceDialog Card+Check idiom (immediate-commit toggle). */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun CategoryCheckRow(name: String, checked: Boolean, onToggle: () -> Unit) {
+    Card(
+        onClick = onToggle,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.colors(
+            containerColor = if (checked) NuvioTheme.colors.FocusBackground else NuvioTheme.colors.BackgroundCard,
+            focusedContainerColor = NuvioTheme.colors.FocusBackground
+        ),
+        shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
+        scale = CardDefaults.scale(focusedScale = 1f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(NuvioTheme.spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (checked) NuvioTheme.colors.Primary else NuvioTheme.colors.TextPrimary,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
+            )
+            if (checked) {
+                Spacer(Modifier.width(NuvioTheme.spacing.md))
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = NuvioTheme.colors.Primary,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
     }
 }
 
+/** Focusable Card matching the settings row focus vocabulary (FocusRing border, no scale, no flood). */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun ChecklistAction(label: String, focusRequester: FocusRequester? = null, onSelect: () -> Unit) {
-    FocusableBox(onSelect = onSelect, focusRequester = focusRequester) { focused ->
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (focused) NuvioTheme.colors.TextPrimary else NuvioTheme.colors.TextSecondary
-        )
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun CategoryCheckRow(name: String, checked: Boolean, onToggle: () -> Unit) {
-    FocusableBox(onSelect = onToggle, modifier = Modifier.fillMaxWidth()) { focused ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = if (checked) "☑" else "☐",
-                style = MaterialTheme.typography.bodyMedium,
-                color = when {
-                    focused -> NuvioTheme.colors.TextPrimary
-                    checked -> NuvioTheme.colors.Primary
-                    else -> NuvioTheme.colors.TextTertiary
-                }
-            )
-            Spacer(Modifier.width(NuvioTheme.spacing.sm))
-            Text(
-                text = name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (focused) NuvioTheme.colors.TextPrimary else NuvioTheme.colors.TextSecondary,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-/** Minimal focusable container with the app's focus border/background styling (dialog rows). */
-@Composable
-private fun FocusableBox(
-    onSelect: () -> Unit,
+private fun SettingsRowCard(
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
-    content: @Composable (focused: Boolean) -> Unit
+    content: @Composable () -> Unit
 ) {
-    var focused by remember { mutableStateOf(false) }
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (focused) NuvioTheme.colors.Primary else Color.Transparent)
-            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .onKeyEvent {
-                if ((it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
-                        it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER) &&
-                    it.nativeKeyEvent.action == KeyEvent.ACTION_DOWN
-                ) { onSelect(); true } else false
-            }
-            .padding(horizontal = 10.dp, vertical = NuvioTheme.spacing.sm)
-    ) {
-        content(focused)
-    }
+    Card(
+        onClick = onClick,
+        modifier = modifier.then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier),
+        colors = CardDefaults.colors(
+            containerColor = NuvioTheme.colors.Background,
+            focusedContainerColor = NuvioTheme.colors.Background
+        ),
+        border = CardDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(NuvioTheme.spacing.xxs, NuvioTheme.colors.FocusRing),
+                shape = RoundedCornerShape(SettingsPillRadius)
+            )
+        ),
+        shape = CardDefaults.shape(RoundedCornerShape(SettingsPillRadius)),
+        scale = CardDefaults.scale(focusedScale = 1f, pressedScale = 1f),
+        content = { content() }
+    )
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
