@@ -408,6 +408,9 @@ dependencies {
     implementation(libs.coil.svg)
     implementation(libs.coil.network.okhttp)
 
+    // Analytics
+    implementation(libs.posthog.android)
+
     // Navigation
     implementation(libs.navigation.compose)
 

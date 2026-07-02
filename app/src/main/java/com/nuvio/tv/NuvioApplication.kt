@@ -20,6 +20,8 @@ import okio.Path.Companion.toOkioPath
 import com.nuvio.tv.core.runtime.PluginRuntimeHooks
 import com.nuvio.tv.core.sync.StartupSyncService
 import com.nuvio.tv.core.sync.androidtv.AndroidTvChannelSyncService
+import com.posthog.android.PostHogAndroid
+import com.posthog.android.PostHogAndroidConfig
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -35,6 +37,10 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     @Inject lateinit var androidTvChannelSyncService: AndroidTvChannelSyncService
 
     companion object {
+        // Public client-side key — safe to ship in the binary.
+        const val POSTHOG_PROJECT_TOKEN = "phc_o824qv3fcxKW9NvF4K6mYKX3rScK5CBQzrSx4RQ5b6ye"
+        const val POSTHOG_HOST = "https://us.i.posthog.com"
+
         /**
          * Shared cookie jar for CloudStream extension HTTP requests.
          * Accessible so the player's OkHttpClient can share cookies
@@ -61,6 +67,16 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        PostHogAndroid.setup(
+            this,
+            PostHogAndroidConfig(
+                apiKey = POSTHOG_PROJECT_TOKEN,
+                host = POSTHOG_HOST
+            ).apply {
+                // Capture uncaught exceptions as $exception events (where the app breaks).
+                errorTrackingConfig.autoCapture = true
+            }
+        )
         PluginRuntimeHooks.onApplicationCreate(this)
         androidTvChannelSyncService.start()
         // Load locale synchronously so it's available before Activity.attachBaseContext.
