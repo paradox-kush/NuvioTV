@@ -24,7 +24,8 @@ class PluginSyncService @Inject constructor(
     private val postgrest: Postgrest,
     private val authManager: AuthManager,
     private val pluginDataStore: PluginDataStore,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
@@ -66,6 +67,7 @@ class PluginSyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             Log.d(TAG, "pushToRemote: calling RPC sync_push_plugins with profile_id=$profileId")
             withJwtRefreshRetry {

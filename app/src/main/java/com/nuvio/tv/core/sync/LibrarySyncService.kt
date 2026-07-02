@@ -27,7 +27,8 @@ class LibrarySyncService @Inject constructor(
     private val authManager: AuthManager,
     private val postgrest: Postgrest,
     private val libraryPreferences: LibraryPreferences,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
@@ -70,6 +71,7 @@ class LibrarySyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_push_library", params)

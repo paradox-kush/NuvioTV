@@ -23,7 +23,8 @@ class AddonSyncService @Inject constructor(
     private val postgrest: Postgrest,
     private val authManager: AuthManager,
     private val addonPreferences: AddonPreferences,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
         return try {
@@ -70,6 +71,7 @@ class AddonSyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             Log.d(TAG, "pushToRemote: calling RPC sync_push_addons with profile_id=$profileId")
             withJwtRefreshRetry {

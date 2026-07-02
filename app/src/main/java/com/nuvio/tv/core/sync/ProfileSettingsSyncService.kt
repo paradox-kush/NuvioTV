@@ -146,7 +146,8 @@ class ProfileSettingsSyncService @Inject constructor(
     private val authManager: AuthManager,
     private val postgrest: Postgrest,
     private val profileManager: ProfileManager,
-    private val profileDataStoreFactory: ProfileDataStoreFactory
+    private val profileDataStoreFactory: ProfileDataStoreFactory,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val syncMutex = Mutex()
@@ -197,6 +198,7 @@ class ProfileSettingsSyncService @Inject constructor(
                     put("p_profile_id", profileId)
                     put("p_settings_json", settingsJson)
                     put("p_platform", SETTINGS_SYNC_PLATFORM)
+                    putSyncOriginClientId(syncClientIdentity)
                 }
 
                 withJwtRefreshRetry {

@@ -27,7 +27,8 @@ class CollectionSyncService @Inject constructor(
     private val postgrest: Postgrest,
     private val authManager: AuthManager,
     private val collectionsDataStore: CollectionsDataStore,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -63,6 +64,7 @@ class CollectionSyncService @Inject constructor(
             val params = buildJsonObject {
                 put("p_profile_id", profileId)
                 put("p_collections_json", collectionsJsonElement)
+                putSyncOriginClientId(syncClientIdentity)
             }
 
             withJwtRefreshRetry {

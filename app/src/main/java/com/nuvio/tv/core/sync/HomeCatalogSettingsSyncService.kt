@@ -65,7 +65,8 @@ class HomeCatalogSettingsSyncService @Inject constructor(
     private val layoutPreferenceDataStore: LayoutPreferenceDataStore,
     private val profileManager: ProfileManager,
     private val addonRepository: AddonRepository,
-    private val collectionsDataStore: CollectionsDataStore
+    private val collectionsDataStore: CollectionsDataStore,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val json = Json {
@@ -175,6 +176,7 @@ class HomeCatalogSettingsSyncService @Inject constructor(
             put("p_profile_id", profileId)
             put("p_settings_json", jsonElement)
             put("p_platform", HOME_CATALOG_SHARED_SYNC_PLATFORM)
+            putSyncOriginClientId(syncClientIdentity)
         }
 
         withJwtRefreshRetry {
