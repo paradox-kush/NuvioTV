@@ -88,7 +88,11 @@ class MetaRepositoryAddonCacheTest {
         return MetaRepositoryImpl(
             context = context,
             api = api,
-            addonRepository = addonRepository
+            addonRepository = addonRepository,
+            xtreamRegistry = mockk(relaxed = true),
+            xtreamClient = mockk(relaxed = true),
+            xtreamAccountStore = mockk(relaxed = true),
+            tmdbMetadataService = mockk(relaxed = true)
         )
     }
 

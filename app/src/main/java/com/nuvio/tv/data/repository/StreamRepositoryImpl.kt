@@ -48,7 +48,8 @@ class StreamRepositoryImpl @Inject constructor(
     private val localDebridAvailabilityService: LocalDebridAvailabilityService,
     private val xtreamRegistry: com.nuvio.tv.core.iptv.XtreamItemRegistry,
     private val xtreamClient: com.nuvio.tv.core.iptv.XtreamClient,
-    private val xtreamAccountStore: com.nuvio.tv.data.local.XtreamAccountStore
+    private val xtreamAccountStore: com.nuvio.tv.data.local.XtreamAccountStore,
+    private val xtreamStreamSource: com.nuvio.tv.core.iptv.match.XtreamStreamSource
 ) : StreamRepository {
     private enum class StreamFailureKind {
         MISSING,
@@ -97,13 +98,22 @@ class StreamRepositoryImpl @Inject constructor(
             // Accumulate results as they arrive
             val accumulatedResults = mutableListOf<AddonStreams>()
 
+            // Xtream IPTV as a stream source for TMDB content: each enabled account gets
+            // its own group via the TMDB->stream matcher (index + verify + synced cache).
+            val xtreamMatchTargets = if (type == "movie" || type == "series") {
+                xtreamAccountStore.accounts.first().filter { it.enabled }
+            } else {
+                emptyList()
+            }
+
             coroutineScope {
                 // Channel to receive results as they complete
                 val resultChannel = Channel<AddonStreams>(Channel.UNLIMITED)
-                
+
                 // Track number of pending jobs
                 val totalJobs = streamAddons.size +
-                    (if (pluginRequest != null) 1 else 0)
+                    (if (pluginRequest != null) 1 else 0) +
+                    xtreamMatchTargets.size
                 val completedJobs = java.util.concurrent.atomic.AtomicInteger(0)
 
                 // Launch addon jobs
@@ -156,6 +166,31 @@ class StreamRepositoryImpl @Inject constructor(
                                 kind = StreamFailureKind.REQUEST_FAILED,
                                 detail = e.message ?: context.getString(com.nuvio.tv.R.string.stream_error_detail_addon_request_failed)
                             )
+                        } finally {
+                            if (completedJobs.incrementAndGet() >= totalJobs) {
+                                resultChannel.close()
+                            }
+                        }
+                    }
+                }
+
+                // Launch TMDB->Xtream match jobs (one group per enabled IPTV account)
+                xtreamMatchTargets.forEach { acc ->
+                    launch {
+                        try {
+                            val streams = xtreamStreamSource.streamsFor(acc, type, videoId, season, episode)
+                            if (streams.isNotEmpty()) {
+                                resultChannel.send(
+                                    AddonStreams(
+                                        addonName = acc.name,
+                                        addonLogo = null,
+                                        streams = streams
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            Log.e(TAG, "Xtream match failed for ${acc.name}: ${e.message}")
                         } finally {
                             if (completedJobs.incrementAndGet() >= totalJobs) {
                                 resultChannel.close()

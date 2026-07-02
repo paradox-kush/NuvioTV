@@ -260,7 +260,50 @@ interface TmdbApi {
         @Path("tv_id") tvId: Int,
         @Query("api_key") apiKey: String
     ): Response<TmdbAlternativeTitlesResponse>
+
+    // every name TMDB knows for a title in ONE call — powers cross-language IPTV matching
+    @GET("movie/{movie_id}")
+    suspend fun getMovieTitleBundle(
+        @Path("movie_id") movieId: Int,
+        @Query("api_key") apiKey: String,
+        @Query("append_to_response") appendToResponse: String = "alternative_titles,translations"
+    ): Response<TmdbTitleBundleResponse>
+
+    @GET("tv/{tv_id}")
+    suspend fun getTvTitleBundle(
+        @Path("tv_id") tvId: Int,
+        @Query("api_key") apiKey: String,
+        @Query("append_to_response") appendToResponse: String = "alternative_titles,translations"
+    ): Response<TmdbTitleBundleResponse>
 }
+
+@JsonClass(generateAdapter = true)
+data class TmdbTitleBundleResponse(
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "name") val name: String? = null,
+    @Json(name = "original_title") val originalTitle: String? = null,
+    @Json(name = "original_name") val originalName: String? = null,
+    @Json(name = "release_date") val releaseDate: String? = null,
+    @Json(name = "first_air_date") val firstAirDate: String? = null,
+    @Json(name = "alternative_titles") val alternativeTitles: TmdbAlternativeTitlesResponse? = null,
+    @Json(name = "translations") val translations: TmdbTranslationsResponse? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class TmdbTranslationsResponse(
+    @Json(name = "translations") val translations: List<TmdbTranslationItem>? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class TmdbTranslationItem(
+    @Json(name = "data") val data: TmdbTranslationData? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class TmdbTranslationData(
+    @Json(name = "title") val title: String? = null,
+    @Json(name = "name") val name: String? = null
+)
 
 @JsonClass(generateAdapter = true)
 data class TmdbAlternativeTitlesResponse(

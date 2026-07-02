@@ -232,6 +232,39 @@ class TmdbService @Inject constructor(
     }
     
     /**
+     * Every name TMDB knows for a title (primary + original + alternative_titles +
+     * translations, one details call) plus release year. This is what makes cross-language
+     * IPTV matching work: a panel's "Planeta Tierra II" or "اتاق های پشتی" matches via the
+     * official localized title, not fuzzy string similarity.
+     */
+    suspend fun titleBundle(tmdbId: Int, mediaType: String): TmdbTitleBundle? = withContext(Dispatchers.IO) {
+        if (TMDB_API_KEY.isBlank()) return@withContext null
+        val type = normalizeMediaType(mediaType)
+        val cacheKey = "$tmdbId:$type"
+        titleBundleCache[cacheKey]?.let { return@withContext it }
+        runCatching {
+            val body = (if (type == "tv") tmdbApi.getTvTitleBundle(tmdbId, TMDB_API_KEY)
+            else tmdbApi.getMovieTitleBundle(tmdbId, TMDB_API_KEY)).body() ?: return@runCatching null
+            val primary = (body.title ?: body.name)?.trim()?.takeIf { it.isNotBlank() }
+            val original = (body.originalTitle ?: body.originalName)?.trim()?.takeIf { it.isNotBlank() }
+            val alts = LinkedHashSet<String>()
+            (body.alternativeTitles?.movieTitles.orEmpty() + body.alternativeTitles?.tvTitles.orEmpty())
+                .mapNotNullTo(alts) { it.title?.trim()?.takeIf(String::isNotBlank) }
+            body.translations?.translations.orEmpty()
+                .mapNotNullTo(alts) { (it.data?.title ?: it.data?.name)?.trim()?.takeIf(String::isNotBlank) }
+            primary?.let(alts::remove); original?.let(alts::remove)
+            TmdbTitleBundle(
+                primary = primary,
+                original = original,
+                alternatives = alts.toList(),
+                year = (body.releaseDate ?: body.firstAirDate)?.take(4)?.toIntOrNull(),
+            ).also { if (titleBundleCache.size < 200) titleBundleCache[cacheKey] = it }
+        }.getOrNull()
+    }
+
+    private val titleBundleCache = ConcurrentHashMap<String, TmdbTitleBundle>()
+
+    /**
      * Normalize media type to consistent format
      */
     private fun normalizeMediaType(mediaType: String): String {
@@ -292,3 +325,11 @@ class TmdbService @Inject constructor(
 }
 
 data class TmdbImages(val backdropUrl: String?, val posterUrl: String?, val runtimeMinutes: Int? = null)
+
+/** All names TMDB knows for a title, ordered strongest-first, plus release year. */
+data class TmdbTitleBundle(
+    val primary: String?,
+    val original: String?,
+    val alternatives: List<String>,
+    val year: Int?,
+)

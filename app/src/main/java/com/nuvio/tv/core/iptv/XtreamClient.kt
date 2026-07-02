@@ -37,7 +37,9 @@ data class XtreamMovie(
     val poster: String?,
     val categoryId: String?,
     val rating: String?,
-    val streamUrl: String
+    val streamUrl: String,
+    val tmdb: Int? = null,
+    val containerExtension: String? = null
 )
 
 data class XtreamSeriesItem(
@@ -46,7 +48,9 @@ data class XtreamSeriesItem(
     val poster: String?,
     val categoryId: String?,
     val plot: String?,
-    val rating: String?
+    val rating: String?,
+    val tmdb: Int? = null,
+    val year: Int? = null
 )
 
 data class XtreamCategory(val id: String, val name: String)
@@ -65,7 +69,9 @@ data class XtreamSeriesDetail(
     val tmdbId: Int?,
     val plot: String?,
     val backdrop: String?,
-    val episodes: List<XtreamEpisode>
+    /** First-air date — the only verify signal old panels give for series (no tmdb there). */
+    val releaseDate: String? = null,
+    val episodes: List<XtreamEpisode> = emptyList()
 )
 
 data class XtreamProgram(
@@ -75,6 +81,9 @@ data class XtreamProgram(
     val endMs: Long,
     val nowPlaying: Boolean
 )
+
+/** Verify signals from get_vod_info during TMDB->stream matching. */
+data class XtreamVodSignal(val tmdbId: Int?, val year: Int?)
 
 /**
  * Talks to one Xtream panel. Builds the `player_api.php` URLs and the live/vod/series
@@ -129,7 +138,9 @@ class XtreamClient @Inject constructor(
                 poster = dto.streamIcon?.takeIf { it.isNotBlank() },
                 categoryId = dto.categoryId,
                 rating = dto.rating,
-                streamUrl = streamUrl(acc, "movie", id, dto.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4")
+                streamUrl = streamUrl(acc, "movie", id, dto.containerExtension?.takeIf { it.isNotBlank() } ?: "mp4"),
+                tmdb = dto.tmdb?.takeIf { it > 0 },
+                containerExtension = dto.containerExtension?.takeIf { it.isNotBlank() }
             )
         }
     }
@@ -137,7 +148,11 @@ class XtreamClient @Inject constructor(
     suspend fun series(acc: XtreamAccount, categoryId: String? = null): Result<List<XtreamSeriesItem>> = call {
         api.getSeries(playerApi(acc, "get_series", categoryId)).requireBody().mapNotNull { dto ->
             val id = dto.seriesId ?: return@mapNotNull null
-            XtreamSeriesItem(id, dto.name.orEmpty(), dto.cover?.takeIf { it.isNotBlank() }, dto.categoryId, dto.plot, dto.rating)
+            XtreamSeriesItem(
+                id, dto.name.orEmpty(), dto.cover?.takeIf { it.isNotBlank() }, dto.categoryId, dto.plot, dto.rating,
+                tmdb = dto.tmdb?.takeIf { it > 0 },
+                year = (dto.releaseDate ?: dto.releaseDateAlt)?.trim()?.take(4)?.toIntOrNull()
+            )
         }
     }
 
@@ -175,6 +190,7 @@ class XtreamClient @Inject constructor(
             tmdbId = resp.info?.tmdbId?.takeIf { it > 0 },
             plot = resp.info?.plot,
             backdrop = resp.info?.backdropPath?.firstOrNull(),
+            releaseDate = resp.info?.releaseDate ?: resp.info?.releaseDateAlt,
             episodes = episodes
         )
     }
@@ -192,6 +208,18 @@ class XtreamClient @Inject constructor(
             .addQueryParameter("vod_id", vodId.toString())
             .build().toString()
         api.getVodInfo(url).requireBody().info?.tmdbId?.takeIf { it > 0 }
+    }
+
+    /** What get_vod_info can confirm about a candidate during TMDB->stream matching. */
+    suspend fun vodMatchSignal(acc: XtreamAccount, vodId: Int): Result<XtreamVodSignal> = call {
+        val url = playerApi(acc, "get_vod_info").toHttpUrl().newBuilder()
+            .addQueryParameter("vod_id", vodId.toString())
+            .build().toString()
+        val info = api.getVodInfo(url).requireBody().info
+        XtreamVodSignal(
+            tmdbId = info?.tmdbId?.takeIf { it > 0 },
+            year = (info?.releaseDate ?: info?.releaseDateAlt)?.trim()?.take(4)?.toIntOrNull()
+        )
     }
 
     // --- URL building --------------------------------------------------------

@@ -86,7 +86,10 @@ data class XtreamVodStreamDto(
     @Json(name = "category_id") val categoryId: String?,
     @Json(name = "container_extension") val containerExtension: String?,
     val rating: String?,
-    @Json(name = "added") val added: String?
+    @Json(name = "added") val added: String?,
+    // XUI.one panels ship a TMDB id in the bulk list (~90% populated on tested providers) —
+    // the free tier of TMDB->stream matching
+    @FlexInt val tmdb: Int?
 )
 
 // action=get_series
@@ -96,7 +99,11 @@ data class XtreamSeriesDto(
     val cover: String?,
     @Json(name = "category_id") val categoryId: String?,
     val plot: String?,
-    val rating: String?
+    val rating: String?,
+    @FlexInt val tmdb: Int?,
+    // panels send BOTH spellings; releaseDate is the one XUI populates
+    @Json(name = "releaseDate") val releaseDate: String?,
+    @Json(name = "release_date") val releaseDateAlt: String?
 )
 
 // action=get_vod_info&vod_id=X -> { info: {...}, movie_data: {...} }
@@ -107,7 +114,10 @@ data class XtreamVodInfoResponseDto(
 )
 
 data class XtreamVodInfoDto(
-    @FlexInt @Json(name = "tmdb_id") val tmdbId: Int?
+    @FlexInt @Json(name = "tmdb_id") val tmdbId: Int?,
+    // verify signal when a panel has no tmdb_id: year check against the TMDB target
+    @Json(name = "releasedate") val releaseDate: String?,
+    @Json(name = "release_date") val releaseDateAlt: String?
 )
 
 // action=get_series_info&series_id=X -> { info:{...}, episodes: { "1":[...], "2":[...] } }
@@ -122,7 +132,9 @@ data class XtreamSeriesInfoDto(
     val plot: String?,
     val genre: String?,
     @Json(name = "backdrop_path") val backdropPath: List<String>?,
-    @FlexInt @Json(name = "tmdb_id") val tmdbId: Int?
+    @FlexInt @Json(name = "tmdb_id") val tmdbId: Int?,
+    @Json(name = "releaseDate") val releaseDate: String?,
+    @Json(name = "release_date") val releaseDateAlt: String?
 )
 
 data class XtreamEpisodeDto(
