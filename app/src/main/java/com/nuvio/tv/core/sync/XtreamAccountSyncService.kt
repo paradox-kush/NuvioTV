@@ -37,9 +37,11 @@ private const val TAG = "XtreamAccountSyncService"
  * pull = direct RLS-scoped select on login. Empty remote + non-empty local => migrate local up.
  *
  * v2 (playlist manager P1): push/pull target the `iptv_playlists` table + RPC. Pull falls back
- * to the legacy `xtream_accounts` table when `iptv_playlists` is empty, applies the legacy rows
- * locally (defaults for the new option fields) and pushes them up to the NEW table — a one-way
- * upgrade per spec §12; the legacy RPC is never written again by this client.
+ * to the legacy `xtream_accounts` table when `iptv_playlists` has no xtream rows, applies the
+ * legacy rows locally (defaults for the new option fields) and pushes them up to the NEW table —
+ * a one-way upgrade per spec §12. After a successful migration push the legacy rows are cleared
+ * (one write of `[]` to the old RPC) so the fallback is one-shot; the legacy RPC is never
+ * written otherwise.
  */
 @Singleton
 class XtreamAccountSyncService @Inject constructor(
@@ -73,16 +75,13 @@ class XtreamAccountSyncService @Inject constructor(
         }
     }
 
-    suspend fun pushToRemote(): Result<Unit> = withContext(Dispatchers.IO) {
+    /** [onlyIfEmpty] is the legacy-migration guard: the loser of a two-device first-login
+     *  race becomes a no-op instead of a full-replace with stale legacy rows. */
+    suspend fun pushToRemote(onlyIfEmpty: Boolean = false): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val profileId = profileManager.activeProfileId.value
             val accounts = accountStore.accounts.first()
-            val params = buildJsonObject {
-                put("p_playlists", buildJsonArray {
-                    accounts.forEachIndexed { index, acc -> add(playlistPushJson(acc, index)) }
-                })
-                put("p_profile_id", profileId)
-            }
+            val params = playlistPushParams(accounts, profileId, onlyIfEmpty)
             withJwtRefreshRetry { postgrest.rpc("sync_push_iptv_playlists", params) }
             Log.d(TAG, "Pushed ${accounts.size} iptv playlists for profile $profileId")
             Result.success(Unit)
@@ -94,8 +93,10 @@ class XtreamAccountSyncService @Inject constructor(
 
     /**
      * Pull this profile's playlists and apply them locally.
-     * `iptv_playlists` empty => fall back to the legacy `xtream_accounts` select and, when legacy
-     * rows exist, migrate them up to the new table. Both empty + non-empty local => push local up.
+     * No usable (xtream) rows in `iptv_playlists` => fall back to the legacy `xtream_accounts`
+     * select and, when legacy rows exist, migrate them up to the new table (then clear them).
+     * Both empty + non-empty local => push local up (source-type-scoped, so it can't delete
+     * foreign rows).
      */
     suspend fun pullAndApply(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -112,10 +113,13 @@ class XtreamAccountSyncService @Inject constructor(
                     } }
                     .decodeList<SupabaseIptvPlaylist>()
             }
-            if (rows.isNotEmpty()) {
-                val accounts = rows.sortedBy { it.sortOrder }.mapNotNull { it.toAccount() }
-                applyRemote(accounts)
-                Log.d(TAG, "Pulled ${accounts.size} iptv playlists for profile $profileId")
+            // Emptiness is decided AFTER filtering to rows this client understands: a table
+            // holding only foreign source types (m3u/stalker from a newer client) must behave
+            // exactly like an empty remote — applying an empty list would wipe local state.
+            val remoteAccounts = rows.sortedBy { it.sortOrder }.mapNotNull { it.toXtreamAccountOrNull() }
+            if (remoteAccounts.isNotEmpty()) {
+                applyRemote(remoteAccounts)
+                Log.d(TAG, "Pulled ${remoteAccounts.size} iptv playlists for profile $profileId")
                 return@withContext Result.success(Unit)
             }
 
@@ -141,8 +145,10 @@ class XtreamAccountSyncService @Inject constructor(
                     )
                 }
                 applyRemote(accounts)
-                // One-way migration: copy the legacy rows into the new table.
-                pushToRemote()
+                // One-way migration: copy the legacy rows into the new table (only-if-empty so
+                // the loser of a two-device first-login race is a no-op), then clear the legacy
+                // rows — a stale legacy copy would resurrect deleted playlists on every login.
+                if (pushToRemote(onlyIfEmpty = true).isSuccess) clearLegacyRemote(profileId)
                 Log.d(TAG, "Migrated ${accounts.size} legacy xtream accounts to iptv_playlists for profile $profileId")
                 return@withContext Result.success(Unit)
             }
@@ -162,28 +168,60 @@ class XtreamAccountSyncService @Inject constructor(
         isSyncingFromRemote = false
     }
 
-    /** P1: this client only understands xtream sources; other source types stay remote-only. */
-    private fun SupabaseIptvPlaylist.toAccount(): XtreamAccount? {
-        if (sourceType != XtreamAccount.SOURCE_XTREAM) return null
-        val base = baseUrl ?: return null
-        val user = username ?: return null
-        val pass = password ?: return null
-        return XtreamAccount(
-            id = "$base|$user",
-            name = name ?: base,
-            baseUrl = base,
-            username = user,
-            password = pass,
-            enabled = enabled,
-            sourceType = sourceType,
-            epgUrl = epgUrl,
-            dnsProvider = dnsProvider,
-            autoRefreshHours = autoRefreshHours,
-            contentTypes = contentTypes.toSet(),
-            categorySelections = decodeCategorySelections(categorySelections)
-        )
+    /** One-shot legacy cleanup after a successful migration push: empty the old
+     *  `xtream_accounts` rows so they can't resurrect deleted playlists on a later login.
+     *  Best-effort — a failure just leaves the (idempotent) migration to run again. */
+    private suspend fun clearLegacyRemote(profileId: Int) {
+        try {
+            val params = buildJsonObject {
+                put("p_profile_id", profileId)
+                put("p_accounts", JsonArray(emptyList()))
+            }
+            withJwtRefreshRetry { postgrest.rpc("sync_push_xtream_accounts", params) }
+            Log.d(TAG, "Cleared legacy xtream_accounts rows for profile $profileId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear legacy xtream_accounts rows", e)
+        }
     }
 }
+
+/** P1: this client only understands xtream sources; other source types stay remote-only. */
+internal fun SupabaseIptvPlaylist.toXtreamAccountOrNull(): XtreamAccount? {
+    if (sourceType != XtreamAccount.SOURCE_XTREAM) return null
+    val base = baseUrl ?: return null
+    val user = username ?: return null
+    val pass = password ?: return null
+    return XtreamAccount(
+        id = "$base|$user",
+        name = name ?: base,
+        baseUrl = base,
+        username = user,
+        password = pass,
+        enabled = enabled,
+        sourceType = sourceType,
+        epgUrl = epgUrl,
+        dnsProvider = dnsProvider,
+        autoRefreshHours = autoRefreshHours,
+        contentTypes = contentTypes.toSet(),
+        categorySelections = decodeCategorySelections(categorySelections)
+    )
+}
+
+/**
+ * Full parameter object for `sync_push_iptv_playlists`. Every push scopes the full-replace with
+ * `p_source_types: ["xtream"]` so this P1 client never deletes rows of source types it doesn't
+ * understand (m3u/stalker written by a newer client). `p_only_if_empty` is sent only on the
+ * legacy-migration push.
+ */
+internal fun playlistPushParams(accounts: List<XtreamAccount>, profileId: Int, onlyIfEmpty: Boolean): JsonObject =
+    buildJsonObject {
+        put("p_playlists", buildJsonArray {
+            accounts.forEachIndexed { index, acc -> add(playlistPushJson(acc, index)) }
+        })
+        put("p_profile_id", profileId)
+        put("p_source_types", buildJsonArray { add(XtreamAccount.SOURCE_XTREAM) })
+        if (onlyIfEmpty) put("p_only_if_empty", true)
+    }
 
 /**
  * One playlist row of the `sync_push_iptv_playlists` payload. Contract (must match the

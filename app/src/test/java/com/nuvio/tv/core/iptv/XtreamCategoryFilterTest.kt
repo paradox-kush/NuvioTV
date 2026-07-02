@@ -72,4 +72,20 @@ class XtreamCategoryFilterTest {
         assertTrue(acc.typeEnabled(XtreamAccount.TYPE_MOVIES))
         assertFalse(acc.typeEnabled(XtreamAccount.TYPE_SERIES))
     }
+
+    @Test
+    fun `search skips explicit-empty selections but keeps partial ones (index has no categoryId)`() {
+        // explicit "Deselect All" -> the type is skipped entirely
+        val deselected = account(CategorySelections(movies = emptyList()))
+        assertFalse(deselected.searchIncludesType(XtreamAccount.TYPE_MOVIES))
+        // other types unaffected
+        assertTrue(deselected.searchIncludesType(XtreamAccount.TYPE_SERIES))
+
+        // partial selection -> still searched (match-index rows carry no categoryId; ceiling)
+        assertTrue(account(CategorySelections(movies = listOf("10"))).searchIncludesType(XtreamAccount.TYPE_MOVIES))
+        // null = all -> searched
+        assertTrue(account().searchIncludesType(XtreamAccount.TYPE_MOVIES))
+        // disabled content type -> never searched, selection irrelevant
+        assertFalse(account(types = setOf(XtreamAccount.TYPE_LIVE)).searchIncludesType(XtreamAccount.TYPE_MOVIES))
+    }
 }

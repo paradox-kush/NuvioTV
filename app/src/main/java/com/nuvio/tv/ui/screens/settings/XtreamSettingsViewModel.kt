@@ -135,6 +135,9 @@ class XtreamSettingsViewModel @Inject constructor(
                 if (account.id != old.id) migrateSavedData(old, account)
                 // Cached stream URLs embed the old server/creds; rebuild lazily on demand.
                 registry.clear()
+                // A renewed/edited account must not keep showing a stale "Expired" status or
+                // category lists fetched under the old creds — evict both ids' caches.
+                evictAccountCaches(old.id, account.id)
                 syncService.triggerRemoteSync()
                 onSuccess()
             }.onFailure { e ->
@@ -182,6 +185,17 @@ class XtreamSettingsViewModel @Inject constructor(
     private val categoryRequests = mutableSetOf<String>()   // "accountId|type" in flight or done
     private val statusRequests = mutableSetOf<String>()     // accountId in flight or done
 
+    /** Drop cached status lines + category lists for these account ids so they refetch. */
+    private fun evictAccountCaches(vararg accountIds: String) {
+        val ids = accountIds.toSet()
+        val typeKeys = ids.flatMap { id ->
+            listOf(XtreamAccount.TYPE_LIVE, XtreamAccount.TYPE_MOVIES, XtreamAccount.TYPE_SERIES).map { "$id|$it" }
+        }.toSet()
+        statusRequests.removeAll(ids)
+        categoryRequests.removeAll(typeKeys)
+        _uiState.update { it.copy(accountStatus = it.accountStatus - ids, categoryLists = it.categoryLists - typeKeys) }
+    }
+
     /** Fetch the three category lists for the Content & Categories dialog (cached, silent on failure). */
     fun loadCategoryLists(account: XtreamAccount) {
         for (type in listOf(XtreamAccount.TYPE_LIVE, XtreamAccount.TYPE_MOVIES, XtreamAccount.TYPE_SERIES)) {
@@ -207,17 +221,32 @@ class XtreamSettingsViewModel @Inject constructor(
         }
     }
 
-    /** Set a type's category selection (null = all incl. future). Option-only edit: no re-verification. */
+    /** Absolute selection write: Select All (null = all incl. future) / Deselect All (empty). */
     fun setCategorySelection(accountId: String, type: String, selection: List<String>?) {
         updateAccount(accountId) { acc ->
             acc.copy(categorySelections = acc.categorySelections.withType(type, selection))
         }
     }
 
+    /**
+     * Toggle ONE category. The dialog sends the operation (not a whole recomputed list from its
+     * possibly-stale composed state); null -> full-list materialization happens inside the store
+     * transform against the LATEST selection, using the cached category list for [type]. So a
+     * toggle racing "Deselect All" yields exactly the toggled id, not a resurrected full list.
+     */
+    fun toggleCategory(accountId: String, type: String, categoryId: String, isChecked: Boolean) {
+        val fullList = _uiState.value.categoryLists["$accountId|$type"].orEmpty().map { it.id }
+        updateAccount(accountId) { acc ->
+            val current = acc.categorySelections.forType(type) ?: fullList
+            val next = if (isChecked) (current - categoryId) + categoryId else current - categoryId
+            acc.copy(categorySelections = acc.categorySelections.withType(type, next))
+        }
+    }
+
+    /** Field-level transform against the store's latest state (see XtreamAccountStore.update). */
     private fun updateAccount(accountId: String, transform: (XtreamAccount) -> XtreamAccount) {
-        val account = _uiState.value.accounts.firstOrNull { it.id == accountId } ?: return
         viewModelScope.launch {
-            store.upsert(transform(account))
+            store.update(accountId, transform)
             syncService.triggerRemoteSync()
         }
     }

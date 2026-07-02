@@ -149,24 +149,30 @@ fun XtreamSettingsContent(
             title = account.name,
             subtitle = account.baseUrl
         ) {
-            SettingsActionRow(
-                title = "Browse Live TV",
-                subtitle = null,
-                onClick = {
-                    val id = account.id
-                    actionsFor = null
-                    onBrowseLive(id)
-                }
-            )
-            SettingsActionRow(
-                title = "Browse Movies (VOD)",
-                subtitle = null,
-                onClick = {
-                    val id = account.id
-                    actionsFor = null
-                    onBrowseVod(id)
-                }
-            )
+            // Browse entries respect the content-type toggles — a disabled type is hidden here
+            // too, not just in the hub (this was a bypass around "Hidden").
+            if (account.typeEnabled(XtreamAccount.TYPE_LIVE)) {
+                SettingsActionRow(
+                    title = "Browse Live TV",
+                    subtitle = null,
+                    onClick = {
+                        val id = account.id
+                        actionsFor = null
+                        onBrowseLive(id)
+                    }
+                )
+            }
+            if (account.typeEnabled(XtreamAccount.TYPE_MOVIES)) {
+                SettingsActionRow(
+                    title = "Browse Movies (VOD)",
+                    subtitle = null,
+                    onClick = {
+                        val id = account.id
+                        actionsFor = null
+                        onBrowseVod(id)
+                    }
+                )
+            }
             SettingsActionRow(
                 title = "Content & Categories",
                 subtitle = "Choose which content types and categories to show",
@@ -223,6 +229,7 @@ fun XtreamSettingsContent(
                     type = type,
                     categories = uiState.categoryLists["$id|$type"],
                     onSetSelection = { selection -> viewModel.setCategorySelection(id, type, selection) },
+                    onToggleCategory = { categoryId, isChecked -> viewModel.toggleCategory(id, type, categoryId, isChecked) },
                     onDismiss = { checklistType = null }
                 )
             }
@@ -288,6 +295,7 @@ private fun XtreamCategoryChecklistDialog(
     type: String,
     categories: List<com.nuvio.tv.core.iptv.XtreamCategory>?,
     onSetSelection: (List<String>?) -> Unit,
+    onToggleCategory: (categoryId: String, isChecked: Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val label = CONTENT_TYPES.firstOrNull { it.first == type }?.second ?: type
@@ -316,12 +324,10 @@ private fun XtreamCategoryChecklistDialog(
                 CategoryCheckRow(
                     name = category.name.ifBlank { "Other" },
                     checked = checked,
-                    onToggle = {
-                        // Toggling away from "all" materializes today's full id list first, so
-                        // only the toggled category changes (future categories arrive unselected).
-                        val current = selection ?: categories.map { it.id }
-                        onSetSelection(if (category.id in current) current - category.id else current + category.id)
-                    }
+                    // Send the OPERATION, not a recomputed list: composed state can be stale for
+                    // a beat after a fast previous toggle, and a whole-list write would clobber
+                    // it. The VM composes the toggle against the store's latest selection.
+                    onToggle = { onToggleCategory(category.id, !checked) }
                 )
             }
         }

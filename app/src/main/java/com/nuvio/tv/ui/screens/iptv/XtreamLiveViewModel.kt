@@ -55,7 +55,11 @@ class XtreamLiveViewModel @Inject constructor(
         account = acc
         _uiState.update { it.copy(accountName = acc.name, loading = true, error = null) }
         client.liveCategories(acc)
-            .onSuccess { cats -> _uiState.update { it.copy(categories = cats, loading = false) } }
+            .onSuccess { cats ->
+                // Deselected categories stay hidden here too (mirrors XtreamHubViewModel).
+                val visible = cats.filter { acc.allowsCategory(XtreamAccount.TYPE_LIVE, it.id) }
+                _uiState.update { it.copy(categories = visible, loading = false) }
+            }
             .onFailure { e -> _uiState.update { it.copy(loading = false, error = e.message ?: "Failed to load") } }
     }
 

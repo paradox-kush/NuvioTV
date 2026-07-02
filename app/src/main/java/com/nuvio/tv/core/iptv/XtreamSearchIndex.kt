@@ -47,18 +47,19 @@ class XtreamSearchIndex @Inject constructor(
         val accounts = store.accounts.first().filter { it.enabled }
         accounts.map { acc ->
             async {
-                // Disabled content types are skipped entirely (not fetched, not indexed).
-                if (acc.typeEnabled(XtreamAccount.TYPE_LIVE) && !liveCache.containsKey(acc.id)) {
+                // Disabled content types and explicit-empty selections are skipped entirely
+                // (not fetched, not indexed).
+                if (acc.searchIncludesType(XtreamAccount.TYPE_LIVE) && !liveCache.containsKey(acc.id)) {
                     val live = client.liveChannels(acc).getOrDefault(emptyList())
                     liveCache[acc.id] = live
                     Log.d(TAG, "indexed live=${live.size} for ${acc.name}")
                 }
                 // a cold index build (huge catalogs) shouldn't stall a keystroke forever;
                 // a built index responds instantly, a building one fills in on a later search
-                if (acc.typeEnabled(XtreamAccount.TYPE_MOVIES)) {
+                if (acc.searchIncludesType(XtreamAccount.TYPE_MOVIES)) {
                     withTimeoutOrNull(INDEX_WAIT_MS) { resolver.ensureIndexed(acc, MatchKind.MOVIE) }
                 }
-                if (acc.typeEnabled(XtreamAccount.TYPE_SERIES)) {
+                if (acc.searchIncludesType(XtreamAccount.TYPE_SERIES)) {
                     withTimeoutOrNull(INDEX_WAIT_MS) { resolver.ensureIndexed(acc, MatchKind.SERIES) }
                 }
             }
@@ -74,10 +75,9 @@ class XtreamSearchIndex @Inject constructor(
         val movies = ArrayList<Hit>()
         val series = ArrayList<Hit>()
         for (acc in accounts) {
-            // Live hits carry a categoryId -> category selections filter them; a disabled
-            // content type contributes nothing. (Movie/series index rows carry no categoryId,
-            // so those filter at the content-type level only.)
-            if (acc.typeEnabled(XtreamAccount.TYPE_LIVE)) liveCache[acc.id].orEmpty().asSequence()
+            // Live hits carry a categoryId -> category selections filter them per item; a
+            // disabled content type (or an explicit "Deselect All") contributes nothing.
+            if (acc.searchIncludesType(XtreamAccount.TYPE_LIVE)) liveCache[acc.id].orEmpty().asSequence()
                 .filter { acc.allowsCategory(XtreamAccount.TYPE_LIVE, it.categoryId) }
                 .filter { it.name.contains(q, ignoreCase = true) }.take(PER_ACCOUNT).forEach { ch ->
                     val id = XtreamItemRegistry.liveId(acc.id, ch.streamId)
@@ -89,7 +89,7 @@ class XtreamSearchIndex @Inject constructor(
                     )
                     channels += Hit(id, ch.name, ch.logo, isLive = true, streamUrl = ch.streamUrl, detailType = "tv")
                 }
-            if (acc.typeEnabled(XtreamAccount.TYPE_MOVIES)) matchIndex.searchByName(acc.id, MatchKind.MOVIE, q, PER_ACCOUNT).forEach { m ->
+            if (acc.searchIncludesType(XtreamAccount.TYPE_MOVIES)) matchIndex.searchByName(acc.id, MatchKind.MOVIE, q, PER_ACCOUNT).forEach { m ->
                 val id = XtreamItemRegistry.vodId(acc.id, m.sid)
                 val streamUrl = client.buildStreamUrl(acc, "movie", m.sid, m.ext ?: "mp4")
                 registry.register(
@@ -100,7 +100,7 @@ class XtreamSearchIndex @Inject constructor(
                 )
                 movies += Hit(id, m.name, m.poster, isLive = false, streamUrl = null, detailType = "movie")
             }
-            if (acc.typeEnabled(XtreamAccount.TYPE_SERIES)) matchIndex.searchByName(acc.id, MatchKind.SERIES, q, PER_ACCOUNT).forEach { s ->
+            if (acc.searchIncludesType(XtreamAccount.TYPE_SERIES)) matchIndex.searchByName(acc.id, MatchKind.SERIES, q, PER_ACCOUNT).forEach { s ->
                 val id = XtreamItemRegistry.seriesId(acc.id, s.sid)
                 registry.register(
                     XtreamResolvedItem(
@@ -121,3 +121,14 @@ class XtreamSearchIndex @Inject constructor(
         private const val INDEX_WAIT_MS = 12_000L
     }
 }
+
+/**
+ * Whether search should index/return [type] for this account.
+ *
+ * ponytail: movie/series match-index rows carry no categoryId, so a PARTIAL category selection
+ * can't filter those hits — they filter at the content-type level only (the ceiling). Upgrade
+ * path: persist category_id in XtreamMatchIndex rows. An EXPLICIT EMPTY selection ("Deselect
+ * All" = none) needs no per-item id though: the whole type is skipped here.
+ */
+internal fun XtreamAccount.searchIncludesType(type: String): Boolean =
+    typeEnabled(type) && categorySelections.forType(type)?.isEmpty() != true

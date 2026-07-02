@@ -62,9 +62,17 @@ class XtreamAccountStore @Inject constructor(
     }
 
     suspend fun setEnabled(id: String, enabled: Boolean) {
+        update(id) { it.copy(enabled = enabled) }
+    }
+
+    /**
+     * Field-level read-modify-write INSIDE the DataStore edit: [transform] runs against the
+     * latest persisted account, so rapid option edits (e.g. "Deselect All" then a toggle) compose
+     * instead of a stale UI snapshot clobbering the earlier write.
+     */
+    suspend fun update(id: String, transform: (XtreamAccount) -> XtreamAccount) {
         store().edit { prefs ->
-            val updated = parse(prefs[accountsKey]).map { if (it.id == id) it.copy(enabled = enabled) else it }
-            prefs[accountsKey] = gson.toJson(updated)
+            prefs[accountsKey] = applyAccountUpdate(gson, prefs[accountsKey], id, transform)
         }
     }
 
@@ -79,6 +87,15 @@ class XtreamAccountStore @Inject constructor(
         private const val FEATURE = "xtream_accounts"
     }
 }
+
+/** [XtreamAccountStore.update]'s transform application against the LATEST persisted JSON.
+ *  Extracted so the compose-against-latest-state behavior is unit-testable. */
+internal fun applyAccountUpdate(
+    gson: Gson,
+    json: String?,
+    id: String,
+    transform: (XtreamAccount) -> XtreamAccount
+): String = gson.toJson(decodeXtreamAccountsJson(gson, json).map { if (it.id == id) transform(it) else it })
 
 /** Decodes the persisted account list. Extracted so the decode-defaults behavior is unit-testable. */
 internal fun decodeXtreamAccountsJson(gson: Gson, json: String?): List<XtreamAccount> {

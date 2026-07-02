@@ -33,13 +33,15 @@ import javax.inject.Inject
 enum class GuideSpecial { FAVORITES, RECENT, ALL }
 data class GuideCategory(val id: String, val name: String, val special: GuideSpecial? = null)
 
-/** One channel row in the guide. */
+/** One channel row in the guide. [categoryId] is null for synthetic rows (Favorites/Recent
+ *  restores), which are never category-filtered. */
 data class GuideChannel(
     val contentId: String,
     val name: String,
     val logo: String?,
     val streamUrl: String,
-    val streamId: Int
+    val streamId: Int,
+    val categoryId: String? = null
 )
 
 /** Now/next programs for a channel (from get_short_epg). */
@@ -105,9 +107,15 @@ class XtreamLiveGuideViewModel @Inject constructor(
             categoriesCache[acc.id]?.let { full ->
                 val visible = filteredCategories(acc, full)
                 _uiState.update { it.copy(categories = visible) }
-                // If the selected category just got deselected, fall back to "All channels".
-                if (visible.none { it.id == _uiState.value.selectedCategoryId }) {
+                // "All channels" was fetched+filtered under the OLD selections — rebuild it.
+                channelsCache.remove("${acc.id}|$ALL_ID")
+                val selectedId = _uiState.value.selectedCategoryId
+                if (visible.none { it.id == selectedId }) {
+                    // The selected category just got deselected: fall back to "All channels".
                     selectCategory(visible.firstOrNull { c -> c.special == GuideSpecial.ALL }?.id ?: visible.firstOrNull()?.id)
+                } else if (selectedId == ALL_ID) {
+                    // Still on "All channels": refresh the displayed list under the new selections.
+                    selectCategory(selectedId, force = true)
                 }
             }
             return
@@ -136,7 +144,7 @@ class XtreamLiveGuideViewModel @Inject constructor(
             val full = buildList {
                 add(GuideCategory("__fav", "Favorites", GuideSpecial.FAVORITES))
                 add(GuideCategory("__recent", "Recent", GuideSpecial.RECENT))
-                add(GuideCategory("__all", "All channels", GuideSpecial.ALL))
+                add(GuideCategory(ALL_ID, "All channels", GuideSpecial.ALL))
                 cats.forEach { add(GuideCategory(it.id, it.name)) }
             }
             categoriesCache[acc.id] = full
@@ -152,10 +160,10 @@ class XtreamLiveGuideViewModel @Inject constructor(
     private fun filteredCategories(acc: XtreamAccount, full: List<GuideCategory>): List<GuideCategory> =
         full.filter { it.special != null || acc.allowsCategory(XtreamAccount.TYPE_LIVE, it.id) }
 
-    fun selectCategory(categoryId: String?) {
+    fun selectCategory(categoryId: String?, force: Boolean = false) {
         val acc = account ?: return
         val category = _uiState.value.categories.firstOrNull { it.id == categoryId } ?: return
-        if (categoryId == _uiState.value.selectedCategoryId && _uiState.value.channels.isNotEmpty()) return
+        if (!force && categoryId == _uiState.value.selectedCategoryId && _uiState.value.channels.isNotEmpty()) return
         channelsJob?.cancel()
         // Cache hit for a network-backed category: swap channels in directly, skipping the empty-list
         // + loadingChannels spinner flash on revisit. (FAVORITES/RECENT stay dynamic — not cached here.)
@@ -175,7 +183,11 @@ class XtreamLiveGuideViewModel @Inject constructor(
                 GuideSpecial.RECENT -> liveStore.recents.first().map {
                     GuideChannel(it.id, it.name, it.logo, it.streamUrl, streamIdOf(it.id))
                 }
-                GuideSpecial.ALL -> retryOnce { fetchChannels(acc, null) }?.take(ALL_CAP)
+                // "All channels" honors the category selections too (filter BEFORE the cap so
+                // a selection at the catalog's tail isn't cut off). Favorites/Recent stay unfiltered.
+                GuideSpecial.ALL -> retryOnce { fetchChannels(acc, null) }
+                    ?.filter { acc.allowsCategory(XtreamAccount.TYPE_LIVE, it.categoryId) }
+                    ?.take(ALL_CAP)
                 null -> retryOnce { fetchChannels(acc, category.id) }
             }
             if (channels == null) {
@@ -281,7 +293,7 @@ class XtreamLiveGuideViewModel @Inject constructor(
                     streamUrl = ch.streamUrl, kind = XtreamKind.LIVE, accountId = acc.id, streamId = ch.streamId
                 )
             )
-            GuideChannel(id, ch.name, ch.logo, ch.streamUrl, ch.streamId)
+            GuideChannel(id, ch.name, ch.logo, ch.streamUrl, ch.streamId, ch.categoryId)
         }
     }
 
@@ -298,6 +310,7 @@ class XtreamLiveGuideViewModel @Inject constructor(
     private fun streamIdOf(contentId: String): Int = contentId.substringAfterLast(":live:").toIntOrNull() ?: 0
 
     companion object {
+        private const val ALL_ID = "__all"
         private const val ALL_CAP = 600   // ponytail: don't render 26k rows; categories are the real browse path
         private const val EPG_FOCUS_DEBOUNCE_MS = 250L   // wait for focus to settle before fetching EPG
         private const val EPG_PREFETCH_RADIUS = 3        // prefetch ±3 neighbours so scrolling has now/next ready

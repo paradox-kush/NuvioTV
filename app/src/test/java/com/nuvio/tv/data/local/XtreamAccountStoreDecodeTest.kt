@@ -89,4 +89,37 @@ class XtreamAccountStoreDecodeTest {
         assertEquals(emptyList<XtreamAccount>(), decodeXtreamAccountsJson(gson, ""))
         assertEquals(emptyList<XtreamAccount>(), decodeXtreamAccountsJson(gson, "{not json"))
     }
+
+    /**
+     * The lost-update race the store's update() closes: option edits are field-level transforms
+     * applied to the LATEST persisted state (inside store().edit), never whole-account writes
+     * from a possibly-stale UI snapshot.
+     */
+    @Test
+    fun `update transform composes against latest stored state, not a stale snapshot`() {
+        val account = XtreamAccount(
+            id = "http://host|u", name = "P", baseUrl = "http://host", username = "u", password = "p",
+            categorySelections = CategorySelections()   // live = null = "all categories"
+        )
+        val fullList = listOf("1", "2", "3")            // the VM's cached category list for "live"
+        val json0 = gson.toJson(listOf(account))
+
+        // 1) Deselect All: absolute write of an empty selection.
+        val json1 = applyAccountUpdate(gson, json0, account.id) { acc ->
+            acc.copy(categorySelections = acc.categorySelections.withType(XtreamAccount.TYPE_LIVE, emptyList()))
+        }
+        // 2) Immediate toggle of "2" -> checked. The transform materializes null -> fullList,
+        //    but MUST see the just-written empty selection, not the stale null snapshot.
+        val json2 = applyAccountUpdate(gson, json1, account.id) { acc ->
+            val current = acc.categorySelections.forType(XtreamAccount.TYPE_LIVE) ?: fullList
+            acc.copy(categorySelections = acc.categorySelections.withType(XtreamAccount.TYPE_LIVE, (current - "2") + "2"))
+        }
+
+        // Exactly the toggled id — a stale-snapshot compose would resurrect the full list.
+        assertEquals(listOf("2"), decodeXtreamAccountsJson(gson, json2).single().categorySelections.live)
+
+        // And a transform for an unknown id changes nothing.
+        val untouched = applyAccountUpdate(gson, json2, "nope") { it.copy(enabled = false) }
+        assertEquals(decodeXtreamAccountsJson(gson, json2), decodeXtreamAccountsJson(gson, untouched))
+    }
 }

@@ -63,7 +63,11 @@ class XtreamVodViewModel @Inject constructor(
         account = acc
         _uiState.update { it.copy(accountId = acc.id, accountName = acc.name, loading = true, error = null) }
         client.vodCategories(acc)
-            .onSuccess { cats -> _uiState.update { it.copy(categories = cats, loading = false) } }
+            .onSuccess { cats ->
+                // Deselected categories stay hidden here too (mirrors XtreamHubViewModel).
+                val visible = cats.filter { acc.allowsCategory(XtreamAccount.TYPE_MOVIES, it.id) }
+                _uiState.update { it.copy(categories = visible, loading = false) }
+            }
             .onFailure { e -> _uiState.update { it.copy(loading = false, error = e.message ?: "Failed to load") } }
     }
 
