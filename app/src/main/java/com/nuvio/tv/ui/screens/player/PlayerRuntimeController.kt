@@ -525,6 +525,7 @@ class PlayerRuntimeController(
     internal var currentVideoTrackCodecs: String? = null
     internal var currentVideoTrackWidth: Int = 0
     internal var currentVideoTrackHeight: Int = 0
+    internal var currentVideoTrackBitrate: Int = -1
     internal var currentVideoTrackColorTransfer: Int? = null
     internal var currentVideoTrackSelected: Boolean = false
     internal var currentVideoTrackBestSupport: Int = C.FORMAT_UNSUPPORTED_TYPE

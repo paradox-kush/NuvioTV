@@ -481,6 +481,7 @@ internal class ParallelRangeDataSource(
         }
 
         val ds = upstreamFactory.createDataSource()
+        transferListeners.forEach { ds.addTransferListener(it) }
         activeDataSources.add(ds)
         try {
             val uri = resolvedUri ?: originalDataSpec?.uri ?: throw IOException("No URI available")
