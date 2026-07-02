@@ -23,6 +23,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -74,6 +75,28 @@ class AuthManager @Inject constructor(
 
     init {
         observeSessionStatus()
+        unblockUiIfAuthInitStalls()
+    }
+
+    // ponytail: offline cold start — supabase-kt retries the boot token refresh forever
+    // (10s timeout per attempt) while sessionStatus sits in Initializing/RefreshFailure,
+    // so authState stays Loading and the splash never dismisses. After 3s, surface the
+    // persisted session from disk (or SignedOut) and let the refresh finish in the
+    // background; the sessionStatus collector overwrites this once it settles for real.
+    private fun unblockUiIfAuthInitStalls() {
+        scope.launch {
+            syncBackendRepository.ensureLoaded()
+            delay(3_000)
+            if (_authState.value !is AuthState.Loading) return@launch
+            val user = runCatching { auth.sessionManager.loadSession() }.getOrNull()?.user
+            val email = user?.email?.takeIf { it.isNotBlank() }
+            _authState.value = if (user != null && email != null) {
+                AuthState.FullAccount(userId = user.id, email = email)
+            } else {
+                AuthState.SignedOut
+            }
+            Log.w(TAG, "Auth init not settled after 3s; proceeding with ${_authState.value}")
+        }
     }
 
     private fun observeSessionStatus() {
