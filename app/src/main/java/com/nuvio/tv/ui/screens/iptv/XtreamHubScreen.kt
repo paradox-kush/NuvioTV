@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,7 +60,6 @@ import com.nuvio.tv.ui.util.asStable
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun XtreamHubScreen(
-    onPlayChannel: (title: String, streamUrl: String, contentId: String) -> Unit,
     onOpenDetail: (contentId: String, type: String) -> Unit,
     onAddProvider: () -> Unit,
     viewModel: XtreamHubViewModel = hiltViewModel()
@@ -67,6 +67,9 @@ fun XtreamHubScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val heroItems by viewModel.heroItems.collectAsStateWithLifecycle()
     var showAccountPicker by remember { mutableStateOf(false) }
+    // B10: the Live guide's preview player expanded to fullscreen — hide the header row so the
+    // video really covers the whole screen. Focus is locked inside the guide while true.
+    var liveFullscreen by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     // Hero banner (Movies/Series): D-pad UP from row 0 lands here; UP from here lands on the tab.
     val heroFocus = remember { FocusRequester() }
@@ -109,32 +112,42 @@ fun XtreamHubScreen(
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(top = NuvioTheme.spacing.xl)) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = if (liveFullscreen) 0.dp else NuvioTheme.spacing.xl)) {
         // Header: account dropdown + section tabs
-        Row(
+        if (!liveFullscreen) Row(
             modifier = Modifier
                 .padding(start = NuvioTheme.spacing.xxxl, bottom = NuvioTheme.spacing.md)
                 .focusRestorer(selectedTabRequester),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.sm)
         ) {
+            // ponytail: the provider chip is NOT a section — render it un-selected so it doesn't
+            // share the active-tab's primary tint (that read as "this is the selected section").
             HubChip(
                 label = (uiState.selectedAccount?.name ?: "Account") + (if (uiState.accounts.size > 1) "  ▾" else ""),
-                selected = true,
+                selected = false,
                 focusRequester = firstFocus,
                 onClick = { if (uiState.accounts.size > 1) showAccountPicker = true }
             )
             Spacer(Modifier.width(NuvioTheme.spacing.md))
-            HubChip("Live TV", uiState.section == XtreamSection.LIVE, focusRequester = liveTab) { viewModel.selectSection(XtreamSection.LIVE) }
-            HubChip("Movies", uiState.section == XtreamSection.MOVIES, focusRequester = moviesTab) { viewModel.selectSection(XtreamSection.MOVIES) }
-            HubChip("Series", uiState.section == XtreamSection.SERIES, focusRequester = seriesTab) { viewModel.selectSection(XtreamSection.SERIES) }
+            HubChip("Live TV", uiState.section == XtreamSection.LIVE, focusRequester = liveTab,
+                onFocusSelect = { if (uiState.section != XtreamSection.LIVE) viewModel.selectSection(XtreamSection.LIVE) }) { viewModel.selectSection(XtreamSection.LIVE) }
+            HubChip("Movies", uiState.section == XtreamSection.MOVIES, focusRequester = moviesTab,
+                onFocusSelect = { if (uiState.section != XtreamSection.MOVIES) viewModel.selectSection(XtreamSection.MOVIES) }) { viewModel.selectSection(XtreamSection.MOVIES) }
+            HubChip("Series", uiState.section == XtreamSection.SERIES, focusRequester = seriesTab,
+                onFocusSelect = { if (uiState.section != XtreamSection.SERIES) viewModel.selectSection(XtreamSection.SERIES) }) { viewModel.selectSection(XtreamSection.SERIES) }
         }
 
         // Live TV = TiViMate-style guide (category col + live preview + EPG channel list).
         // Movies/Series = native poster rows.
         val liveAccount = uiState.selectedAccount
         if (uiState.section == XtreamSection.LIVE && liveAccount != null) {
-            LiveGuide(account = liveAccount, onPlayChannel = onPlayChannel, selectedTabRequester = selectedTabRequester)
+            LiveGuide(
+                account = liveAccount,
+                fullscreen = liveFullscreen,
+                onFullscreenChange = { liveFullscreen = it },
+                selectedTabRequester = selectedTabRequester
+            )
         } else {
             val status = when {
                 uiState.error != null -> uiState.error
@@ -241,9 +254,14 @@ private fun HubChip(
     label: String,
     selected: Boolean,
     focusRequester: FocusRequester? = null,
+    onFocusSelect: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
+    val latestOnFocusSelect by rememberUpdatedState(onFocusSelect)
+    // ponytail: section tabs switch on FOCUS (TiViMate-style) — arrow onto a tab and it
+    // selects; no OK needed. OK/click still works via onKeyEvent below.
+    LaunchedEffect(focused) { if (focused) latestOnFocusSelect?.invoke() }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier

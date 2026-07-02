@@ -51,6 +51,9 @@ data class LiveGuideUiState(
     val channels: List<GuideChannel> = emptyList(),
     val epg: Map<Int, GuideEpg> = emptyMap(),
     val focusedChannelId: String? = null,
+    /** What the single preview player is tuned to. Changes ONLY on OK (or last-played restore),
+     *  never on focus movement — focus just browses. */
+    val previewChannel: GuideChannel? = null,
     val loadingChannels: Boolean = false,
     val error: String? = null
 ) {
@@ -96,6 +99,16 @@ class XtreamLiveGuideViewModel @Inject constructor(
         if (acc.id == account?.id) return
         account = acc
         epgRequested.clear()
+        // Tune the preview to the LAST OPENED channel of this account (TiViMate-style resume).
+        viewModelScope.launch {
+            if (_uiState.value.previewChannel != null) return@launch
+            liveStore.recents.first()
+                .firstOrNull { it.id.startsWith("${XtreamItemRegistry.PREFIX}${acc.id}:live:") }
+                ?.let { ref ->
+                    val restored = GuideChannel(ref.id, ref.name, ref.logo, ref.streamUrl, streamIdOf(ref.id))
+                    _uiState.update { it.copy(previewChannel = it.previewChannel ?: restored) }
+                }
+        }
         // Cache hit: show the category column immediately without re-fetching.
         categoriesCache[acc.id]?.let { full ->
             _uiState.update { it.copy(categories = full) }
@@ -133,22 +146,35 @@ class XtreamLiveGuideViewModel @Inject constructor(
         }
         _uiState.update { it.copy(selectedCategoryId = categoryId, channels = emptyList(), focusedChannelId = null, loadingChannels = true, error = null) }
         channelsJob = viewModelScope.launch {
-            val channels: List<GuideChannel> = when (category.special) {
+            // null = the panel request FAILED (these panels throw transient 403/500s and
+            // rate-limit bursts) — retry once, then surface an error instead of faking "empty".
+            val channels: List<GuideChannel>? = when (category.special) {
                 GuideSpecial.FAVORITES -> favoriteChannels()
                 GuideSpecial.RECENT -> liveStore.recents.first().map {
                     GuideChannel(it.id, it.name, it.logo, it.streamUrl, streamIdOf(it.id))
                 }
-                GuideSpecial.ALL -> fetchChannels(acc, null).take(ALL_CAP)
-                null -> fetchChannels(acc, category.id)
+                GuideSpecial.ALL -> retryOnce { fetchChannels(acc, null) }?.take(ALL_CAP)
+                null -> retryOnce { fetchChannels(acc, category.id) }
             }
-            // Cache network-backed lists so revisiting the category is instant.
-            if (category.special == null || category.special == GuideSpecial.ALL) {
+            if (channels == null) {
+                _uiState.update {
+                    it.copy(loadingChannels = false, error = "Provider error loading \"${category.name}\" — re-select to retry")
+                }
+                return@launch
+            }
+            // Cache network-backed lists so revisiting the category is instant. Never cache an
+            // empty list: a transient panel failure must not pin a category empty all session.
+            if ((category.special == null || category.special == GuideSpecial.ALL) && channels.isNotEmpty()) {
                 channelsCache["${acc.id}|${category.id}"] = channels
             }
             _uiState.update { it.copy(channels = channels, loadingChannels = false, focusedChannelId = channels.firstOrNull()?.contentId) }
             channels.firstOrNull()?.let { ensureEpg(it.streamId) }
         }
     }
+
+    /** One quiet retry for flaky IPTV panels; second failure bubbles up as null. */
+    private suspend fun <T> retryOnce(block: suspend () -> T?): T? =
+        block() ?: run { delay(RETRY_DELAY_MS); block() }
 
     /**
      * Channel got D-pad focus: drive the preview + fetch its now/next EPG. Debounced ~250ms and
@@ -191,6 +217,13 @@ class XtreamLiveGuideViewModel @Inject constructor(
         }
     }
 
+    /** OK on a channel row: tune the single preview player to it (and remember it as
+     *  last-played). OK on the already-tuned channel is handled by the screen (fullscreen). */
+    fun playPreview(channel: GuideChannel) {
+        _uiState.update { it.copy(previewChannel = channel) }
+        recordPlayed(channel)
+    }
+
     /** Record a channel as just-watched + publish the current list so the fullscreen player
      *  can zap up/down through these channels. Called right before going fullscreen. */
     fun recordPlayed(channel: GuideChannel) {
@@ -216,8 +249,9 @@ class XtreamLiveGuideViewModel @Inject constructor(
         }
     }
 
-    private suspend fun fetchChannels(acc: XtreamAccount, categoryId: String?): List<GuideChannel> {
-        return client.liveChannels(acc, categoryId).getOrDefault(emptyList()).map { ch ->
+    /** null = request failed (as opposed to a genuinely empty category). */
+    private suspend fun fetchChannels(acc: XtreamAccount, categoryId: String?): List<GuideChannel>? {
+        return client.liveChannels(acc, categoryId).getOrNull()?.map { ch ->
             val id = XtreamItemRegistry.liveId(acc.id, ch.streamId)
             registry.register(
                 XtreamResolvedItem(
@@ -245,5 +279,6 @@ class XtreamLiveGuideViewModel @Inject constructor(
         private const val ALL_CAP = 600   // ponytail: don't render 26k rows; categories are the real browse path
         private const val EPG_FOCUS_DEBOUNCE_MS = 250L   // wait for focus to settle before fetching EPG
         private const val EPG_PREFETCH_RADIUS = 3        // prefetch ±3 neighbours so scrolling has now/next ready
+        private const val RETRY_DELAY_MS = 1000L         // pause before the single panel-flake retry
     }
 }

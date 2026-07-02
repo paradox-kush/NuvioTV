@@ -31,7 +31,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Cache
+import okhttp3.CacheControl
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -126,6 +129,53 @@ object NetworkModule {
                         .build()
                 } else {
                     response
+                }
+            }
+            // Xtream catalogs (categories / channel & VOD lists) → force disk-cacheable.
+            // Panels send no-store, so every app start refetched everything and every panel
+            // flake (transient 403/500/timeouts) surfaced to the UI. Fresh window serves
+            // instantly from disk; the app interceptor below falls back to a stale copy when
+            // the panel errors. EPG and auth are excluded (must stay live).
+            .addNetworkInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                if (response.isSuccessful && isXtreamCatalogUrl(chain.request().url)) {
+                    response.newBuilder()
+                        .removeHeader("Pragma")
+                        .header("Cache-Control", "public, max-age=$XTREAM_CATALOG_FRESH_SECONDS")
+                        .build()
+                } else {
+                    response
+                }
+            }
+            // Panel flake fallback: on network failure or 4xx/5xx for a catalog request,
+            // serve the last cached copy (up to 7 days stale) instead of failing the screen.
+            .addInterceptor { chain ->
+                val request = chain.request()
+                if (!isXtreamCatalogUrl(request.url)) return@addInterceptor chain.proceed(request)
+                val staleRequest = request.newBuilder()
+                    .cacheControl(
+                        CacheControl.Builder()
+                            .onlyIfCached()
+                            .maxStale(7, TimeUnit.DAYS)
+                            .build()
+                    )
+                    .build()
+                val networkResponse: Response = try {
+                    chain.proceed(request)
+                } catch (e: java.io.IOException) {
+                    val cached = chain.proceed(staleRequest)
+                    if (cached.isSuccessful) return@addInterceptor cached
+                    cached.close()
+                    throw e
+                }
+                if (networkResponse.isSuccessful) return@addInterceptor networkResponse
+                val cached = chain.proceed(staleRequest)
+                if (cached.isSuccessful) {
+                    networkResponse.close()
+                    cached
+                } else {
+                    cached.close()
+                    networkResponse
                 }
             }
             .addInterceptor(HttpLoggingInterceptor().apply {
@@ -549,4 +599,15 @@ object NetworkModule {
     @Singleton
     fun provideImdbTapframeApi(@Named("imdbTapframe") retrofit: Retrofit): ImdbTapframeApi =
         retrofit.create(ImdbTapframeApi::class.java)
+
+    /** Xtream player_api list endpoints that are safe to serve from disk (EPG/auth stay live). */
+    private val XTREAM_CACHEABLE_ACTIONS = setOf(
+        "get_live_categories", "get_vod_categories", "get_series_categories",
+        "get_live_streams", "get_vod_streams", "get_series"
+    )
+    private const val XTREAM_CATALOG_FRESH_SECONDS = 3600 // 1h serve-from-disk window
+
+    private fun isXtreamCatalogUrl(url: HttpUrl): Boolean =
+        url.encodedPath.endsWith("/player_api.php") &&
+            url.queryParameter("action") in XTREAM_CACHEABLE_ACTIONS
 }

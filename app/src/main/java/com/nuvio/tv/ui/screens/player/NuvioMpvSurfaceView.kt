@@ -259,7 +259,11 @@ class NuvioMpvSurfaceView @JvmOverloads constructor(
 
     private fun applyAspectModeInternal(mode: AspectMode, allowRetry: Boolean) {
         val viewAspect = readViewAspectRatio(width, height)
-        val videoAspect = readVideoAspectRatio()
+        // Property reads are synchronous JNI into the mpv core and can block the UI thread for
+        // SECONDS while the core is mid-open on a slow live stream (ANR'd the Live guide on
+        // expand-resize). Only modes that actually use the video aspect may pay that cost;
+        // ORIGINAL and the fixed zooms resolve without it.
+        val videoAspect = if (aspectModeNeedsVideoAspect(mode)) readVideoAspectRatio() else null
         val scale = resolveAspectScale(
             mode = mode,
             viewAspect = viewAspect,

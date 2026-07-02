@@ -1136,13 +1136,6 @@ fun NuvioNavHost(
 
         composable(Screen.XtreamHub.route) {
             com.nuvio.tv.ui.screens.iptv.XtreamHubScreen(
-                onPlayChannel = { title, streamUrl, contentId ->
-                    // "live" → forces the libmpv engine (ExoPlayer can't sustain raw continuous
-                    // MPEG-TS). contentId lets the fullscreen player zap up/down the channel list.
-                    navController.navigate(
-                        Screen.Player.createRoute(streamUrl = streamUrl, title = title, contentId = contentId, contentType = "live")
-                    )
-                },
                 onOpenDetail = { contentId, type ->
                     navController.navigate(Screen.Detail.createRoute(contentId, type))
                 },
