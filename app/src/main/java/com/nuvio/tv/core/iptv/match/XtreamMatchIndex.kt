@@ -12,7 +12,7 @@ import javax.inject.Singleton
 enum class MatchKind(val slug: String) { MOVIE("movie"), SERIES("series") }
 
 /** One catalog entry as stored in the index. [ext] = container extension (movies only). */
-data class IndexedItem(val sid: Int, val name: String, val year: Int?, val tmdb: Int?, val ext: String?)
+data class IndexedItem(val sid: Int, val name: String, val year: Int?, val tmdb: Int?, val ext: String?, val poster: String? = null)
 
 /** A confirmed (or confirmed-absent when [sid] is null) TMDB->stream mapping. */
 data class CachedMapping(val sid: Int?, val matchedName: String?, val updatedAtMs: Long)
@@ -30,9 +30,9 @@ data class UnsyncedMapping(val kind: String, val tmdb: Int, val sid: Int?, val m
 @Singleton
 class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context) {
 
-    private val helper = object : SQLiteOpenHelper(context, "xtream_match.db", null, 1) {
+    private val helper = object : SQLiteOpenHelper(context, "xtream_match.db", null, 2) {
         override fun onCreate(db: SQLiteDatabase) {
-            db.execSQL("CREATE TABLE items(provider TEXT NOT NULL, kind TEXT NOT NULL, sid INTEGER NOT NULL, name TEXT NOT NULL, year INTEGER, tmdb INTEGER, ext TEXT, PRIMARY KEY(provider, kind, sid)) WITHOUT ROWID")
+            db.execSQL("CREATE TABLE items(provider TEXT NOT NULL, kind TEXT NOT NULL, sid INTEGER NOT NULL, name TEXT NOT NULL, year INTEGER, tmdb INTEGER, ext TEXT, poster TEXT, PRIMARY KEY(provider, kind, sid)) WITHOUT ROWID")
             db.execSQL("CREATE INDEX items_tmdb ON items(provider, kind, tmdb)")
             db.execSQL("CREATE TABLE keys(provider TEXT NOT NULL, kind TEXT NOT NULL, k TEXT NOT NULL, sid INTEGER NOT NULL, PRIMARY KEY(provider, kind, k, sid)) WITHOUT ROWID")
             db.execSQL("CREATE TABLE idx_meta(provider TEXT NOT NULL, kind TEXT NOT NULL, built_at INTEGER NOT NULL, item_count INTEGER NOT NULL, PRIMARY KEY(provider, kind)) WITHOUT ROWID")
@@ -72,7 +72,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
         for (chunk in items.chunked(5_000)) {
             db.beginTransaction()
             try {
-                val itemStmt = db.compileStatement("INSERT OR REPLACE INTO items(provider, kind, sid, name, year, tmdb, ext) VALUES(?,?,?,?,?,?,?)")
+                val itemStmt = db.compileStatement("INSERT OR REPLACE INTO items(provider, kind, sid, name, year, tmdb, ext, poster) VALUES(?,?,?,?,?,?,?,?)")
                 val keyStmt = db.compileStatement("INSERT OR REPLACE INTO keys(provider, kind, k, sid) VALUES(?,?,?,?)")
                 for (it in chunk) {
                     itemStmt.clearBindings()
@@ -81,6 +81,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
                     if (it.year != null) itemStmt.bindLong(5, it.year.toLong()) else itemStmt.bindNull(5)
                     if (it.tmdb != null) itemStmt.bindLong(6, it.tmdb.toLong()) else itemStmt.bindNull(6)
                     if (it.ext != null) itemStmt.bindString(7, it.ext) else itemStmt.bindNull(7)
+                    if (it.poster != null) itemStmt.bindString(8, it.poster) else itemStmt.bindNull(8)
                     itemStmt.executeInsert()
                     for (key in TitleNormalizer.keysOf(it.name)) {
                         keyStmt.clearBindings()
@@ -106,10 +107,33 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
         }
     }
 
+    /** Substring name search over the indexed catalog — backs the IPTV rows in Search. */
+    suspend fun searchByName(provider: String, kind: MatchKind, query: String, limit: Int): List<IndexedItem> = withContext(Dispatchers.IO) {
+        db.rawQuery(
+            "SELECT sid, name, year, tmdb, ext, poster FROM items WHERE provider = ? AND kind = ? AND name LIKE '%' || ? || '%' LIMIT ?",
+            arrayOf(provider, kind.slug, query, limit.toString())
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(
+                        IndexedItem(
+                            sid = c.getLong(0).toInt(),
+                            name = c.getString(1),
+                            year = if (c.isNull(2)) null else c.getLong(2).toInt(),
+                            tmdb = if (c.isNull(3)) null else c.getLong(3).toInt(),
+                            ext = if (c.isNull(4)) null else c.getString(4),
+                            poster = if (c.isNull(5)) null else c.getString(5),
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     /** All items indexed under a normalized key. */
     suspend fun probe(provider: String, kind: MatchKind, key: String): List<IndexedItem> = withContext(Dispatchers.IO) {
         db.rawQuery(
-            "SELECT i.sid, i.name, i.year, i.tmdb, i.ext FROM keys x JOIN items i ON i.provider = x.provider AND i.kind = x.kind AND i.sid = x.sid WHERE x.provider = ? AND x.kind = ? AND x.k = ?",
+            "SELECT i.sid, i.name, i.year, i.tmdb, i.ext, i.poster FROM keys x JOIN items i ON i.provider = x.provider AND i.kind = x.kind AND i.sid = x.sid WHERE x.provider = ? AND x.kind = ? AND x.k = ?",
             arrayOf(provider, kind.slug, key)
         ).use { c ->
             buildList {
@@ -121,6 +145,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
                             year = if (c.isNull(2)) null else c.getLong(2).toInt(),
                             tmdb = if (c.isNull(3)) null else c.getLong(3).toInt(),
                             ext = if (c.isNull(4)) null else c.getString(4),
+                            poster = if (c.isNull(5)) null else c.getString(5),
                         )
                     )
                 }
@@ -131,7 +156,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
     /** Tier-1: items whose bulk-list tmdb id already matches. */
     suspend fun byTmdb(provider: String, kind: MatchKind, tmdb: Int): List<IndexedItem> = withContext(Dispatchers.IO) {
         db.rawQuery(
-            "SELECT sid, name, year, tmdb, ext FROM items WHERE provider = ? AND kind = ? AND tmdb = ?",
+            "SELECT sid, name, year, tmdb, ext, poster FROM items WHERE provider = ? AND kind = ? AND tmdb = ?",
             arrayOf(provider, kind.slug, tmdb.toString())
         ).use { c ->
             buildList {
@@ -143,6 +168,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
                             year = if (c.isNull(2)) null else c.getLong(2).toInt(),
                             tmdb = if (c.isNull(3)) null else c.getLong(3).toInt(),
                             ext = if (c.isNull(4)) null else c.getString(4),
+                            poster = if (c.isNull(5)) null else c.getString(5),
                         )
                     )
                 }
@@ -152,7 +178,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
 
     suspend fun item(provider: String, kind: MatchKind, sid: Int): IndexedItem? = withContext(Dispatchers.IO) {
         db.rawQuery(
-            "SELECT sid, name, year, tmdb, ext FROM items WHERE provider = ? AND kind = ? AND sid = ?",
+            "SELECT sid, name, year, tmdb, ext, poster FROM items WHERE provider = ? AND kind = ? AND sid = ?",
             arrayOf(provider, kind.slug, sid.toString())
         ).use { c ->
             if (!c.moveToFirst()) null
@@ -162,6 +188,7 @@ class XtreamMatchIndex @Inject constructor(@ApplicationContext context: Context)
                 year = if (c.isNull(2)) null else c.getLong(2).toInt(),
                 tmdb = if (c.isNull(3)) null else c.getLong(3).toInt(),
                 ext = if (c.isNull(4)) null else c.getString(4),
+                poster = if (c.isNull(5)) null else c.getString(5),
             )
         }
     }

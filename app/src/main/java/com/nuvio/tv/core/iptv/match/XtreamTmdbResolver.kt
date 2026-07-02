@@ -149,10 +149,10 @@ class XtreamTmdbResolver @Inject constructor(
                 try {
                     val items = when (kind) {
                         MatchKind.MOVIE -> client.vodMovies(acc).getOrThrow().map {
-                            IndexedItem(it.streamId, it.name, TitleNormalizer.yearOf(it.name), it.tmdb, it.containerExtension)
+                            IndexedItem(it.streamId, it.name, TitleNormalizer.yearOf(it.name), it.tmdb, it.containerExtension, it.poster)
                         }
                         MatchKind.SERIES -> client.series(acc).getOrThrow().map {
-                            IndexedItem(it.seriesId, it.name, it.year ?: TitleNormalizer.yearOf(it.name), it.tmdb, null)
+                            IndexedItem(it.seriesId, it.name, it.year ?: TitleNormalizer.yearOf(it.name), it.tmdb, null, it.poster)
                         }
                     }
                     index.rebuild(acc.id, kind, items)
