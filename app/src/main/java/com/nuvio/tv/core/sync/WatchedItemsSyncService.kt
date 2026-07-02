@@ -46,7 +46,8 @@ class WatchedItemsSyncService @Inject constructor(
     private val watchedItemsPreferences: WatchedItemsPreferences,
     private val traktAuthDataStore: TraktAuthDataStore,
     private val traktSettingsDataStore: TraktSettingsDataStore,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private val deltaSyncMutex = Mutex()
 
@@ -153,6 +154,7 @@ class WatchedItemsSyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_push_watched_items", params)
@@ -393,6 +395,7 @@ class WatchedItemsSyncService @Inject constructor(
                         if (episode != null) put("episode", episode)
                     }
                 })
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_delete_watched_items", params)
@@ -425,6 +428,7 @@ class WatchedItemsSyncService @Inject constructor(
                         }
                     }
                 })
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_delete_watched_items", params)

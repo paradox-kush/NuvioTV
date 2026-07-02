@@ -46,7 +46,8 @@ class WatchProgressSyncService @Inject constructor(
     private val watchProgressPreferences: WatchProgressPreferences,
     private val traktAuthDataStore: TraktAuthDataStore,
     private val traktSettingsDataStore: TraktSettingsDataStore,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val syncClientIdentity: SyncClientIdentity
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val deltaSyncMutex = Mutex()
@@ -138,6 +139,7 @@ class WatchProgressSyncService @Inject constructor(
                     distinctKeys.forEach { add(it) }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_delete_watch_progress", params)
@@ -188,6 +190,7 @@ class WatchProgressSyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_push_watch_progress", params)
@@ -230,6 +233,7 @@ class WatchProgressSyncService @Inject constructor(
                     }
                 })
                 put("p_profile_id", profileId)
+                putSyncOriginClientId(syncClientIdentity)
             }
             withJwtRefreshRetry {
                 postgrest.rpc("sync_push_watch_progress", params)
