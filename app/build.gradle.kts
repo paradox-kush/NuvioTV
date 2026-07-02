@@ -301,6 +301,16 @@ android {
         unitTests {
             // Robolectric needs the merged manifest/resources on the unit-test classpath
             isIncludeAndroidResources = true
+            all { test ->
+                // Full stack traces in console output so CI failures are diagnosable
+                // from the run log without downloading report artifacts.
+                test.testLogging {
+                    events("failed")
+                    exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+                    showStackTraces = true
+                    showCauses = true
+                }
+            }
         }
     }
 
