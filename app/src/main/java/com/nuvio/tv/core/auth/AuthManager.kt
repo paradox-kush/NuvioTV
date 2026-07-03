@@ -349,42 +349,6 @@ class AuthManager @Inject constructor(
         }
     }
 
-    /**
-     * QR login RPCs currently require an authenticated Supabase session.
-     * This creates/reuses an anonymous session only for the QR flow while
-     * keeping app-level auth state exposed as SignedOut until a full account exists.
-     */
-    suspend fun ensureQrSessionAuthenticated(traceId: Long? = null, diagnostics: AuthDiagnosticsSession? = null): Result<Unit> {
-        val startedAtMs = SystemClock.elapsedRealtime()
-        val user = auth.currentUserOrNull()
-        val hasToken = auth.currentAccessTokenOrNull() != null
-        val trace = qrTrace(traceId)
-        Log.d(TAG, "$trace ensureQrSessionAuthenticated begin user=${user?.id.rawForLog()} hasToken=$hasToken authState=${_authState.value.nameForLog()}")
-
-        if (user != null && hasToken) {
-            Log.d(TAG, "$trace ensureQrSessionAuthenticated reused existing session elapsedMs=${SystemClock.elapsedRealtime() - startedAtMs}")
-            return Result.success(Unit)
-        }
-
-        return try {
-            val body = executeSupabaseJsonRequest(
-                diagnostics = diagnostics,
-                endpoint = AUTH_ENDPOINT_SIGNUP,
-                url = supabaseUrl(AUTH_ENDPOINT_SIGNUP),
-                headers = supabaseHeaders(),
-                body = "{}"
-            ).body
-            val result = json.decodeFromString<TvLoginExchangeResult>(body)
-            auth.importAuthToken(result.accessToken, result.refreshToken)
-            val signedInUser = auth.currentUserOrNull()
-            Log.d(TAG, "$trace ensureQrSessionAuthenticated anonymous sign-in ok user=${signedInUser?.id.rawForLog()} hasToken=${auth.currentAccessTokenOrNull() != null} elapsedMs=${SystemClock.elapsedRealtime() - startedAtMs}")
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Log.e(TAG, "$trace ensureQrSessionAuthenticated anonymous sign-in failed elapsedMs=${SystemClock.elapsedRealtime() - startedAtMs} error=${e.diagnosticSummary()}", e)
-            Result.failure(e)
-        }
-    }
-
     suspend fun signOut(explicit: Boolean = true) {
         if (explicit) {
             authSessionNoticeDataStore.markNuvioExplicitLogout()
@@ -553,13 +517,11 @@ class AuthManager @Inject constructor(
             if (!deviceName.isNullOrBlank()) put("p_device_name", deviceName)
         }
         Log.d(TAG, "$trace rpc start_tv_login_session request nonce=${deviceNonce.rawForLog()} redirect=${redirectBaseUrl.urlForLog()} deviceNamePresent=${!deviceName.isNullOrBlank()}")
-        val token = auth.currentAccessTokenOrNull()
-            ?: throw IllegalStateException("Not authenticated")
         val body = executeSupabaseJsonRequest(
             diagnostics = diagnostics,
             endpoint = AUTH_ENDPOINT_START_TV_LOGIN,
             url = supabaseUrl(AUTH_ENDPOINT_START_TV_LOGIN),
-            headers = supabaseHeaders(token),
+            headers = supabaseHeaders(),
             body = params.toString()
         ).body
         val results = json.decodeFromString<List<TvLoginStartResult>>(body)
@@ -583,13 +545,11 @@ class AuthManager @Inject constructor(
                 put("p_code", code)
                 put("p_device_nonce", deviceNonce)
             }
-            val token = auth.currentAccessTokenOrNull()
-                ?: throw IllegalStateException("Not authenticated")
             val body = executeSupabaseJsonRequest(
                 diagnostics = diagnostics,
                 endpoint = AUTH_ENDPOINT_POLL_TV_LOGIN,
                 url = supabaseUrl(AUTH_ENDPOINT_POLL_TV_LOGIN),
-                headers = supabaseHeaders(token),
+                headers = supabaseHeaders(),
                 body = params.toString()
             ).body
             val results = json.decodeFromString<List<TvLoginPollResult>>(body)
@@ -612,19 +572,17 @@ class AuthManager @Inject constructor(
         val startedAtMs = SystemClock.elapsedRealtime()
         val trace = qrTrace(traceId)
         return try {
-            val token = auth.currentAccessTokenOrNull()
-                ?: throw IllegalStateException("Not authenticated")
             val payload = buildJsonObject {
                 put("code", code)
                 put("device_nonce", deviceNonce)
             }.toString()
             val url = supabaseUrl(AUTH_ENDPOINT_EXCHANGE_TV_LOGIN)
-            Log.d(TAG, "$trace exchangeTvLoginSession request url=${url.urlForLog()} code=${code.rawForLog()} nonce=${deviceNonce.rawForLog()} tokenPresent=${token.isNotBlank()} payloadBytes=${payload.length}")
+            Log.d(TAG, "$trace exchangeTvLoginSession request url=${url.urlForLog()} code=${code.rawForLog()} nonce=${deviceNonce.rawForLog()} payloadBytes=${payload.length}")
             val body = executeSupabaseJsonRequest(
                 diagnostics = diagnostics,
                 endpoint = AUTH_ENDPOINT_EXCHANGE_TV_LOGIN,
                 url = url,
-                headers = supabaseHeaders(token),
+                headers = supabaseHeaders(),
                 body = payload
             ).body
             val result = json.decodeFromString<TvLoginExchangeResult>(body)

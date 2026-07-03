@@ -53,7 +53,6 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 
 private const val TAG = "AccountViewModel"
-private const val QR_ENDPOINT_SIGNUP = "/auth/v1/signup"
 private const val QR_ENDPOINT_START = "/rest/v1/rpc/start_tv_login_session"
 private const val QR_ENDPOINT_POLL = "/rest/v1/rpc/poll_tv_login_session"
 private const val QR_ENDPOINT_EXCHANGE = "/functions/v1/tv-logins-exchange"
@@ -304,22 +303,6 @@ class AccountViewModel @Inject constructor(
                     qrLoginExpiresAtMillis = null
                 )
             }
-            val ensureStartedAtMs = SystemClock.elapsedRealtime()
-            Log.d(TAG, "QR_LOGIN[$traceId] ensure QR Supabase session begin")
-            authManager.ensureQrSessionAuthenticated(traceId = traceId, diagnostics = diagnostics).onFailure { e ->
-                Log.e(TAG, "QR_LOGIN[$traceId] ensure QR Supabase session failed elapsedMs=${SystemClock.elapsedRealtime() - ensureStartedAtMs} error=${e.diagnosticSummary()}", e)
-                diagnostics.finishFailure("ensure_qr_session_failed", QR_ENDPOINT_SIGNUP, error = e)
-                activeQrLoginDiagnostics = null
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = userFriendlyError(e),
-                        qrLoginStatus = context.getString(R.string.qr_login_device_auth_failed)
-                    )
-                }
-                return@launch
-            }
-            Log.d(TAG, "QR_LOGIN[$traceId] ensure QR Supabase session ok elapsedMs=${SystemClock.elapsedRealtime() - ensureStartedAtMs}")
             Log.d(TAG, "QR_LOGIN[$traceId] start_tv_login_session call begin")
             authManager.startTvLoginSession(
                 deviceNonce = nonce,
