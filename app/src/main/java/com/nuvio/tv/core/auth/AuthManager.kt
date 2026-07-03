@@ -665,7 +665,9 @@ class AuthManager @Inject constructor(
         return try {
             withContext(Dispatchers.IO) {
                 client.newCall(request).execute().use { response ->
-                    val responseBody = response.body.string()
+                    val body = response.body
+                    val responseContentType = body?.contentType()?.toString()
+                    val responseBody = body?.string().orEmpty()
                     diagnostics?.recordResponse(
                         endpoint = endpoint,
                         method = method,
@@ -674,7 +676,7 @@ class AuthManager @Inject constructor(
                         isSuccessful = response.isSuccessful,
                         headers = response.headers.toDiagnosticMap(),
                         body = responseBody,
-                        contentType = response.body.contentType()?.toString()
+                        contentType = responseContentType
                     )
                     Log.d(TAG, "auth response #$requestId endpoint=$endpoint http=${response.code} success=${response.isSuccessful} bodyBytes=${responseBody.length} elapsedMs=${SystemClock.elapsedRealtime() - startedAtMs} body=${authDiagnosticFilteredBody(responseBody).orEmpty().bodySnippetForLog()}")
                     if (!response.isSuccessful) {
