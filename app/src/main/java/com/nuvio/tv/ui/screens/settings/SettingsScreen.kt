@@ -496,6 +496,11 @@ fun SettingsScreen(
                     }
                 }
             } else {
+            val isZenRailGlide = NuvioTheme.settingsUiStyle == SettingsUiStyle.ZEN
+            var railCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+            var focusedRailBounds by remember { mutableStateOf<Rect?>(null) }
+            val density = LocalDensity.current
+
             Row(
                 modifier = Modifier.fillMaxSize(),
                 horizontalArrangement = Arrangement.spacedBy(NuvioTheme.spacing.lg)
@@ -504,7 +509,33 @@ fun SettingsScreen(
                     modifier = Modifier
                         .width(220.dp)
                         .fillMaxHeight()
+                        .onGloballyPositioned { railCoordinates = it }
                 ) {
+                    if (isZenRailGlide) {
+                        focusedRailBounds?.let { bounds ->
+                            val pillTop by animateFloatAsState(
+                                targetValue = bounds.top,
+                                animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+                                label = "railPillTop"
+                            )
+                            val pillAlpha by animateFloatAsState(
+                                targetValue = if (railHadFocus) 1f else 0f,
+                                animationSpec = tween(durationMillis = 200),
+                                label = "railPillAlpha"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .offset { IntOffset(bounds.left.roundToInt(), pillTop.roundToInt()) }
+                                    .size(
+                                        width = with(density) { bounds.width.toDp() },
+                                        height = with(density) { bounds.height.toDp() }
+                                    )
+                                    .graphicsLayer { alpha = pillAlpha }
+                                    .clip(SettingsZenRowShape)
+                                    .background(settingsFocusFillColor())
+                            )
+                        }
+                    }
                     LazyColumn(
                         state = railListState,
                         modifier = Modifier
@@ -546,7 +577,16 @@ fun SettingsScreen(
                                 rawIconRes = section.rawIconRes,
                                 isSelected = selectedCategory == section.category,
                                 focusRequester = railFocusRequesters[section.category],
-                                onClick = { onSectionClick(section) }
+                                onClick = { onSectionClick(section) },
+                                onFocusedItemPositioned = if (isZenRailGlide) {
+                                    { itemCoordinates ->
+                                        railCoordinates?.let { container ->
+                                            focusedRailBounds = container.localBoundingBoxOf(itemCoordinates, clipBounds = false)
+                                        }
+                                    }
+                                } else {
+                                    null
+                                }
                             )
                         }
                     }

@@ -1767,6 +1767,8 @@
     <string name="account_total_label">Total</string>
     <string name="account_loading_sync">Loading sync data\u2026</string>
     <string name="account_sign_out">Sign Out</string>
+    <string name="account_sign_out_confirm_title">Sign out?</string>
+    <string name="account_sign_out_confirm_subtitle">You will need to sign in again to sync library, watch progress, addons, and plugins on this device.</string>
     <string name="account_error_signin_required">Sign in with an account first.</string>
     <string name="account_signin_create_title">Sign In / Create Account</string>
     <string name="account_signin_create_desc">Use email and password to create or sign into your account.</string>
