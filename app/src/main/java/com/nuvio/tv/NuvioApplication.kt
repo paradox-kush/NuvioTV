@@ -17,10 +17,12 @@ import coil3.request.allowRgb565
 import coil3.bitmapFactoryMaxParallelism
 
 import okio.Path.Companion.toOkioPath
+import com.nuvio.tv.core.diagnostics.SentryInitializer
 import com.nuvio.tv.core.runtime.PluginRuntimeHooks
 import com.nuvio.tv.core.sync.RealtimeSyncInvalidationService
 import com.nuvio.tv.core.sync.StartupSyncService
 import com.nuvio.tv.core.sync.androidtv.AndroidTvChannelSyncService
+import com.nuvio.tv.data.local.SentrySettingsDataStore
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -35,6 +37,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
     @Inject lateinit var startupSyncService: StartupSyncService
     @Inject lateinit var androidTvChannelSyncService: AndroidTvChannelSyncService
     @Inject lateinit var realtimeSyncInvalidationService: RealtimeSyncInvalidationService
+    @Inject lateinit var sentrySettingsDataStore: SentrySettingsDataStore
 
     companion object {
         /**
@@ -63,6 +66,7 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        SentryInitializer.start(this, sentrySettingsDataStore)
         PluginRuntimeHooks.onApplicationCreate(this)
         androidTvChannelSyncService.start()
         realtimeSyncInvalidationService.start()

@@ -37,6 +37,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import com.nuvio.tv.core.network.IPv4FirstDns
+import com.nuvio.tv.core.diagnostics.SentryNetworkBreadcrumbInterceptor
 import java.io.File
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -117,6 +118,7 @@ object NetworkModule {
                     .build()
                 chain.proceed(request)
             }
+            .addInterceptor(SentryNetworkBreadcrumbInterceptor())
             // Prevent OkHttp from caching error responses (4xx/5xx).
             .addNetworkInterceptor { chain ->
                 val response = chain.proceed(chain.request())
@@ -151,6 +153,7 @@ object NetworkModule {
                     .build()
                 chain.proceed(request)
             }
+            .addInterceptor(SentryNetworkBreadcrumbInterceptor())
             .build()
 
     @Provides

@@ -60,6 +60,8 @@ val doviStaticLibPath = resolveProperty(devProperties, localProperties, "DOVI_LI
 val doviIncludeDirPath = resolveProperty(devProperties, localProperties, "DOVI_LIBDOVI_INCLUDE_DIR")
 val doviPrebuiltRootPath = resolveProperty(devProperties, localProperties, "DOVI_LIBDOVI_PREBUILT_ROOT")
 val sponsorNames = resolveProperty(devProperties, localProperties, "SPONSOR_NAMES", "ragmehos.")
+val sentryDsn = providers.environmentVariable("SENTRY_DSN").orNull?.trim()?.takeIf { it.isNotBlank() }
+    ?: resolveProperty(devProperties, localProperties, "SENTRY_DSN")
 
 fun env(name: String): String? = providers.environmentVariable(name).orNull
 
@@ -129,6 +131,7 @@ android {
         buildConfigField("String", "PLAYBACK_REPORTS_BASE_URL", buildConfigString(localProperties.getProperty("PLAYBACK_REPORTS_BASE_URL", "")))
         buildConfigField("String", "PREMIUMIZE_CLIENT_ID", "\"${localProperties.getProperty("PREMIUMIZE_CLIENT_ID", "")}\"")
         buildConfigField("String", "SPONSOR_NAMES", buildConfigString(sponsorNames))
+        buildConfigField("String", "SENTRY_DSN", buildConfigString(sentryDsn))
 
         // In-app updater (GitHub Releases)
         buildConfigField("String", "GITHUB_OWNER", "\"tapframe\"")
@@ -178,6 +181,7 @@ android {
             isMinifyEnabled = false
 
             buildConfigField("boolean", "IS_DEBUG_BUILD", "true")
+            buildConfigField("String", "SENTRY_ENVIRONMENT", buildConfigString("debug"))
 
             // Dev environment (from local.dev.properties)
             buildConfigField("String", "SUPABASE_URL", "\"${resolveProperty(devProperties, localProperties, "NUVIO_SUPABASE_URL")}\"")
@@ -210,6 +214,7 @@ android {
             }
 
             buildConfigField("boolean", "IS_DEBUG_BUILD", "false")
+            buildConfigField("String", "SENTRY_ENVIRONMENT", buildConfigString("production"))
 
             // Production environment (from local.properties)
             buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("NUVIO_SUPABASE_URL", "")}\"")
@@ -239,6 +244,7 @@ android {
                 "proguard-rules.pro"
             )
             buildConfigField("boolean", "IS_DEBUG_BUILD", "true")
+            buildConfigField("String", "SENTRY_ENVIRONMENT", buildConfigString("benchmark"))
             applicationIdSuffix = ".debug"
             matchingFallbacks += "release"
         }
@@ -477,6 +483,7 @@ dependencies {
     implementation(libs.supabase.postgrest)
     implementation(libs.supabase.realtime)
     implementation(libs.ktor.client.okhttp)
+    implementation(libs.sentry.android)
 
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
