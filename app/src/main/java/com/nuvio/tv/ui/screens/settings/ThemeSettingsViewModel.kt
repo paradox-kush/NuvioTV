@@ -43,6 +43,14 @@ class ThemeSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ThemeSettingsUiState())
     val uiState: StateFlow<ThemeSettingsUiState> = _uiState.asStateFlow()
 
+    private var restoreStyleFocus = false
+
+    fun consumeStyleFocusRestore(): Boolean {
+        val pending = restoreStyleFocus
+        restoreStyleFocus = false
+        return pending
+    }
+
     init {
         viewModelScope.launch {
             themeDataStore.selectedTheme
@@ -135,6 +143,7 @@ class ThemeSettingsViewModel @Inject constructor(
 
     private fun selectSettingsUiStyle(style: SettingsUiStyle) {
         if (_uiState.value.settingsUiStyle == style) return
+        restoreStyleFocus = true
         viewModelScope.launch {
             themeDataStore.setSettingsUiStyle(style)
         }
