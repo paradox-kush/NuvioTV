@@ -322,6 +322,14 @@
     <string name="appearance_amoled_mode_subtitle">Use pure black for app backgrounds</string>
     <string name="appearance_amoled_surfaces_mode">Pure Black Surfaces</string>
     <string name="appearance_amoled_surfaces_mode_subtitle">Also make cards, panels, and containers pure black</string>
+    <string name="appearance_settings_style">Settings Style</string>
+    <string name="appearance_settings_style_subtitle">Choose how the settings screens are presented</string>
+    <string name="settings_style_classic">Default</string>
+    <string name="settings_style_classic_desc">Standard layout with cards</string>
+    <string name="settings_style_zen">Minimal</string>
+    <string name="settings_style_zen_desc">Simple, flat layout</string>
+    <string name="settings_style_horizon">Top Bar</string>
+    <string name="settings_style_horizon_desc">Navigation tabs at the top</string>
     <string name="appearance_font_and_language">Font and Language</string>
     <string name="appearance_font_and_language_subtitle">Choose the typeface and locale used throughout the app</string>
     <string name="cd_selected">Selected</string>
@@ -1759,6 +1767,8 @@
     <string name="account_total_label">Total</string>
     <string name="account_loading_sync">Loading sync data\u2026</string>
     <string name="account_sign_out">Sign Out</string>
+    <string name="account_sign_out_confirm_title">Sign out?</string>
+    <string name="account_sign_out_confirm_subtitle">You will need to sign in again to sync library, watch progress, addons, and plugins on this device.</string>
     <string name="account_error_signin_required">Sign in with an account first.</string>
     <string name="account_signin_create_title">Sign In / Create Account</string>
     <string name="account_signin_create_desc">Use email and password to create or sign into your account.</string>
