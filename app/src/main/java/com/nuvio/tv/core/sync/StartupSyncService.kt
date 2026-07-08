@@ -531,7 +531,7 @@ class StartupSyncService @Inject constructor(
                 }
         }
 
-        traktCredentialSyncService.pullFromRemote()
+        traktCredentialSyncService.pullFromRemote(profileId = profileId)
             .onSuccess { applied ->
                 Log.d(TAG, "Trakt credential pull completed for profile $profileId (applied=$applied)")
             }
