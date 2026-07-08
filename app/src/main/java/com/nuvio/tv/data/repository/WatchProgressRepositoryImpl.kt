@@ -835,7 +835,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
                 }
         }
         if (authManager.isAuthenticated && !useTraktProgress) {
-            watchedItemsSyncService.deleteFromRemote(contentId, season, episode)
+            watchedItemsSyncService.deleteFromRemote(contentId, season, episode, profileId = profileId)
                 .onFailure { error ->
                     Log.w(TAG, "removeFromHistory watched item remote delete failed", error)
                 }
@@ -880,7 +880,7 @@ class WatchProgressRepositoryImpl @Inject constructor(
                     }
             }
             if (authManager.isAuthenticated) {
-                watchedItemsSyncService.deleteFromRemoteBatch(contentId, episodes)
+                watchedItemsSyncService.deleteFromRemoteBatch(contentId, episodes, profileId = profileId)
                     .onFailure { error ->
                         Log.w(TAG, "removeFromHistoryBatch watched item remote delete failed", error)
                     }
