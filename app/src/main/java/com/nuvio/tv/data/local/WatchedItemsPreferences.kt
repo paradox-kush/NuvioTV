@@ -99,8 +99,11 @@ class WatchedItemsPreferences @Inject constructor(
         }
     }
 
-    suspend fun markAsWatched(item: WatchedItem) {
-        store().edit { preferences ->
+    suspend fun markAsWatched(
+        item: WatchedItem,
+        profileId: Int = profileManager.activeProfileId.value
+    ) {
+        store(profileId).edit { preferences ->
             val current = preferences[watchedItemsKey] ?: emptySet()
             val filtered = current.filterNot { json ->
                 runCatching {
@@ -115,9 +118,12 @@ class WatchedItemsPreferences @Inject constructor(
         }
     }
 
-    suspend fun markAsWatchedBatch(items: List<WatchedItem>) {
+    suspend fun markAsWatchedBatch(
+        items: List<WatchedItem>,
+        profileId: Int = profileManager.activeProfileId.value
+    ) {
         if (items.isEmpty()) return
-        store().edit { preferences ->
+        store(profileId).edit { preferences ->
             val current = preferences[watchedItemsKey] ?: emptySet()
             val newKeys = items.map { Triple(it.contentId, it.season, it.episode) }.toSet()
             val filtered = current.filterNot { json ->

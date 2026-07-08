@@ -264,13 +264,16 @@ class WatchProgressPreferences @Inject constructor(
     /**
      * Mark content as completed
      */
-    suspend fun markAsCompleted(progress: WatchProgress) {
+    suspend fun markAsCompleted(
+        progress: WatchProgress,
+        profileId: Int = profileManager.activeProfileId.value
+    ) {
         // If the incoming duration is a dummy sentinel (≤ 1ms), check for an
         // existing local entry with a real duration from prior playback.
         // This creates a proper completed entry that syncs correctly cross-device.
         val effectiveDuration = if (progress.duration <= 1L) {
             val key = createKey(progress)
-            val existing = getAllRawEntries()[key]
+            val existing = getAllRawEntries(profileId)[key]
             existing?.duration?.takeIf { it > 1L } ?: progress.duration
         } else {
             progress.duration
@@ -287,9 +290,12 @@ class WatchProgressPreferences @Inject constructor(
     /**
      * Mark multiple items as completed in a single DataStore transaction.
      */
-    suspend fun markAsCompletedBatch(progressList: List<WatchProgress>) {
+    suspend fun markAsCompletedBatch(
+        progressList: List<WatchProgress>,
+        profileId: Int = profileManager.activeProfileId.value
+    ) {
         if (progressList.isEmpty()) return
-        val rawEntries = getAllRawEntries()
+        val rawEntries = getAllRawEntries(profileId)
         val now = System.currentTimeMillis()
         val completed = progressList.map { progress ->
             val effectiveDuration = if (progress.duration <= 1L) {
