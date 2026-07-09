@@ -60,16 +60,16 @@ class WatchedItemsSyncService @Inject constructor(
     var lastSuccessfulPushMs: Long = 0L
         private set
 
-    fun markPushSucceeded() {
+    fun markPushSucceeded(profileId: Int = profileManager.activeProfileId.value) {
         val now = System.currentTimeMillis()
         lastSuccessfulPushMs = now
         CoroutineScope(Dispatchers.IO).launch {
-            watchedItemsPreferences.setLastSuccessfulPushMs(now)
+            watchedItemsPreferences.setLastSuccessfulPushMs(now, profileId)
         }
     }
 
-    suspend fun restoreLastPushTimestamp() {
-        lastSuccessfulPushMs = watchedItemsPreferences.getLastSuccessfulPushMs()
+    suspend fun restoreLastPushTimestamp(profileId: Int = profileManager.activeProfileId.value) {
+        lastSuccessfulPushMs = watchedItemsPreferences.getLastSuccessfulPushMs(profileId)
     }
 
     private suspend fun <T> withJwtRefreshRetry(block: suspend () -> T): T {
@@ -119,11 +119,11 @@ class WatchedItemsSyncService @Inject constructor(
         }
     }
 
-    suspend fun pushToRemote(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun pushToRemote(profileId: Int = profileManager.activeProfileId.value): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val items = watchedItemsPreferences.getAllItems()
             Log.d(TAG, "pushToRemote: ${items.size} watched items to push")
-            pushItemsToRemote(items, updateLastSuccessfulPush = true)
+            pushItemsToRemote(items, updateLastSuccessfulPush = true, profileId = profileId)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to push watched items to remote", e)
             Result.failure(e)
@@ -162,7 +162,7 @@ class WatchedItemsSyncService @Inject constructor(
 
             Log.d(TAG, "Pushed ${items.size} watched items to remote for profile $profileId")
             if (updateLastSuccessfulPush) {
-                markPushSucceeded()
+                markPushSucceeded(profileId)
             }
             Result.success(Unit)
         } catch (e: Exception) {

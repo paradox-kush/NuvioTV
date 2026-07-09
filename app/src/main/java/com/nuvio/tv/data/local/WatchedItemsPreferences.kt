@@ -36,13 +36,13 @@ class WatchedItemsPreferences @Inject constructor(
     private val deltaCursorKey = longPreferencesKey("watched_items_delta_cursor")
     private val deltaInitializedKey = booleanPreferencesKey("watched_items_delta_initialized")
 
-    suspend fun getLastSuccessfulPushMs(): Long {
-        val prefs = store().data.first()
+    suspend fun getLastSuccessfulPushMs(profileId: Int = profileManager.activeProfileId.value): Long {
+        val prefs = store(profileId).data.first()
         return prefs[lastSuccessfulPushMsKey] ?: 0L
     }
 
-    suspend fun setLastSuccessfulPushMs(timestampMs: Long) {
-        store().edit { prefs ->
+    suspend fun setLastSuccessfulPushMs(timestampMs: Long, profileId: Int = profileManager.activeProfileId.value) {
+        store(profileId).edit { prefs ->
             prefs[lastSuccessfulPushMsKey] = timestampMs
         }
     }
@@ -182,8 +182,8 @@ class WatchedItemsPreferences @Inject constructor(
         return allItems.first()
     }
 
-    suspend fun mergeRemoteItems(remoteItems: List<WatchedItem>) {
-        store().edit { preferences ->
+    suspend fun mergeRemoteItems(remoteItems: List<WatchedItem>, profileId: Int = profileManager.activeProfileId.value) {
+        store(profileId).edit { preferences ->
             val current = preferences[watchedItemsKey] ?: emptySet()
             val localItems = current.mapNotNull { json ->
                 runCatching { gson.fromJson(json, WatchedItem::class.java) }.getOrNull()
@@ -275,8 +275,8 @@ class WatchedItemsPreferences @Inject constructor(
         return preservedLocalItems
     }
 
-    suspend fun clearAll() {
-        store().edit { preferences ->
+    suspend fun clearAll(profileId: Int = profileManager.activeProfileId.value) {
+        store(profileId).edit { preferences ->
             preferences.remove(watchedItemsKey)
             preferences.remove(deltaCursorKey)
             preferences.remove(deltaInitializedKey)
