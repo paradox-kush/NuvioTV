@@ -480,8 +480,8 @@ class WatchProgressPreferences @Inject constructor(
      * Clear all watch progress entries EXCEPT those with non-Trakt-compatible IDs
      */
     suspend fun clearAllPreservingNonTraktIds(
-        isNonTraktId: (String) -> Boolean,
-        profileId: Int = profileManager.activeProfileId.value
+        profileId: Int = profileManager.activeProfileId.value,
+        isNonTraktId: (String) -> Boolean
     ) {
         store(profileId).edit { preferences ->
             val json = preferences[watchProgressKey] ?: "{}"
