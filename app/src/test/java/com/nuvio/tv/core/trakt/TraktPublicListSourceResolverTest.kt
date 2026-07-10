@@ -33,6 +33,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
 
+import com.nuvio.tv.core.sync.TraktCredentialSyncService
+
 class TraktPublicListSourceResolverTest {
     private val context = mockk<Context>(relaxed = true)
 
@@ -291,7 +293,8 @@ class TraktPublicListSourceResolverTest {
             context = context,
             traktApi = api,
             traktAuthDataStore = authStore,
-            authSessionNoticeDataStore = mockk<AuthSessionNoticeDataStore>(relaxed = true)
+            authSessionNoticeDataStore = mockk<AuthSessionNoticeDataStore>(relaxed = true),
+            traktCredentialSyncService = mockk<TraktCredentialSyncService>(relaxed = true)
         )
         return TraktPublicListSourceResolver(
             appContext = context,
