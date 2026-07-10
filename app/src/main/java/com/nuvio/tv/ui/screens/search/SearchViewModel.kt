@@ -506,7 +506,8 @@ class SearchViewModel @Inject constructor(
 
             fun putRow(catalogId: String, name: String, rawType: String, hits: List<com.nuvio.tv.core.iptv.XtreamSearchIndex.Hit>) {
                 if (hits.isEmpty()) return
-                val key = catalogKey(addonId = "xtream", type = rawType, catalogId = catalogId)
+                // Matches the empty addonBaseUrl on the CatalogRow below (IPTV rows aren't addon-backed).
+                val key = catalogKey(addonId = "xtream", addonBaseUrl = "", type = rawType, catalogId = catalogId)
                 if (key !in catalogOrder) catalogOrder.add(key)
                 catalogsMap[key] = CatalogRow(
                     addonId = "xtream",
