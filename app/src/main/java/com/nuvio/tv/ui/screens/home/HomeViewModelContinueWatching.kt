@@ -153,8 +153,7 @@ internal data class CwMetaSummary(
      * Used as a revalidation deadline so currently-airing "caught up" series are
      * re-checked the day a new episode drops, instead of waiting the default 7-day TTL.
      */
-    fun earliestUpcomingEpisodeMs(): Long? {
-        val now = Instant.now()
+    fun earliestUpcomingEpisodeMs(now: Instant = Instant.now()): Long? {
         return videos
             .asSequence()
             .filter { (it.season ?: 0) > 0 && it.available != false }
@@ -165,8 +164,8 @@ internal data class CwMetaSummary(
     }
 
     /** Best revalidation deadline: next episode air time, else next-season window. */
-    fun earliestRevalidationMs(): Long? =
-        listOfNotNull(earliestUpcomingEpisodeMs(), earliestUpcomingSeasonMs()).minOrNull()
+    fun earliestRevalidationMs(now: Instant = Instant.now()): Long? =
+        listOfNotNull(earliestUpcomingEpisodeMs(now), earliestUpcomingSeasonMs()).minOrNull()
 }
 
 internal data class CwVideoSummary(
@@ -842,11 +841,10 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                                         showUnairedNextUp = showUnairedNextUp
                                     )
                                     if (item != null) {
-                                        // Same mid-season case as the lightweight path: a fully-watched
-                                        // (caught-up) series with a newly aired next episode must stay
-                                        // on CW and lose the stale checkmark.
-                                        if (item.info.hasAired &&
-                                            seed.contentId in fullyWatchedSeriesIds.fullyWatchedSeriesIds.value
+                                        // Same mid-season case as the lightweight path.
+                                        if (seed.contentId in fullyWatchedSeriesIds.fullyWatchedSeriesIds.value &&
+                                            fullyWatchedNextUpAction(item.info.hasAired) ==
+                                            FullyWatchedNextUpAction.KEEP_AND_CLEAR_BADGE
                                         ) {
                                             clearStaleFullyWatchedForAiredNextUp(
                                                 contentId = seed.contentId,
@@ -1505,24 +1503,23 @@ private suspend fun HomeViewModel.buildLightweightNextUpItems(
                 }
                 val fullyWatched = fullyWatchedSeriesIds.fullyWatchedSeriesIds.value
                 if (progress.contentId in fullyWatched) {
-                    // buildNextUpItem succeeded, meaning there IS a next episode.
-                    // Unaired (countdown / new-season window): keep the checkmark badge
-                    // but still show the item in Continue Watching.
-                    // Aired: the user is no longer caught up — a new episode dropped
-                    // after they finished all previously available ones. Clear the
-                    // stale fully-watched badge and keep the series on CW instead of
-                    // dropping it (that used to remove airing shows on air day).
-                    if (nextUp.info.hasAired) {
-                        clearStaleFullyWatchedForAiredNextUp(
-                            contentId = progress.contentId,
-                            nextSeason = nextUp.info.season,
-                            nextEpisode = nextUp.info.episode
-                        )
-                        logNextUpDecision(
-                            "keep contentId=${progress.contentId} name=${progress.name} " +
-                                "reason=aired-next-up-cleared-fully-watched-badge " +
-                                "next=${nextUp.info.season}x${nextUp.info.episode}"
-                        )
+                    // See [fullyWatchedNextUpAction] — never drop when a next episode exists.
+                    when (fullyWatchedNextUpAction(nextUp.info.hasAired)) {
+                        FullyWatchedNextUpAction.KEEP_AND_CLEAR_BADGE -> {
+                            clearStaleFullyWatchedForAiredNextUp(
+                                contentId = progress.contentId,
+                                nextSeason = nextUp.info.season,
+                                nextEpisode = nextUp.info.episode
+                            )
+                            logNextUpDecision(
+                                "keep contentId=${progress.contentId} name=${progress.name} " +
+                                    "reason=aired-next-up-cleared-fully-watched-badge " +
+                                    "next=${nextUp.info.season}x${nextUp.info.episode}"
+                            )
+                        }
+                        FullyWatchedNextUpAction.KEEP_WITH_BADGE -> {
+                            // Unaired countdown / new-season window: badge stays, item stays.
+                        }
                     }
                 }
                 val shouldPublish: Boolean
@@ -2661,20 +2658,19 @@ private fun HomeViewModel.clearStaleFullyWatchedForAiredNextUp(
             revalidateAt = toRemove.associateWith { Long.MAX_VALUE }
         )
     }
-    if (nextSeason != null && nextEpisode != null) {
-        val pair = nextSeason to nextEpisode
-        synchronized(cwBadgeEpisodeCache) {
-            listOf("series:$contentId", "tv:$contentId").forEach { key ->
-                val existing = cwBadgeEpisodeCache[key] ?: return@forEach
-                cwBadgeEpisodeCache[key] = existing + pair
+    synchronized(cwBadgeEpisodeCache) {
+        listOf("series:$contentId", "tv:$contentId").forEach { key ->
+            val existing = cwBadgeEpisodeCache[key] ?: return@forEach
+            mergeAiredNextEpisodeIntoBadgeCache(existing, nextSeason, nextEpisode)?.let {
+                cwBadgeEpisodeCache[key] = it
             }
-            // If only the other type key was populated, still ensure series: is updated.
-            val seriesKey = "series:$contentId"
-            if (!cwBadgeEpisodeCache.containsKey(seriesKey)) {
-                val fromTv = cwBadgeEpisodeCache["tv:$contentId"]
-                if (fromTv != null) {
-                    cwBadgeEpisodeCache[seriesKey] = fromTv + pair
-                }
+        }
+        // If only the tv: key was populated, mirror onto series: for publishBadgeUpdate.
+        val seriesKey = "series:$contentId"
+        if (!cwBadgeEpisodeCache.containsKey(seriesKey)) {
+            val fromTv = cwBadgeEpisodeCache["tv:$contentId"]
+            mergeAiredNextEpisodeIntoBadgeCache(fromTv, nextSeason, nextEpisode)?.let {
+                cwBadgeEpisodeCache[seriesKey] = it
             }
         }
     }
@@ -2692,7 +2688,7 @@ private fun HomeViewModel.publishBadgeUpdate(
             } ?: return@filter false
             if (airedEpisodes.isEmpty()) return@filter false
             val watched = allWatchedEpisodes[contentId] ?: return@filter false
-            val allWatched = airedEpisodes.all { it in watched }
+            val allWatched = isFullyWatchedAgainstAiredList(airedEpisodes, watched)
             val fullyWatchedByCount = !allWatched &&
                 watched.size >= airedEpisodes.size
             if (!allWatched && !fullyWatchedByCount && watched.isNotEmpty()) {
