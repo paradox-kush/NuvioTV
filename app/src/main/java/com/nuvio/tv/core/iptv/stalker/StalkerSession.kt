@@ -23,8 +23,8 @@ import okhttp3.Request
  *    token / empty `js` / 401 / 403.
  *
  * create_link is NOT done here (it's a per-play call in [StalkerClient]) — but every call routes
- * through [request] so it inherits the auth + retry-once behaviour. Watchdog keep-alive is driven by
- * [StalkerWatchdog], which calls [watchdogTick] on the portal's cadence while the IPTV UI is active.
+ * through [request] so it inherits the auth + retry-once behaviour. There is no keep-alive: an idle
+ * session simply re-handshakes on demand the next time it's used, like a real STB after it sleeps.
  *
  * Thread-safe: [authMutex] serialises (re-)auth; the resolved token/endpoint are @Volatile so browse
  * calls read the freshest values without holding the lock.
@@ -35,8 +35,6 @@ class StalkerSession(
 ) {
     @Volatile private var token: String? = null
     @Volatile private var resolvedEndpoint: String? = null   // e.g. "/portal.php"
-    @Volatile var watchdogTimeoutMs: Long = DEFAULT_WATCHDOG_MS
-        private set
 
     private val authMutex = Mutex()
 
@@ -60,22 +58,16 @@ class StalkerSession(
      */
     suspend fun request(params: Map<String, String>): JsonElement = withContext(Dispatchers.IO) {
         ensureAuthenticated()
+        val staleToken = token
         val first = runCatching { rawRequest(params) }
         val js = first.getOrNull()?.jsOrNull()
         if (js != null) return@withContext js
 
         // Stale token / transient auth failure -> force a fresh handshake, then retry exactly once.
         Log.d(TAG, "Stalker request stale for ${account.name} (${params["action"]}) — re-authenticating")
-        reauthenticate()
+        reauthenticate(staleToken)
         rawRequest(params).jsOrNull()
             ?: error("Stalker portal returned no data for ${params["action"]}")
-    }
-
-    /** Poll `watchdog get_events` on the portal cadence to keep the session alive. Best-effort. */
-    suspend fun watchdogTick() {
-        runCatching {
-            request(mapOf("type" to "watchdog", "action" to "get_events", "cur_play_type" to "1", "event_active_id" to "0", "init" to "0"))
-        }.onFailure { Log.d(TAG, "watchdog tick failed for ${account.name}", it) }
     }
 
     /** Force re-auth on the next call (used when a create_link/browse hits a hard 401/403). */
@@ -91,8 +83,16 @@ class StalkerSession(
         }
     }
 
-    private suspend fun reauthenticate() {
+    /**
+     * Re-handshake ONCE for a stale [staleToken]. Single-flight like [ensureAuthenticated]: if another
+     * coroutine already refreshed the token while we waited on the lock, reuse theirs instead of
+     * handshaking again. Critical because a Stalker handshake OVERWRITES the MAC's token server-side —
+     * N concurrent browse calls all re-authing would rotate the token N times and invalidate each
+     * other's retry ("portal error" on the return-to-app path).
+     */
+    private suspend fun reauthenticate(staleToken: String?) {
         authMutex.withLock {
+            if (token != staleToken) return   // someone already refreshed — reuse it
             token = null
             doHandshakeAndProfile()
         }
@@ -110,8 +110,8 @@ class StalkerSession(
             ?: error("Stalker handshake returned no token for ${account.name}")
         token = newToken
 
-        // get_profile activates the session + returns the watchdog cadence. Non-fatal if it errors
-        // (some portals authorise on handshake alone); we keep the token either way.
+        // get_profile activates the session. Non-fatal if it errors (some portals authorise on
+        // handshake alone); we keep the token either way.
         runCatching {
             val profileParams = buildMap {
                 put("type", "stb"); put("action", "get_profile"); put("hd", "1")
@@ -126,11 +126,7 @@ class StalkerSession(
                 account.stalkerUsername.takeIf { it.isNotBlank() }?.let { put("login", it) }
                 account.stalkerPassword.takeIf { it.isNotBlank() }?.let { put("password", it) }
             }
-            rawRequestAt(endpoint, profileParams).jsOrNull()?.let { js ->
-                (js as? JsonObject)?.get("watchdog_timeout")?.asLongOrNull()?.let {
-                    if (it > 0) watchdogTimeoutMs = it * 1000
-                }
-            }
+            rawRequestAt(endpoint, profileParams)
         }.onFailure { Log.d(TAG, "get_profile non-fatal failure for ${account.name}", it) }
     }
 
@@ -193,6 +189,12 @@ class StalkerSession(
                 return JsonObject()
             }
             if (!resp.isSuccessful) error("HTTP ${resp.code}")
+            // A portal that rejects the STB identity replies HTTP 200 with the plain text
+            // "Authorization failed." (not JSON). A stale token recovers via re-auth; a persistent
+            // rejection would otherwise surface as a vague "no data". Throw an actionable error — it
+            // only becomes terminal when re-auth can't fix it (MAC/Serial/Device ID genuinely wrong).
+            if (bodyStr.contains(AUTH_FAILED_MARKER, ignoreCase = true))
+                error("Stalker portal rejected this device for ${account.name} — check the MAC address (and Serial / Device ID if the portal requires them)")
             return runCatching { JsonParser.parseString(bodyStr) }.getOrDefault(JsonObject())
         }
     }
@@ -215,12 +217,10 @@ class StalkerSession(
     private fun JsonElement.asStringOrNull(): String? =
         runCatching { if (isJsonNull) null else asString }.getOrNull()
 
-    private fun JsonElement.asLongOrNull(): Long? =
-        runCatching { if (isJsonNull) null else asString.trim().toLong() }.getOrNull()
-
     companion object {
         private const val TAG = "StalkerSession"
-        private const val DEFAULT_WATCHDOG_MS = 120_000L
+        // The reference server's rejection sentinel: `echo 'Authorization failed.'; exit;`
+        private const val AUTH_FAILED_MARKER = "Authorization failed"
         private const val STB_VER =
             "ImageDescription: 0.2.18-r14-pub-250; ImageDate: Wed Aug 29 10:49:52 EEST 2018; PORTAL version: 5.6.1; API Version: JS API version: 343; STB API version: 146; Player Engine version: 0x58c"
         private const val USER_AGENT =
