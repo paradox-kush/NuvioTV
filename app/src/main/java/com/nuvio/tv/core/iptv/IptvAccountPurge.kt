@@ -23,6 +23,7 @@ class IptvAccountPurge @Inject constructor(
     private val contentDb: IptvContentDb,
     private val refreshStore: IptvRefreshStore,
     private val fileStore: M3UFileStore,
+    private val epgMirrorDb: com.nuvio.tv.core.epg.EpgMirrorDb,
 ) {
     suspend fun purgeCaches(accountId: String) {
         registry.clear() // global in-memory map; rebuilds lazily on next browse
@@ -31,5 +32,6 @@ class IptvAccountPurge @Inject constructor(
         runCatching { contentDb.purge(accountId) }
         runCatching { refreshStore.clear(accountId) }
         runCatching { fileStore.delete(accountId) }
+        runCatching { epgMirrorDb.purgeProvider(accountId) }
     }
 }

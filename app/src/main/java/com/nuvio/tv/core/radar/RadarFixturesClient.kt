@@ -50,4 +50,18 @@ class RadarFixturesClient @Inject constructor(
             }
         }.onFailure { e -> Log.e(TAG, "fetch failed", e) }.getOrNull()
     }
+
+    /** Broadcaster listings for one event (server caches 12h; empty on any failure). */
+    suspend fun fetchTv(eventId: String): List<RadarTvStation> = withContext(Dispatchers.IO) {
+        runCatching {
+            val base = supabaseProvider.selectedBackend.normalizedSupabaseUrl
+            val url = "$base/functions/v1/radar-fixtures?tv_event_ids=" +
+                URLEncoder.encode(eventId, "UTF-8")
+            http.newCall(Request.Builder().url(url).get().build()).execute().use { response ->
+                check(response.isSuccessful) { "radar-fixtures HTTP ${response.code}" }
+                json.decodeFromString<RadarFixturesResponse>(response.body?.string().orEmpty())
+                    .tv[eventId].orEmpty()
+            }
+        }.onFailure { e -> Log.e(TAG, "tv fetch failed", e) }.getOrDefault(emptyList())
+    }
 }

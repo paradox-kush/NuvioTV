@@ -200,4 +200,17 @@ class RadarRepository @Inject constructor(
 
     private fun liveIds(response: RadarFixturesResponse): Set<String> =
         response.livescore.values.asSequence().flatten().mapNotNull { it.eventId }.toSet()
+
+    // Broadcaster listings barely change and the edge function caches them 12h — one
+    // fetch per event per app session is plenty.
+    private val tvCache = java.util.concurrent.ConcurrentHashMap<String, List<RadarTvStation>>()
+
+    /** TheSportsDB broadcaster list for a fixture (session-cached; empty when unknown). */
+    suspend fun tvStations(eventId: String?): List<RadarTvStation> {
+        if (eventId.isNullOrBlank()) return emptyList()
+        tvCache[eventId]?.let { return it }
+        val fetched = fixturesClient.fetchTv(eventId)
+        if (fetched.isNotEmpty()) tvCache[eventId] = fetched
+        return fetched
+    }
 }

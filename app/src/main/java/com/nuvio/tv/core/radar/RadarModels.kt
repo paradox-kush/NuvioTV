@@ -124,10 +124,19 @@ data class RadarLiveScore(
     val awayScore: String? = null,
 )
 
+/** One broadcaster listing for an event (TheSportsDB lookuptv via the edge function). */
+@Serializable
+data class RadarTvStation(
+    val country: String? = null,
+    val channel: String? = null,
+)
+
 @Serializable
 data class RadarFixturesResponse(
     val fixtures: Map<String, List<RadarFixture>> = emptyMap(),
     val livescore: Map<String, List<RadarLiveScore>> = emptyMap(),
+    /** eventId → broadcasters; present only when tv_event_ids was requested. */
+    val tv: Map<String, List<RadarTvStation>> = emptyMap(),
     val fetchedAt: String? = null,
 )
 

@@ -86,10 +86,17 @@ class XtreamLiveGuideViewModel @Inject constructor(
     private val livePlaylist: XtreamLivePlaylist,
     private val libraryRepository: LibraryRepository,
     private val livePlayback: PlaylistLivePlayback,
+    private val epgMirror: com.nuvio.tv.core.epg.EpgMirrorRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LiveGuideUiState())
     val uiState: StateFlow<LiveGuideUiState> = _uiState.asStateFlow()
+
+    init {
+        // Warm the canonical-EPG mirror (12h TTL, no-op when fresh) — it backs the guide's
+        // now/next whenever the panel's own EPG is missing.
+        viewModelScope.launch { epgMirror.ensureFresh() }
+    }
 
     /** Live channel ids currently in the platform Library (drives the ★ + add/remove). */
     val favoriteLiveIds: StateFlow<Set<String>> = libraryRepository.libraryItems
@@ -326,8 +333,14 @@ class XtreamLiveGuideViewModel @Inject constructor(
         val acc = account ?: return
         if (streamId <= 0 || !epgRequested.add(streamId)) return
         viewModelScope.launch {
-            val programs = clientFactory.clientFor(acc).shortEpg(acc, streamId).getOrDefault(emptyList())
             val nowMs = System.currentTimeMillis()
+            // Panel EPG first; when the panel has nothing (the common case on real panels —
+            // Starshare fills 6%), fall back to the mirrored canonical EPG via the mapping.
+            val programs = clientFactory.clientFor(acc).shortEpg(acc, streamId).getOrDefault(emptyList())
+                .ifEmpty {
+                    runCatching { epgMirror.nowNext(acc.id, streamId, nowMs) }.getOrDefault(emptyList())
+                        .map { XtreamProgram(it.title, it.desc.orEmpty(), it.startMs, it.endMs, nowPlaying = nowMs in it.startMs until it.endMs) }
+                }
             val nowIdx = programs.indexOfFirst { it.nowPlaying || (nowMs in it.startMs until it.endMs) }
                 .takeIf { it >= 0 } ?: 0
             val now = programs.getOrNull(nowIdx)

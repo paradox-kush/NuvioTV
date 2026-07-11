@@ -372,8 +372,15 @@ private fun MatchChannelsOverlay(
                                 when {
                                     isProbing -> "Checking channel…"
                                     isDead -> "Offline · ${match.channel.playlistName}"
-                                    programme != null ->
-                                        "${programme.title} · ${RadarTime.formatTime(programme.startMs)} – ${RadarTime.formatTime(programme.endMs)}"
+                                    programme != null -> listOfNotNull(
+                                        match.language,
+                                        "${programme.title} · ${RadarTime.formatTime(programme.startMs)} – ${RadarTime.formatTime(programme.endMs)}",
+                                    ).joinToString(" · ")
+                                    match.via == RadarChannelMatcher.MatchVia.LISTING -> listOfNotNull(
+                                        match.language,
+                                        "TV listing",
+                                        match.channel.playlistName,
+                                    ).joinToString(" · ")
                                     else -> match.channel.playlistName
                                 },
                                 style = MaterialTheme.typography.labelSmall,

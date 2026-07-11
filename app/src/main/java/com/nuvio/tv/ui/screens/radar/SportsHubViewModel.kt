@@ -44,6 +44,7 @@ data class MatchSheetState(
 class SportsHubViewModel @Inject constructor(
     val repository: RadarRepository,
     private val matcher: RadarChannelMatcher,
+    private val epgMirror: com.nuvio.tv.core.epg.EpgMirrorRepository,
     accountStore: XtreamAccountStore,
 ) : ViewModel() {
 
@@ -57,6 +58,12 @@ class SportsHubViewModel @Inject constructor(
     val sheet: StateFlow<MatchSheetState?> = _sheet.asStateFlow()
 
     private var matchJob: Job? = null
+
+    init {
+        // The match sheet reads the mirror; refresh it (12h TTL, no-op when fresh) so the
+        // EPG tier is warm by the time a fixture is opened.
+        viewModelScope.launch { epgMirror.ensureFresh() }
+    }
 
     fun ensureLoaded() = repository.ensureLoaded()
 
@@ -73,7 +80,12 @@ class SportsHubViewModel @Inject constructor(
                 val recordings = runCatching { matcher.findRecordings(fixture) }.getOrDefault(emptyList())
                 _sheet.update { s -> if (s?.fixture === fixture) s.copy(recordings = recordings) else s }
             }
-            val result = matcher.match(fixture, league, onPartial = { partial ->
+            // Broadcaster listings are one cached edge-fn call; bounded so a slow network
+            // can't hold the whole sheet hostage (matching proceeds without them).
+            val stations = kotlinx.coroutines.withTimeoutOrNull(4_000) {
+                repository.tvStations(fixture.id)
+            } ?: emptyList()
+            val result = matcher.match(fixture, league, stations, onPartial = { partial ->
                 _sheet.update { s -> if (s?.fixture === fixture) s.copy(matches = partial) else s }
             })
             val replays = buildMap {
