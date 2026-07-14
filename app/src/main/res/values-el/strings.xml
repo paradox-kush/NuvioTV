@@ -1567,6 +1567,8 @@
   <string name="account_sync_restart_note">Ο συγχρονισμός δεν είναι πραγματικού χρόνου σε ενεργές συσκευές. Επανεκκινήστε αυτή τη συσκευή μετά τη σύνδεση ή για να λάβετε αλλαγές που έγιναν αλλού.</string>
   <string name="account_signin_qr_title">Σύνδεση με QR</string>
   <string name="account_signin_qr_subtitle">Σαρώστε QR code και ολοκληρώστε τη σύνδεση με email στο κινητό σας</string>
+  <string name="account_signin_email_title">Σύνδεση</string>
+  <string name="account_signin_email_subtitle">Εισάγετε το email και τον κωδικό πρόσβασης του αυτοφιλοξενούμενου λογαριασμού σας</string>
   <string name="account_signed_in_label">Συνδεδεμένος</string>
   <string name="account_total_label">Σύνολο</string>
   <string name="account_loading_sync">Φόρτωση δεδομένων συγχρονισμού…</string>
@@ -1575,6 +1577,12 @@
   <string name="auth_signin_title">Σύνδεση</string>
   <string name="auth_signin_tv_disabled">Η εισαγωγή email/κωδικού στην TV είναι απενεργοποιημένη. Συνεχίστε με QR σύνδεση.</string>
   <string name="auth_signin_qr_btn">Συνέχεια με QR</string>
+  <string name="auth_email_hint">Συνδεθείτε απευθείας με τον λογαριασμό στον αυτοφιλοξενούμενο διακομιστή σας.</string>
+  <string name="auth_email_instruction">Εισάγετε το email και τον κωδικό πρόσβασης για να συνεχίσετε.</string>
+  <string name="auth_email_placeholder">Διεύθυνση email</string>
+  <string name="auth_password_placeholder">Κωδικός πρόσβασης</string>
+  <string name="auth_email_sign_in">Σύνδεση</string>
+  <string name="auth_email_signing_in">Σύνδεση\u2026</string>
   <!-- AuthQrSignInScreen -->
   <string name="auth_qr_title">Σύνδεση με QR</string>
   <string name="auth_qr_account_login">Σύνδεση λογαριασμού</string>
@@ -2559,6 +2567,10 @@
   <string name="settings_stream_addon_logo_title">Λογότυπο πρόσθετου</string>
   <string name="diag_value_not_available">Μη διαθέσιμο</string>
   <string name="player_report_loading_issue">Αναφορά προβλήματος φόρτωσης</string>
+  <plurals name="player_report_loading_issue_prompt">
+    <item quantity="one">Ακόμα φορτώνει μετά από %1$d δευτερόλεπτο</item>
+    <item quantity="other">Ακόμα φορτώνει μετά από %1$d δευτερόλεπτα</item>
+  </plurals>
   <string name="advanced_playback_issue_reports_subtitle">Εμφάνιση κουμπιών αναφοράς κατά την αναπαραγωγή, σε παρατεταμένη φόρτωση και σε σφάλματα αναπαραγωγής</string>
   <string name="settings_stream_badge_position_top">Πάνω</string>
   <string name="stream_test_btn_measuring_parallel8">Μέτρηση παράλληλης (8MB)...</string>
