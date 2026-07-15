@@ -2,31 +2,13 @@ package com.nuvio.tv.ui.util
 
 import android.content.Context
 import com.nuvio.tv.R
-import java.time.Instant
+import com.nuvio.tv.core.util.parseEpisodeCalendarDate
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 internal fun parseEpisodeReleaseDate(raw: String?): LocalDate? {
-    if (raw.isNullOrBlank()) return null
-    val value = raw.trim()
-    val zone = ZoneId.systemDefault()
-
-    return runCatching {
-        Instant.parse(value).atZone(zone).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        OffsetDateTime.parse(value).atZoneSameInstant(zone).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        LocalDateTime.parse(value).toLocalDate()
-    }.getOrNull() ?: runCatching {
-        LocalDate.parse(value)
-    }.getOrNull() ?: runCatching {
-        val datePortion = Regex("\\b\\d{4}-\\d{2}-\\d{2}\\b").find(value)?.value
-            ?: return@runCatching null
-        LocalDate.parse(datePortion)
-    }.getOrNull()
+    return parseEpisodeCalendarDate(raw)
 }
 
 internal fun computeAirDateBadgeText(

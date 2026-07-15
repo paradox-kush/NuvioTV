@@ -2,13 +2,10 @@ package com.nuvio.tv.ui.screens.player
 
 import com.nuvio.tv.data.local.NextEpisodeThresholdMode
 import com.nuvio.tv.data.repository.SkipInterval
+import com.nuvio.tv.core.util.parseEpisodeCalendarDate
 import com.nuvio.tv.domain.model.Video
 import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.OffsetDateTime
-import java.time.ZoneId
 
 object PlayerNextEpisodeRules {
     fun resolveNextEpisode(
@@ -99,12 +96,7 @@ object PlayerNextEpisodeRules {
     }
 
     fun parseEpisodeReleaseDate(raw: String?): LocalDate? {
-        val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-
-        return runCatching { LocalDate.parse(value) }.getOrNull()
-            ?: runCatching { Instant.parse(value).atZone(ZoneId.systemDefault()).toLocalDate() }.getOrNull()
-            ?: runCatching { OffsetDateTime.parse(value).toLocalDate() }.getOrNull()
-            ?: runCatching { LocalDateTime.parse(value).toLocalDate() }.getOrNull()
+        return parseEpisodeCalendarDate(raw)
     }
 
     fun hasEpisodeAired(raw: String?, clock: Clock = Clock.systemDefaultZone()): Boolean {
