@@ -2,13 +2,13 @@ package com.nuvio.tv.ui.util
 
 import android.content.Context
 import com.nuvio.tv.R
-import com.nuvio.tv.core.util.parseEpisodeCalendarDate
+import com.nuvio.tv.core.util.parseEpisodeReleaseLocalDate
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 internal fun parseEpisodeReleaseDate(raw: String?): LocalDate? {
-    return parseEpisodeCalendarDate(raw)
+    return parseEpisodeReleaseLocalDate(raw)
 }
 
 internal fun computeAirDateBadgeText(

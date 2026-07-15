@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.nuvio.tv.core.network.NetworkResult
+import com.nuvio.tv.core.util.selectEpisodeReleaseValue
 import com.nuvio.tv.data.local.TraktSettingsDataStore
 import com.nuvio.tv.data.local.WatchedItemsPreferences
 import com.nuvio.tv.domain.model.ContinueWatchingSortMode
@@ -1871,9 +1872,11 @@ private suspend fun HomeViewModel.enrichNextUpItem(
     } else {
         null
     }
-    val released = (if (currentTmdbSettings.useReleaseDates) tmdbData?.airDate else null)
-        ?: video?.released?.trim()?.takeIf { it.isNotEmpty() }
-        ?: item.info.released
+    val released = selectEpisodeReleaseValue(
+        addonReleased = video?.released ?: item.info.released,
+        tmdbAirDate = tmdbData?.airDate,
+        useTmdbReleaseDates = currentTmdbSettings.useReleaseDates
+    )
     val releaseDate = parseEpisodeReleaseDate(released)
     val todayLocal = LocalDate.now(ZoneId.systemDefault())
     val hasAired = hasEpisodeAired(released, fallback = item.info.hasAired)

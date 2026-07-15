@@ -36,6 +36,7 @@ import com.nuvio.tv.data.local.WatchedItemsPreferences
 import com.nuvio.tv.data.local.TrailerSettingsDataStore
 import com.nuvio.tv.data.trailer.TrailerService
 import com.nuvio.tv.core.util.isUnreleased
+import com.nuvio.tv.core.util.selectEpisodeReleaseValue
 import java.time.LocalDate
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -1384,7 +1385,11 @@ class MetaDetailsViewModel @Inject constructor(
                     video.copy(
                         title = ep?.title ?: video.title,
                         overview = ep?.overview ?: video.overview,
-                        released = if (settings.useReleaseDates) ep?.airDate ?: video.released else video.released,
+                        released = selectEpisodeReleaseValue(
+                            addonReleased = video.released,
+                            tmdbAirDate = ep?.airDate,
+                            useTmdbReleaseDates = settings.useReleaseDates
+                        ),
                         thumbnail = ep?.thumbnail ?: video.thumbnail,
                         runtime = ep?.runtimeMinutes
                     )
