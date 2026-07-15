@@ -28,6 +28,7 @@ import com.nuvio.tv.data.local.BingeGroupCacheDataStore
 import com.nuvio.tv.domain.model.AddonStreams
 import com.nuvio.tv.domain.model.Meta
 import com.nuvio.tv.domain.model.Stream
+import com.nuvio.tv.domain.model.Video
 import com.nuvio.tv.domain.model.WatchProgress
 import com.nuvio.tv.domain.model.StreamDebridCacheState
 import com.nuvio.tv.domain.model.enabledAddons
@@ -107,6 +108,7 @@ class StreamScreenViewModel @Inject constructor(
     private var streamBadgePresentationJob: Job? = null
     private var streamBadgePresentationRequestId = 0L
     private var badgedAddonNames: Set<String> = emptySet()
+    private var playbackMetaVideos: List<Video>? = null
 
     private val embeddedStreamGroupName: String by lazy {
         context.getString(R.string.stream_embedded_group)
@@ -226,6 +228,14 @@ class StreamScreenViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            _uiState
+                .map { state -> state.directAutoPlayMessage to state.directAutoPlayProgress }
+                .distinctUntilChanged()
+                .collectLatest { (message, progress) ->
+                    externalPlaybackTracker.updateAutoNextOverlayStatus(message, progress)
+                }
+        }
         if (manualSelection) {
             // Returning from a playback error: keep the user on stream selection.
             autoPlayHandledForSession = true
@@ -754,7 +764,7 @@ class StreamScreenViewModel @Inject constructor(
                             directAutoPlayMessage = null
                         )
                     }
-                    externalPlaybackTracker.releaseAutoNextOverlay()
+                    externalPlaybackTracker.releaseAutoNextOverlay(forceRelease = true)
                 }
             }
 
@@ -849,7 +859,7 @@ class StreamScreenViewModel @Inject constructor(
                                 directAutoPlayMessage = null
                             )
                         }
-                        externalPlaybackTracker.releaseAutoNextOverlay()
+                        externalPlaybackTracker.releaseAutoNextOverlay(forceRelease = true)
                         streamLoadInner.cancel()
                         markRemainingSourceChipsAsError()
                     }
@@ -1046,8 +1056,6 @@ class StreamScreenViewModel @Inject constructor(
 
     private fun loadMissingMetaDetailsIfNeeded() {
         val requiresMetadataLookup = genres.isNullOrBlank() || year.isNullOrBlank() || runtime == null
-        if (!requiresMetadataLookup) return
-
         val metaId = contentId ?: videoId.substringBefore(":")
         if (metaId.isBlank() || contentType.isBlank()) return
 
@@ -1058,6 +1066,8 @@ class StreamScreenViewModel @Inject constructor(
             if (result !is NetworkResult.Success) return@launch
 
             val meta = result.data
+            playbackMetaVideos = meta.videos
+            if (!requiresMetadataLookup) return@launch
             val metaGenres = meta.genres.takeIf { it.isNotEmpty() }?.joinToString(" • ")
             val metaYear = meta.releaseInfo
                 ?.substringBefore("-")
@@ -1234,8 +1244,8 @@ class StreamScreenViewModel @Inject constructor(
 
     /** Release the MainActivity auto-next loader once this Stream screen has settled. Hides the
      *  overlay only; it must not abort the chain, or a fast settle would suppress the next advance. */
-    fun dismissExternalAutoNextOverlay() {
-        externalPlaybackTracker.releaseAutoNextOverlay()
+    fun dismissExternalAutoNextOverlay(forceRelease: Boolean = false) {
+        externalPlaybackTracker.releaseAutoNextOverlay(forceRelease = forceRelease)
     }
 
     /** Set to true when external player is launched, reset on stop. */
@@ -1551,6 +1561,7 @@ class StreamScreenViewModel @Inject constructor(
                         )
                     )
                 }
+                externalPlaybackTracker.releaseAutoNextOverlay(forceRelease = true)
                 return
             } finally {
                 call?.cancel()
@@ -1606,7 +1617,7 @@ class StreamScreenViewModel @Inject constructor(
         // protects against spurious ON_RESUME after the player intent is sent.
         externalPlayerLaunchTimeMs = System.currentTimeMillis()
 
-        externalPlaybackTracker.launchPlayer(
+        val launched = externalPlaybackTracker.launchPlayer(
             metadata = metadata,
             url = playUrl,
             title = metadata.buildPlayerTitle(),
@@ -1614,8 +1625,27 @@ class StreamScreenViewModel @Inject constructor(
             resumePositionMs = resumePositionMs,
             subtitles = subtitleInputs,
             autoLaunch = autoLaunch,
+            nextEpisodeSnapshot = playbackMetaVideos?.let { videos ->
+                com.nuvio.tv.core.player.resolveExternalNextEpisodeSnapshot(
+                    videos = videos,
+                    currentSeason = metadata.season,
+                    currentEpisode = metadata.episode
+                )
+            },
             context = context
         )
+        if (!launched) {
+            externalPlayerLaunched = false
+            externalPlayerLaunchTimeMs = 0L
+            updateUiStateIfChanged {
+                it.copy(
+                    showDirectAutoPlayOverlay = false,
+                    externalPlayerOverlayVisible = false,
+                    directAutoPlayMessage = null,
+                    directAutoPlayProgress = null
+                )
+            }
+        }
     }
 
     /**

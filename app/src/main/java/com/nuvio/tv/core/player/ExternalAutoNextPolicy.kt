@@ -33,8 +33,8 @@ internal object ExternalAutoNextPolicy {
     ): Boolean = chainAborted && nowMs - lastAutoNextEmitMs < continuationWindowMs
 
     /**
-     * Whether the auto-advance loader may be raised. Only for a series/tv episode that hasn't been
-     * aborted, released on settle, or already raised. Season may be null (absolute-numbered content).
+     * Whether the auto-advance loader may be raised. Only for a series/tv episode that has not been
+     * aborted, explicitly released, or already raised. Season may be null (absolute-numbered content).
      */
     fun shouldRaiseLoader(
         episode: Int?,
@@ -44,10 +44,12 @@ internal object ExternalAutoNextPolicy {
         overlaySuppressed: Boolean,
         alreadyShowing: Boolean,
         autoNextEnabled: Boolean? = null,
-        hasNextEpisode: Boolean? = null
+        hasNextEpisode: Boolean? = null,
+        allowUnknownNextEpisode: Boolean = false
     ): Boolean {
         if (cancelled || chainAborted || overlaySuppressed || alreadyShowing) return false
-        if (autoNextEnabled == false || hasNextEpisode != true) return false
+        if (autoNextEnabled == false || hasNextEpisode == false) return false
+        if (hasNextEpisode == null && !allowUnknownNextEpisode) return false
         return isSeriesEpisode(episode, contentType)
     }
 
@@ -69,14 +71,22 @@ internal object ExternalAutoNextPolicy {
     fun isPlayableNextEpisode(available: Boolean?, hasAired: Boolean): Boolean =
         available != false && hasAired
 
-    fun shouldDelayLoaderRelease(
+    fun shouldHoldLoaderOnSettle(
         overlayShowing: Boolean,
         handoffActive: Boolean,
-        hasConfirmedNextEpisode: Boolean
-    ): Boolean = overlayShowing && handoffActive && hasConfirmedNextEpisode
+        mayHaveNextEpisode: Boolean,
+        forceRelease: Boolean
+    ): Boolean = overlayShowing && handoffActive && mayHaveNextEpisode && !forceRelease
 
     fun shouldIgnoreLoaderRelease(externalPlaybackActive: Boolean): Boolean =
         externalPlaybackActive
+
+    fun shouldCancelPendingAutoLaunch(
+        autoLaunch: Boolean,
+        autoNextNavigationPending: Boolean,
+        cancelled: Boolean,
+        chainAborted: Boolean
+    ): Boolean = autoLaunch && autoNextNavigationPending && (cancelled || chainAborted)
 
     private fun isSeriesEpisode(episode: Int?, contentType: String): Boolean =
         episode != null && contentType.lowercase() in SERIES_TYPES

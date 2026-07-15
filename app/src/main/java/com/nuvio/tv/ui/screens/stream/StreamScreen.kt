@@ -280,7 +280,10 @@ fun StreamScreen(
     // mask this screen (whether it auto-launches a player or shows the manual list).
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading) {
-            viewModel.dismissExternalAutoNextOverlay()
+            viewModel.dismissExternalAutoNextOverlay(
+                forceRelease = !uiState.isDirectAutoPlayFlow ||
+                    playerPreference != PlayerPreference.EXTERNAL
+            )
         }
     }
 
