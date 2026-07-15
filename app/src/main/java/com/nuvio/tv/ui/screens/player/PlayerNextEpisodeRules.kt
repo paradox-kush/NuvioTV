@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.screens.player
 
 import com.nuvio.tv.data.local.NextEpisodeThresholdMode
 import com.nuvio.tv.data.repository.SkipInterval
+import com.nuvio.tv.core.util.isEpisodeReleaseAired
 import com.nuvio.tv.core.util.parseEpisodeReleaseLocalDate
 import com.nuvio.tv.domain.model.Video
 import java.time.Clock
@@ -100,8 +101,7 @@ object PlayerNextEpisodeRules {
     }
 
     fun hasEpisodeAired(raw: String?, clock: Clock = Clock.systemDefaultZone()): Boolean {
-        val releasedDate = parseEpisodeReleaseDate(raw) ?: return true
-        return !releasedDate.isAfter(LocalDate.now(clock))
+        return isEpisodeReleaseAired(raw, clock) ?: true
     }
 
     val OUTRO_SEGMENT_TYPES = setOf("outro", "ed", "mixed-ed")

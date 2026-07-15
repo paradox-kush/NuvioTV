@@ -1,9 +1,13 @@
 package com.nuvio.tv.core.util
 
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EpisodeReleaseDateParserTest {
@@ -61,5 +65,46 @@ class EpisodeReleaseDateParserTest {
                 useTmdbReleaseDates = false
             )
         )
+        assertEquals(
+            "2026-07-16",
+            selectEpisodeReleaseValue(
+                addonReleased = "2026-07-15T15:00:00",
+                tmdbAirDate = "2026-07-16",
+                useTmdbReleaseDates = true
+            )
+        )
+    }
+
+    @Test
+    fun `zoned release stays unavailable until its exact instant`() {
+        val before = Clock.fixed(Instant.parse("2026-07-15T14:59:59Z"), eastern)
+        val exact = Clock.fixed(Instant.parse("2026-07-15T15:00:00Z"), eastern)
+
+        assertFalse(isEpisodeReleaseAired("2026-07-15T15:00:00Z", before)!!)
+        assertTrue(isEpisodeReleaseAired("2026-07-15T15:00:00Z", exact)!!)
+    }
+
+    @Test
+    fun `date only release starts at viewer local midnight`() {
+        val beforeMidnight = Clock.fixed(Instant.parse("2026-07-15T03:59:59Z"), eastern)
+        val localMidnight = Clock.fixed(Instant.parse("2026-07-15T04:00:00Z"), eastern)
+
+        assertFalse(isEpisodeReleaseAired("2026-07-15", beforeMidnight)!!)
+        assertTrue(isEpisodeReleaseAired("2026-07-15", localMidnight)!!)
+    }
+
+    @Test
+    fun `local timestamp uses viewer timezone without overriding tmdb`() {
+        val before = Clock.fixed(Instant.parse("2026-07-15T18:59:59Z"), eastern)
+        val exact = Clock.fixed(Instant.parse("2026-07-15T19:00:00Z"), eastern)
+
+        assertFalse(isEpisodeReleaseAired("2026-07-15T15:00:00", before)!!)
+        assertTrue(isEpisodeReleaseAired("2026-07-15T15:00:00", exact)!!)
+    }
+
+    @Test
+    fun `invalid and missing release eligibility remain unknown`() {
+        assertNull(isEpisodeReleaseAired(null))
+        assertNull(isEpisodeReleaseAired("not-a-date"))
     }
 }
