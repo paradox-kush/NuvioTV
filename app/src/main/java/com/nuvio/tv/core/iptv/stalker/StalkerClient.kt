@@ -46,9 +46,17 @@ class StalkerClient @Inject constructor(
     private val liveCmds = ConcurrentHashMap<String, String>()
     private val liveMutex = Mutex()
 
+    // The whole guide per account in ONE get_epg_info fetch, keyed by channel id (see [bulkEpg]).
+    private class EpgSnapshot(val byChannel: Map<Int, List<XtreamProgram>>, val fetchedAtMs: Long)
+    private val epgCache = ConcurrentHashMap<String, EpgSnapshot>()
+    private val epgUnsupported = java.util.Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    private val epgMutex = Mutex()
+
     /** Drop an account's cached lineup/rows (portal or MAC edited, playlist removed). */
     fun evictCaches(accountId: String) {
         liveCache.remove(accountId)
+        epgCache.remove(accountId)
+        epgUnsupported.remove(accountId)
         liveCmds.keys.removeAll { it.startsWith("$accountId:") }
         rowCache.keys.removeAll { it.startsWith("$accountId:") }
     }
@@ -136,19 +144,30 @@ class StalkerClient @Inject constructor(
     )
 
     override suspend fun vodMovies(acc: XtreamAccount, categoryId: String?): Result<List<XtreamMovie>> = runCatching {
-        orderedList(acc, "vod", categoryId, maxItems = CATEGORY_ITEMS).map { item ->
-            XtreamMovie(
-                streamId = item.int("id") ?: 0,
-                name = item.str("name").orEmpty(),
-                poster = (item.str("screenshot_uri") ?: item.str("cover"))?.takeIf { it.isNotBlank() }?.let { absolutize(acc, it) },
-                categoryId = item.str("category_id"),
-                rating = item.str("rating_imdb") ?: item.str("rating"),
-                streamUrl = "",   // create_link at play time
-                tmdb = null,
-                containerExtension = null
-            )
-        }.filter { it.streamId > 0 }
+        orderedList(acc, "vod", categoryId, maxItems = CATEGORY_ITEMS).map { movieOf(acc, it) }.filter { it.streamId > 0 }
     }
+
+    /**
+     * Portal-side VOD search via get_ordered_list's `search` param (what the MAG UI's own search
+     * uses). Stalker content never enters the TMDB match index — those player_api builds just fail
+     * into backoff, and paging a 63k-movie catalog at 14 rows/page is a DoS — so the TMDB->stream
+     * bridge asks the portal directly. Never throws.
+     */
+    suspend fun searchMovies(acc: XtreamAccount, query: String): List<XtreamMovie> = runCatching {
+        orderedList(acc, "vod", null, search = query, maxItems = SEARCH_ITEMS)
+            .map { movieOf(acc, it) }.filter { it.streamId > 0 }
+    }.getOrDefault(emptyList())
+
+    private fun movieOf(acc: XtreamAccount, item: JsonObject) = XtreamMovie(
+        streamId = item.int("id") ?: 0,
+        name = item.str("name").orEmpty(),
+        poster = (item.str("screenshot_uri") ?: item.str("cover"))?.takeIf { it.isNotBlank() }?.let { absolutize(acc, it) },
+        categoryId = item.str("category_id"),
+        rating = item.str("rating_imdb") ?: item.str("rating"),
+        streamUrl = "",   // create_link at play time
+        tmdb = null,
+        containerExtension = null
+    )
 
     override suspend fun series(acc: XtreamAccount, categoryId: String?): Result<List<XtreamSeriesItem>> = runCatching {
         orderedList(acc, "series", categoryId, maxItems = CATEGORY_ITEMS).map { item ->
@@ -198,7 +217,14 @@ class StalkerClient @Inject constructor(
     }
 
     /** Now/next EPG. Stalker's itv get_short_epg returns programmes with begin/end timestamps. */
+    /**
+     * Now/next for one channel — served from the ONE bulk [bulkEpg] fetch, not a request per channel.
+     * The guide UI asks per channel as tiles come into view, so the old per-channel `get_short_epg`
+     * meant a request for every tile (measured on mobile: 132 in a single browse).
+     */
     override suspend fun shortEpg(acc: XtreamAccount, streamId: Int, limit: Int): Result<List<XtreamProgram>> = runCatching {
+        bulkEpg(acc)?.let { return@runCatching it[streamId].orEmpty().take(limit) }
+        // Portal has no get_epg_info — fall back to the per-channel call.
         val js = sessions.sessionFor(acc).request(
             mapOf("type" to "itv", "action" to "get_short_epg", "ch_id" to streamId.toString(), "size" to limit.toString())
         )
@@ -206,17 +232,50 @@ class StalkerClient @Inject constructor(
             ?: (js as? JsonObject)?.get("data") as? com.google.gson.JsonArray
             ?: return@runCatching emptyList()
         val now = System.currentTimeMillis()
-        list.mapNotNull { it as? JsonObject }.map { p ->
-            val startMs = (p.long("start_timestamp") ?: 0L) * 1000
-            val endMs = (p.long("stop_timestamp") ?: 0L) * 1000
-            XtreamProgram(
-                title = p.str("name").orEmpty(),
-                description = p.str("descr").orEmpty(),
-                startMs = startMs,
-                endMs = endMs,
-                nowPlaying = now in startMs until endMs
-            )
+        list.mapNotNull { it as? JsonObject }.map { programOf(it, now) }
+    }
+
+    /**
+     * The WHOLE guide in ONE request (`get_epg_info&period=3` — 2.5MB, ~600 channels, 1s on a real
+     * portal), keyed by channel id. Null when the portal doesn't support it, so the caller degrades to
+     * the per-channel path. Re-fetched every [EPG_TTL_MS] because "now/next" advances.
+     *
+     * Only channels that HAVE epg appear — a miss here means the portal has no guide for that channel,
+     * NOT that we should ask per-channel (that's what caused the fan-out).
+     */
+    private suspend fun bulkEpg(acc: XtreamAccount): Map<Int, List<XtreamProgram>>? = epgMutex.withLock {
+        if (acc.id in epgUnsupported) return@withLock null
+        val now = System.currentTimeMillis()
+        epgCache[acc.id]?.takeIf { now - it.fetchedAtMs < EPG_TTL_MS }?.let { return@withLock it.byChannel }
+        val js = runCatching {
+            sessions.sessionFor(acc).request(mapOf("type" to "itv", "action" to "get_epg_info", "period" to EPG_PERIOD_HOURS))
+        }.getOrNull()
+        val data = (js as? JsonObject)?.get("data") as? JsonObject
+        if (data == null || data.size() == 0) {
+            epgUnsupported += acc.id   // don't retry the bulk call all session
+            return@withLock null
         }
+        val byChannel = HashMap<Int, List<XtreamProgram>>(data.size())
+        for ((chId, arr) in data.entrySet()) {
+            val id = chId.toIntOrNull() ?: continue
+            val progs = (arr as? com.google.gson.JsonArray)?.mapNotNull { it as? JsonObject }
+                ?.map { programOf(it, now) }.orEmpty()
+            if (progs.isNotEmpty()) byChannel[id] = progs
+        }
+        epgCache[acc.id] = EpgSnapshot(byChannel, now)
+        byChannel
+    }
+
+    private fun programOf(p: JsonObject, nowMs: Long): XtreamProgram {
+        val startMs = (p.long("start_timestamp") ?: 0L) * 1000
+        val endMs = (p.long("stop_timestamp") ?: 0L) * 1000
+        return XtreamProgram(
+            title = p.str("name").orEmpty(),
+            description = p.str("descr").orEmpty(),
+            startMs = startMs,
+            endMs = endMs,
+            nowPlaying = nowMs in startMs until endMs
+        )
     }
 
     /**
@@ -329,6 +388,7 @@ class StalkerClient @Inject constructor(
         acc: XtreamAccount,
         type: String,
         categoryId: String?,
+        search: String? = null,
         maxItems: Int = MAX_ITEMS,
         stopWhen: ((JsonObject) -> Boolean)? = null,
     ): List<JsonObject> {
@@ -342,6 +402,7 @@ class StalkerClient @Inject constructor(
                 put("action", "get_ordered_list")
                 put("genre", categoryId ?: "*")
                 if (type != "itv") put("category", categoryId ?: "*")
+                search?.let { put("search", it) }
                 put("p", page.toString())
                 put("sortby", "number")
                 put("JsHttpRequest", "1-xml")
@@ -395,6 +456,12 @@ class StalkerClient @Inject constructor(
         // ponytail: fixed cap, not incremental paging. If a row ever needs to go deeper, page it on
         // demand as the row scrolls rather than raising this.
         private const val CATEGORY_ITEMS = 70
+        private const val SEARCH_ITEMS = 100  // search results: a page or two is plenty
+
+        // get_epg_info window + snapshot freshness. 3h covers now/next; re-fetched every 30 min so
+        // "now" keeps up.
+        private const val EPG_PERIOD_HOURS = "3"
+        private const val EPG_TTL_MS = 30 * 60 * 1000L
     }
 }
 

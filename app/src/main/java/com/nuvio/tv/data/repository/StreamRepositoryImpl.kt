@@ -3,6 +3,7 @@ package com.nuvio.tv.data.repository
 import android.content.Context
 import android.util.Log
 import com.nuvio.tv.R
+import com.nuvio.tv.core.iptv.XtreamAccount
 import com.nuvio.tv.core.network.NetworkResult
 import com.nuvio.tv.core.network.safeApiCall
 import com.nuvio.tv.core.debrid.DebridStreamPresentation
@@ -137,11 +138,14 @@ class StreamRepositoryImpl @Inject constructor(
             // Xtream IPTV as a stream source for TMDB content: each enabled account gets
             // its own group via the TMDB->stream matcher (index + verify + synced cache).
             // TMDB->stream matching (Sports Centre + addon-detail IPTV streams) needs a get_vod_info /
-            // get_series_info verify endpoint, which only real Xtream panels have — M3U (url/file) and
-            // Stalker sources must not reach the resolver (their player_api calls just fail into
-            // backoff). Their content still plays via its own namespaced hybrid lane (registry ids).
+            // get_series_info verify endpoint, which only real Xtream panels have — M3U (url/file)
+            // must not reach the resolver (its player_api calls just fail into backoff); its content
+            // still plays via its own namespaced hybrid lane (registry ids). Stalker IS included: it
+            // takes a different route inside XtreamStreamSource (the portal's own search endpoint).
             val xtreamMatchTargets = if (type == "movie" || type == "series") {
-                xtreamAccountStore.accounts.first().filter { it.enabled && it.isXtream() }
+                xtreamAccountStore.accounts.first().filter {
+                    it.enabled && (it.isXtream() || it.sourceType == XtreamAccount.SOURCE_STALKER)
+                }
             } else {
                 emptyList()
             }

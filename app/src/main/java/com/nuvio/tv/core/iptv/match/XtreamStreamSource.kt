@@ -15,6 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class XtreamStreamSource @Inject constructor(
     private val client: XtreamClient,
+    private val stalkerClient: com.nuvio.tv.core.iptv.stalker.StalkerClient,
     private val resolver: XtreamTmdbResolver,
     private val index: XtreamMatchIndex,
     private val tmdbService: TmdbService,
@@ -33,6 +34,11 @@ class XtreamStreamSource @Inject constructor(
             android.util.Log.w("XtreamStreamSource", "skip tmdb=$tmdbId: title bundle unavailable (API key/network)")
             return emptyList()
         }
+        // Stalker has no match index — the resolver builds one from player_api bulk lists a portal
+        // doesn't have, and paging its 63k-movie catalog is what got a portal to ban us. Instead ask
+        // the PORTAL to find the title (get_ordered_list&search=, 1-2 requests).
+        if (acc.sourceType == XtreamAccount.SOURCE_STALKER) return stalkerStreams(acc, kind, titles)
+
         val match = resolver.resolve(acc, kind, tmdbId, titles) ?: return emptyList()
 
         return when (kind) {
@@ -69,6 +75,36 @@ class XtreamStreamSource @Inject constructor(
     }
 
     /**
+     * Stalker VOD for a TMDB title, via the portal's own search. Panels ship no tmdb ids, so the match
+     * is name-key equality + a year guard — the same rule [sameNameEditions] uses for id-less panels.
+     *
+     * MOVIES ONLY: these portals model a series as a flat episode list that all lands in season 1
+     * (see StalkerClient.seriesInfo), so a TMDB S/E can't be mapped to an episode reliably. Series
+     * stay browsable in the IPTV hub, where registry ids carry the real episode numbers.
+     */
+    private suspend fun stalkerStreams(acc: XtreamAccount, kind: MatchKind, titles: com.nuvio.tv.core.tmdb.TmdbTitleBundle): List<Stream> {
+        if (kind != MatchKind.MOVIE) return emptyList()
+        val query = titles.primary?.takeIf { it.isNotBlank() } ?: return emptyList()
+        val wantKeys = listOfNotNull(titles.primary, titles.original)
+            .map { TitleNormalizer.normKey(it) }.filter { it.isNotEmpty() }.toSet()
+        if (wantKeys.isEmpty()) return emptyList()
+
+        return stalkerClient.searchMovies(acc, query)
+            .filter { TitleNormalizer.normKey(it.name) in wantKeys }
+            .filter { yearCompatible(TitleNormalizer.yearOf(it.name), titles.year) }
+            .take(MAX_STALKER_EDITIONS)   // a catalog carries 4K/HD/language cuts of the same film
+            .mapNotNull { movie ->
+                // create_link FRESH — the URL carries a single-use play_token, so it is never cached.
+                // searchMovies already cached the row, so this costs only the create_link itself.
+                val url = stalkerClient.resolveStreamUrl(acc, "movie", movie.streamId) ?: return@mapNotNull null
+                xtreamStream(acc = acc, label = movie.name, url = url)
+            }
+    }
+
+    private fun yearCompatible(a: Int?, b: Int?): Boolean =
+        a == null || b == null || (if (a > b) a - b else b - a) <= 1
+
+    /**
      * Editions of the same title on panels that ship no tmdb ids: items sharing the matched
      * item's normalized name key, year-compatible with the target. The verified match leads.
      */
@@ -97,5 +133,6 @@ class XtreamStreamSource @Inject constructor(
 
     companion object {
         private const val MAX_SERIES_EDITIONS = 5
+        private const val MAX_STALKER_EDITIONS = 5
     }
 }
