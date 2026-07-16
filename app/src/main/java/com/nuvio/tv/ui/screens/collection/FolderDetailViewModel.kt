@@ -471,6 +471,7 @@ class FolderDetailViewModel @Inject constructor(
                     add(GridItem.SeeAll(
                         catalogId = row.catalogId,
                         addonId = row.addonId,
+                        addonBaseUrl = row.addonBaseUrl,
                         type = row.apiType
                     ))
                 }
