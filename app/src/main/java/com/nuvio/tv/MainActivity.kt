@@ -869,7 +869,8 @@ class MainActivity : ComponentActivity() {
                             backdropUrl = ov.backdrop,
                             logoUrl = ov.logo,
                             title = ov.title,
-                            message = stringResource(R.string.external_auto_next_loading),
+                            message = ov.message ?: stringResource(R.string.external_auto_next_loading),
+                            progress = ov.progress,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -947,6 +948,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        externalPlaybackTracker.onExternalPlayerCoveredApp()
         super.onStop()
         startupSyncService.stopPeriodicSurfacePulls()
         // App going to background (e.g. user returning to the launcher): reconcile the
