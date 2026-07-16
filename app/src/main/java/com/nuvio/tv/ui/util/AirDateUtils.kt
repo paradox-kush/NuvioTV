@@ -2,6 +2,7 @@ package com.nuvio.tv.ui.util
 
 import android.content.Context
 import com.nuvio.tv.R
+import com.nuvio.tv.core.util.isEpisodeReleaseAired
 import com.nuvio.tv.core.util.parseEpisodeReleaseLocalDate
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,6 +20,7 @@ internal fun computeAirDateBadgeText(
     if (releasedIso.isNullOrBlank()) {
         return airDateLabel?.let { context.getString(R.string.cw_airs_date, it) }
     }
+    if (isEpisodeReleaseAired(releasedIso) == true) return null
 
     val releaseDate = parseEpisodeReleaseDate(releasedIso) ?: return null
     val today = LocalDate.now(ZoneId.systemDefault())

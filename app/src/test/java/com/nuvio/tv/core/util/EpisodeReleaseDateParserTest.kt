@@ -1,5 +1,7 @@
 package com.nuvio.tv.core.util
 
+import com.nuvio.tv.domain.model.TmdbSettings
+import com.nuvio.tv.ui.screens.settings.TmdbSettingsUiState
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -36,9 +38,21 @@ class EpisodeReleaseDateParserTest {
     }
 
     @Test
-    fun `precise addon timestamp wins over tmdb broadcaster date`() {
+    fun `addon timestamp wins when tmdb release dates are disabled`() {
         assertEquals(
             "2026-07-15T15:00:00Z",
+            selectEpisodeReleaseValue(
+                addonReleased = "2026-07-15T15:00:00Z",
+                tmdbAirDate = "2026-07-16",
+                useTmdbReleaseDates = false
+            )
+        )
+    }
+
+    @Test
+    fun `tmdb date replaces compliant addon timestamp only when enabled`() {
+        assertEquals(
+            "2026-07-16",
             selectEpisodeReleaseValue(
                 addonReleased = "2026-07-15T15:00:00Z",
                 tmdbAirDate = "2026-07-16",
@@ -48,31 +62,28 @@ class EpisodeReleaseDateParserTest {
     }
 
     @Test
-    fun `tmdb date remains the fallback for imprecise addon metadata`() {
+    fun `release selection falls back without inventing metadata`() {
         assertEquals(
-            "2026-07-16",
+            "2026-07-15T15:00:00Z",
             selectEpisodeReleaseValue(
-                addonReleased = null,
-                tmdbAirDate = "2026-07-16",
+                addonReleased = "2026-07-15T15:00:00Z",
+                tmdbAirDate = null,
                 useTmdbReleaseDates = true
             )
         )
-        assertEquals(
-            "2026-07-15",
+        assertNull(
             selectEpisodeReleaseValue(
-                addonReleased = "2026-07-15",
+                addonReleased = null,
                 tmdbAirDate = "2026-07-16",
                 useTmdbReleaseDates = false
             )
         )
-        assertEquals(
-            "2026-07-16",
-            selectEpisodeReleaseValue(
-                addonReleased = "2026-07-15T15:00:00",
-                tmdbAirDate = "2026-07-16",
-                useTmdbReleaseDates = true
-            )
-        )
+    }
+
+    @Test
+    fun `tmdb release dates default to disabled`() {
+        assertFalse(TmdbSettings().useReleaseDates)
+        assertFalse(TmdbSettingsUiState().useReleaseDates)
     }
 
     @Test
@@ -85,12 +96,12 @@ class EpisodeReleaseDateParserTest {
     }
 
     @Test
-    fun `date only release starts at viewer local midnight`() {
-        val beforeMidnight = Clock.fixed(Instant.parse("2026-07-15T03:59:59Z"), eastern)
-        val localMidnight = Clock.fixed(Instant.parse("2026-07-15T04:00:00Z"), eastern)
+    fun `date only release starts at utc midnight`() {
+        val beforeMidnight = Clock.fixed(Instant.parse("2026-07-14T23:59:59Z"), eastern)
+        val utcMidnight = Clock.fixed(Instant.parse("2026-07-15T00:00:00Z"), eastern)
 
         assertFalse(isEpisodeReleaseAired("2026-07-15", beforeMidnight)!!)
-        assertTrue(isEpisodeReleaseAired("2026-07-15", localMidnight)!!)
+        assertTrue(isEpisodeReleaseAired("2026-07-15", utcMidnight)!!)
     }
 
     @Test

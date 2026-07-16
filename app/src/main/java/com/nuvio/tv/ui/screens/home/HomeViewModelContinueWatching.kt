@@ -37,6 +37,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -119,19 +120,13 @@ internal data class CwMetaSummary(
             .mapNotNull { (_, eps) ->
                 val first = eps.minByOrNull { it.episode ?: Int.MAX_VALUE } ?: return@mapNotNull null
                 if (first.available == false) return@mapNotNull null
-                val released = first.released?.substringBefore('T')?.trim()
-                if (released.isNullOrBlank()) return@mapNotNull null
-                try {
-                    val date = java.time.LocalDate.parse(
-                        released,
-                        java.time.format.DateTimeFormatter.ISO_LOCAL_DATE
-                    )
-                    if (date.isAfter(today)) {
-                        val premiereMs = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        // Trigger revalidation 7 days before premiere so countdown badge shows up
-                        (premiereMs - sevenDaysMs).coerceAtLeast(System.currentTimeMillis())
-                    } else null
-                } catch (_: java.time.format.DateTimeParseException) { null }
+                val date = parseEpisodeReleaseDate(first.released)
+                if (date == null) return@mapNotNull null
+                if (date.isAfter(today)) {
+                    val premiereMs = date.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    // Trigger revalidation 7 days before premiere so countdown badge shows up
+                    (premiereMs - sevenDaysMs).coerceAtLeast(System.currentTimeMillis())
+                } else null
             }
             .minOrNull()
     }

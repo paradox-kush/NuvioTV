@@ -6,6 +6,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
 private val ISO_DATE_PATTERN = Regex("(?<!\\d)\\d{4}-\\d{2}-\\d{2}(?!\\d)")
@@ -27,9 +28,9 @@ internal fun parseEpisodeReleaseLocalDate(
 }
 
 /**
- * Returns whether a known release has been reached. Zoned timestamps use their exact instant;
- * date-only values become available at local midnight. A local timestamp without a zone is
- * interpreted in the viewer's timezone but is never considered precise provider metadata.
+ * Returns whether a known release has been reached. Zoned timestamps use their exact instant,
+ * while date-only values use UTC midnight. A local timestamp without a zone is interpreted in
+ * the viewer's timezone.
  */
 internal fun isEpisodeReleaseAired(
     raw: String?,
@@ -47,14 +48,13 @@ internal fun parseEpisodeReleaseInstant(
 
     return parseExplicitReleaseInstant(value)
         ?: runCatching { LocalDateTime.parse(value).atZone(zoneId).toInstant() }.getOrNull()
-        ?: runCatching { LocalDate.parse(value).atStartOfDay(zoneId).toInstant() }.getOrNull()
-        ?: parseEmbeddedReleaseDate(value)?.atStartOfDay(zoneId)?.toInstant()
+        ?: runCatching { LocalDate.parse(value).atStartOfDay(ZoneOffset.UTC).toInstant() }.getOrNull()
+        ?: parseEmbeddedReleaseDate(value)?.atStartOfDay(ZoneOffset.UTC)?.toInstant()
 }
 
 /**
- * TMDB episode air dates are date-only and may use the broadcaster's calendar day. Keep an
- * addon's timestamp when present because it carries enough information to derive the viewer's
- * local day; use TMDB as enrichment only when that precision is unavailable.
+ * Uses the add-on release timestamp unless the user explicitly opts into TMDB's date-only
+ * broadcaster calendar dates.
  */
 internal fun selectEpisodeReleaseValue(
     addonReleased: String?,
@@ -63,14 +63,8 @@ internal fun selectEpisodeReleaseValue(
 ): String? {
     val addonValue = addonReleased?.trim()?.takeIf { it.isNotEmpty() }
     if (!useTmdbReleaseDates) return addonValue
-    if (addonValue != null && hasExplicitReleaseZone(addonValue)) return addonValue
     return tmdbAirDate?.trim()?.takeIf { it.isNotEmpty() } ?: addonValue
 }
-
-private fun hasExplicitReleaseZone(value: String): Boolean =
-    runCatching { Instant.parse(value) }.isSuccess ||
-        runCatching { OffsetDateTime.parse(value) }.isSuccess ||
-        runCatching { ZonedDateTime.parse(value) }.isSuccess
 
 private fun parseExplicitReleaseInstant(value: String): Instant? =
     runCatching { Instant.parse(value) }.getOrNull()
