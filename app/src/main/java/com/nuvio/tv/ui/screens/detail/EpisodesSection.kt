@@ -85,6 +85,9 @@ import com.nuvio.tv.ui.components.FocusMarqueeText
 import com.nuvio.tv.ui.components.ImdbRatingSourceLabel
 import com.nuvio.tv.ui.components.NuvioDialog
 import com.nuvio.tv.ui.theme.NuvioTheme
+import com.nuvio.tv.domain.model.CardDepthSurface
+import com.nuvio.tv.ui.components.LocalCardDepthStyle
+import com.nuvio.tv.ui.components.nuvioCardDepth
 import com.nuvio.tv.ui.theme.ThemeColors
 import android.text.format.DateFormat
 import androidx.compose.ui.draw.clipToBounds
@@ -482,6 +485,7 @@ private fun EpisodeCard(
     var longPressTriggered by remember { mutableStateOf(false) }
     val longPressKeyTracker = rememberLongPressKeyTracker()
     val shape = remember(cardMetrics.cornerRadius) { RoundedCornerShape(cardMetrics.cornerRadius) }
+    val cardDepthStyle = LocalCardDepthStyle.current
     val thumbnailWidthPx = remember(cardMetrics.cardWidth, density) {
         with(density) { cardMetrics.cardWidth.roundToPx() }
     }
@@ -643,7 +647,13 @@ private fun EpisodeCard(
             modifier = Modifier
                 .width(cardMetrics.cardWidth)
                 .height(cardMetrics.cardHeight)
-                .clipToBounds()
+                .clip(shape)
+                .nuvioCardDepth(
+                    shape = shape,
+                    surface = CardDepthSurface.EPISODE_CARDS,
+                    style = cardDepthStyle,
+                    fallbackBorderAlpha = 0.12f
+                )
         ) {
             val bgPainter = remember(cardBgColor) { androidx.compose.ui.graphics.painter.ColorPainter(cardBgColor) }
             AsyncImage(
