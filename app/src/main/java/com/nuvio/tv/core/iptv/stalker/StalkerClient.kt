@@ -14,6 +14,7 @@ import com.nuvio.tv.core.iptv.XtreamProgram
 import com.nuvio.tv.core.iptv.XtreamSeriesDetail
 import com.nuvio.tv.core.iptv.XtreamSeriesItem
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,6 +33,10 @@ import javax.inject.Singleton
 class StalkerClient @Inject constructor(
     private val sessions: StalkerSessionManager
 ) : IptvClient {
+
+    // Browse-time rows keyed accountId:type:id — see [row]. This is what keeps play/detail from
+    // re-paging the whole catalog (the request storm that got a live portal to block us).
+    private val rowCache = ConcurrentHashMap<String, JsonObject>()
 
     /** Verify = handshake succeeds (session authenticates) + account_info is reachable. */
     suspend fun verify(acc: XtreamAccount): Result<Unit> = runCatching {
@@ -121,8 +126,8 @@ class StalkerClient @Inject constructor(
      * season 1. Grouping by a season field is the upgrade path if a portal ever provides one.
      */
     override suspend fun seriesInfo(acc: XtreamAccount, seriesId: Int): Result<XtreamSeriesDetail> = runCatching {
-        // Re-fetch the series row to read its episode list + cmd (portals don't have a get_series_info).
-        val row = orderedList(acc, "series", null).firstOrNull { it.int("id") == seriesId }
+        // Read the series row for its episode list + cmd (portals have no get_series_info).
+        val row = row(acc, "series", seriesId)
         val plot = row?.str("description")
         val backdrop = (row?.str("screenshot_uri") ?: row?.str("cover"))?.takeIf { it.isNotBlank() }?.let { absolutize(acc, it) }
         val episodeNums = row?.get("series")?.let { el ->
@@ -219,13 +224,35 @@ class StalkerClient @Inject constructor(
     // --- cmd lookup (browse-time cmd needed for create_link) ------------------
 
     private suspend fun liveCmd(acc: XtreamAccount, streamId: Int): String? =
-        orderedList(acc, "itv", null).firstOrNull { it.int("id") == streamId }?.str("cmd")
+        row(acc, "itv", streamId)?.str("cmd")
 
     private suspend fun vodCmd(acc: XtreamAccount, streamId: Int): String? =
-        orderedList(acc, "vod", null).firstOrNull { it.int("id") == streamId }?.str("cmd")
+        row(acc, "vod", streamId)?.str("cmd")
 
     private suspend fun seriesCmd(acc: XtreamAccount, seriesId: Int): String? =
-        orderedList(acc, "series", null).firstOrNull { it.int("id") == seriesId }?.str("cmd")
+        row(acc, "series", seriesId)?.str("cmd")
+
+    /**
+     * The browse row for ONE item. `get_ordered_list` already returns each item's `cmd` (the
+     * create_link input), so [orderedList] caches every row it sees and playing anything you browsed
+     * costs ZERO extra requests.
+     *
+     * This used to re-page the ENTIRE catalog (genre=*, up to [MAX_PAGES] requests) per lookup — one
+     * tap = ~200 requests — which is what got a real portal's Cloudflare to block the whole IP. The
+     * cold-start miss (play straight from the library) still scans, but stops at the match.
+     */
+    private suspend fun row(acc: XtreamAccount, type: String, id: Int): JsonObject? =
+        rowCache[rowKey(acc.id, type, id)]
+            ?: orderedList(acc, type, null, stopWhen = { it.int("id") == id })
+                .firstOrNull { it.int("id") == id }
+
+    private fun rowKey(accId: String, type: String, id: Int) = "$accId:$type:$id"
+
+    private fun cacheRows(accId: String, type: String, rows: List<JsonObject>) {
+        // ponytail: crude cap, not an LRU — swap one in only if this shows up in a memory profile.
+        if (rowCache.size > MAX_CACHED_ROWS) rowCache.clear()
+        rows.forEach { r -> r.int("id")?.let { rowCache[rowKey(accId, type, it)] = r } }
+    }
 
     // --- request helpers ------------------------------------------------------
 
@@ -245,7 +272,12 @@ class StalkerClient @Inject constructor(
      * list of item objects. Capped so a 26k-channel "All" fetch can't run away — categories are the
      * real browse path (matches the Xtream/M3U "All channels" cap).
      */
-    private suspend fun orderedList(acc: XtreamAccount, type: String, categoryId: String?): List<JsonObject> {
+    private suspend fun orderedList(
+        acc: XtreamAccount,
+        type: String,
+        categoryId: String?,
+        stopWhen: ((JsonObject) -> Boolean)? = null,
+    ): List<JsonObject> {
         val session = sessions.sessionFor(acc)
         val out = ArrayList<JsonObject>()
         var page = 1
@@ -265,7 +297,11 @@ class StalkerClient @Inject constructor(
             total = obj.int("total_items") ?: obj.int("max_page_items")?.let { it * MAX_PAGES } ?: out.size
             val data = obj.get("data") as? com.google.gson.JsonArray ?: break
             if (data.size() == 0) break
-            data.mapNotNullTo(out) { it as? JsonObject }
+            val rows = data.mapNotNull { it as? JsonObject }
+            // Every row carries its `cmd` — keep them so play/detail never re-pages to find one.
+            cacheRows(acc.id, type, rows)
+            out += rows
+            if (stopWhen != null && rows.any(stopWhen)) break   // found the target — stop paging
             page++
         }
         return out
@@ -297,6 +333,7 @@ class StalkerClient @Inject constructor(
         private const val TAG = "StalkerClient"
         private const val MAX_ITEMS = 8000    // ponytail: categories are the browse path; don't slurp 26k
         private const val MAX_PAGES = 200
+        private const val MAX_CACHED_ROWS = 10_000
     }
 }
 

@@ -13,6 +13,9 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+/** The portal rejected our identity/token — the ONLY failure that may trigger a re-handshake. */
+class StalkerAuthException(message: String) : IllegalStateException(message)
+
 /**
  * A stateful Stalker-portal (MAG/Ministra) session for ONE playlist. Owns:
  *  - endpoint probing (the user enters just a base portal URL; we try [StalkerProtocol.ENDPOINT_CANDIDATES]
@@ -59,11 +62,18 @@ class StalkerSession(
     suspend fun request(params: Map<String, String>): JsonElement = withContext(Dispatchers.IO) {
         ensureAuthenticated()
         val staleToken = token
-        val first = runCatching { rawRequest(params) }
-        val js = first.getOrNull()?.jsOrNull()
+        // ONLY an auth failure earns a re-handshake. A transport/HTTP throw (429/419/5xx/timeout) must
+        // NOT: re-authing on those turns a rate-limited portal into a stampede — every call becomes
+        // request + handshake + retry — which is exactly how we got a live portal to block us. Those
+        // throws propagate; callers' runCatching degrades to empty.
+        val js = try {
+            rawRequest(params).jsOrNull()
+        } catch (e: StalkerAuthException) {
+            null   // fall through to the single re-auth + retry below
+        }
         if (js != null) return@withContext js
 
-        // Stale token / transient auth failure -> force a fresh handshake, then retry exactly once.
+        // Stale token (empty `js` / "Authorization failed." / 401 / 403) -> one handshake, retry once.
         Log.d(TAG, "Stalker request stale for ${account.name} (${params["action"]}) — re-authenticating")
         reauthenticate(staleToken)
         rawRequest(params).jsOrNull()
@@ -194,7 +204,7 @@ class StalkerSession(
             // rejection would otherwise surface as a vague "no data". Throw an actionable error — it
             // only becomes terminal when re-auth can't fix it (MAC/Serial/Device ID genuinely wrong).
             if (bodyStr.contains(AUTH_FAILED_MARKER, ignoreCase = true))
-                error("Stalker portal rejected this device for ${account.name} — check the MAC address (and Serial / Device ID if the portal requires them)")
+                throw StalkerAuthException("Stalker portal rejected this device for ${account.name} — check the MAC address (and Serial / Device ID if the portal requires them)")
             return runCatching { JsonParser.parseString(bodyStr) }.getOrDefault(JsonObject())
         }
     }
