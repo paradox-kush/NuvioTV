@@ -507,6 +507,9 @@ private fun MatchCard(
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             color = NuvioTheme.colors.TextPrimary,
+            // minLines keeps every card the same height — short titles were
+            // producing visibly smaller boxes next to two-line ones.
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
