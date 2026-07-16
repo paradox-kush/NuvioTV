@@ -115,7 +115,11 @@ class XtreamStreamSource @Inject constructor(
                     .take(MAX_STALKER_EDITIONS)   // language cuts ("Breaking Bad (Hindi)") are separate
                     .mapNotNull { series ->
                         val url = stalkerClient.resolveEpisodeUrl(acc, series.seriesId, s, e) ?: return@mapNotNull null
-                        xtreamStream(acc = acc, label = "S${s}E${e}", url = url, title = series.name)
+                        // The label IS what's shown (name wins; title is only a fallback), so the
+                        // portal's own name has to live there, exactly like the movie branch. Stalker
+                        // episode titles are generic ("Episode 7"), so the series name is what
+                        // distinguishes editions ("Breaking Bad (Hindi)").
+                        xtreamStream(acc = acc, label = "${series.name} · S${s}E${e}", url = url, title = series.name)
                     }
             }
         }
