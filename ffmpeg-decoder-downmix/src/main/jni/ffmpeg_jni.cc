@@ -85,6 +85,14 @@ static const int AUDIO_DECODER_ERROR_INVALID_DATA = -1;
 static const int AUDIO_DECODER_ERROR_OTHER = -2;
 // LINT.ThenChange(../java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java)
 
+// LINT.IfChange
+// Fixed output profile for the AC3 transcode path. 48 kHz / 640 kbps CBR gives a
+// constant 2560-byte, 1536-sample frame — FfmpegAudioDecoder's output timestamps
+// are derived from that frame layout, so these must change together.
+static const int AC3_TRANSCODE_SAMPLE_RATE = 48000;
+static const int AC3_TRANSCODE_BIT_RATE = 640000;
+// LINT.ThenChange(../java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java)
+
 struct DecoderContext {
   AVCodecContext* codec_context;
   SwrContext* resample_context;
@@ -500,7 +508,12 @@ int decodePacket(DecoderContext* decoderContext, AVPacket* packet,
       }
       free(converted_data);
 
-      while (av_audio_fifo_size(decoderContext->fifo) >= decoderContext->encoder_context->frame_size) {
+      // ONE packet per decode call: DefaultAudioSink counts a single encoded access
+      // unit per handleBuffer for direct AC3, so a buffer carrying N packets gets
+      // counted as one frame and every later timestamp reads N-1 frames "early"
+      // (measured live: a constant +224ms = 7 frames → discontinuity storm).
+      // Surplus FIFO samples simply drain on subsequent calls.
+      if (av_audio_fifo_size(decoderContext->fifo) >= decoderContext->encoder_context->frame_size) {
         av_audio_fifo_read(decoderContext->fifo, (void**)decoderContext->encoder_frame->data,
                             decoderContext->encoder_context->frame_size);
 
@@ -629,10 +642,16 @@ int configureResampler(DecoderContext* decoderContext, AVFrame* frame,
 
   clearResampler(decoderContext);
 
+  // AC3 over HDMI/SPDIF must be 48 kHz: Amlogic HALs reject other rates
+  // ("Unsupported bitstream id") and then freeze the track's presentation
+  // position, which stalls the whole player clock. Resample everything to
+  // 48 kHz on the transcode path; the passthrough-less path keeps the input rate.
+  int outputSampleRate =
+      decoderContext->transcode_to_ac3 ? AC3_TRANSCODE_SAMPLE_RATE : inputSampleRate;
   SwrContext* resampleContext = NULL;
   int result = swr_alloc_set_opts2(&resampleContext, &outputLayout,
                                    decoderContext->output_sample_format,
-                                   inputSampleRate, &inputLayout,
+                                   outputSampleRate, &inputLayout,
                                    inputSampleFormat, inputSampleRate, 0, NULL);
   if (result < 0) {
     logError("swr_alloc_set_opts2", result);
@@ -692,9 +711,10 @@ int configureResampler(DecoderContext* decoderContext, AVFrame* frame,
       return AUDIO_DECODER_ERROR_OTHER;
     }
     enc_ctx->sample_fmt = AV_SAMPLE_FMT_FLTP;
-    enc_ctx->sample_rate = inputSampleRate;
+    // Must match the resampler's pinned output rate above.
+    enc_ctx->sample_rate = AC3_TRANSCODE_SAMPLE_RATE;
     av_channel_layout_copy(&enc_ctx->ch_layout, &outputLayout);
-    enc_ctx->bit_rate = 640000;
+    enc_ctx->bit_rate = AC3_TRANSCODE_BIT_RATE;
     
     int ret = avcodec_open2(enc_ctx, encoder, NULL);
     if (ret < 0) {

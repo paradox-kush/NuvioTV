@@ -47,6 +47,9 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
 
   private static final String TAG = "FfmpegAudioRenderer";
 
+  /** Output rate of the AC3 transcode path — pinned in the native encoder (ffmpeg_jni.cc). */
+  private static final int AC3_TRANSCODE_SAMPLE_RATE = 48000;
+
   /** The number of input and output buffers. */
   private static final int NUM_BUFFERS = 16;
 
@@ -148,12 +151,13 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     }
     boolean supportsConfiguredOutput;
     if (transcodeToAc3) {
-      int sampleRate = format.sampleRate > 0 ? format.sampleRate : 48000;
+      // The transcode path always emits 48 kHz AC3 (pinned in the native encoder),
+      // regardless of the source rate — probe the sink with what we actually output.
       supportsConfiguredOutput = sinkSupportsFormat(
           new Format.Builder()
               .setSampleMimeType(MimeTypes.AUDIO_AC3)
               .setChannelCount(6)
-              .setSampleRate(sampleRate)
+              .setSampleRate(AC3_TRANSCODE_SAMPLE_RATE)
               .build());
     } else {
       int outputChannelCount = resolveOutputChannelCount(format.channelCount);
@@ -226,10 +230,13 @@ public final class FfmpegAudioRenderer extends DecoderAudioRenderer<FfmpegAudioD
     checkNotNull(decoder);
     int encoding = decoder.getEncoding();
     if (encoding == C.ENCODING_AC3) {
+      // decoder.getSampleRate() reports the INPUT stream's rate; the transcode path always
+      // emits 48 kHz AC3. Advertising the input rate made the sink open (and account) the
+      // direct track at the wrong rate — e.g. 44.1 kHz AC3, which Amlogic HALs reject.
       return new Format.Builder()
           .setSampleMimeType(MimeTypes.AUDIO_AC3)
           .setChannelCount(decoder.getChannelCount())
-          .setSampleRate(decoder.getSampleRate())
+          .setSampleRate(AC3_TRANSCODE_SAMPLE_RATE)
           .build();
     }
     return new Format.Builder()

@@ -1,0 +1,3 @@
+
+# local ffmpeg source checkout + static libs (built via build_ffmpeg.sh, never committed)
+src/main/jni/ffmpeg/

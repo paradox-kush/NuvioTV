@@ -46,6 +46,14 @@ import java.util.List;
   private static final int AUDIO_DECODER_ERROR_INVALID_DATA = -1;
   private static final int AUDIO_DECODER_ERROR_OTHER = -2;
 
+  // LINT.IfChange
+  // Fixed output profile of the native AC3 transcode path (see ffmpeg_jni.cc): 48 kHz /
+  // 640 kbps CBR AC3 = 1536 samples per frame, 2560 bytes per frame (640000 * 1536 / 48000 / 8).
+  private static final int AC3_TRANSCODE_SAMPLE_RATE = 48000;
+  private static final int AC3_TRANSCODE_FRAME_SAMPLES = 1536;
+  private static final int AC3_TRANSCODE_FRAME_BYTES = 2560;
+  // LINT.ThenChange(../../../../../jni/ffmpeg_jni.cc)
+
   // FLAC parsing constants
   private static final byte[] flacStreamMarker = {'f', 'L', 'a', 'C'};
   private static final int FLAC_METADATA_TYPE_STREAM_INFO = 0;
@@ -63,6 +71,12 @@ import java.util.List;
   private boolean hasOutputFormat;
   private volatile int channelCount;
   private volatile int sampleRate;
+
+  // AC3 transcode timestamp continuity (see decode()). The native FIFO decouples input
+  // buffers from emitted AC3 packets, so input timestamps must not be copied to outputs.
+  private boolean transcodeBaseTimeSet;
+  private long transcodeBaseTimeUs;
+  private long transcodeSamplesEmitted;
 
   public FfmpegAudioDecoder(
       Format format,
@@ -129,6 +143,9 @@ import java.util.List;
       if (nativeContext == 0) {
         return new FfmpegDecoderException("Error resetting (see logcat).");
       }
+      // The native reset drops the transcode FIFO — re-anchor output timestamps too.
+      transcodeBaseTimeSet = false;
+      transcodeSamplesEmitted = 0;
     }
     ByteBuffer inputData = Util.castNonNull(inputBuffer.data);
     int inputSize = inputData.limit();
@@ -174,6 +191,22 @@ import java.util.List;
     outputData = checkNotNull(outputBuffer.data);
     outputData.position(0);
     outputData.limit(result);
+    if (outputEncoding == C.ENCODING_AC3) {
+      // Transcode outputs are whole encoder packets pulled from a FIFO, so they don't line up
+      // 1:1 with input buffers. Copying the input timeUs (init() above) makes timestamps jump
+      // versus the sink's frames-written accounting and triggers a continuous
+      // UnexpectedDiscontinuityException storm. Stamp outputs from a running sample counter
+      // anchored at the first output after construction/flush instead.
+      if (!transcodeBaseTimeSet) {
+        transcodeBaseTimeUs = inputBuffer.timeUs;
+        transcodeBaseTimeSet = true;
+      }
+      outputBuffer.timeUs =
+          transcodeBaseTimeUs
+              + transcodeSamplesEmitted * C.MICROS_PER_SECOND / AC3_TRANSCODE_SAMPLE_RATE;
+      transcodeSamplesEmitted +=
+          (long) (result / AC3_TRANSCODE_FRAME_BYTES) * AC3_TRANSCODE_FRAME_SAMPLES;
+    }
     return null;
   }
 
