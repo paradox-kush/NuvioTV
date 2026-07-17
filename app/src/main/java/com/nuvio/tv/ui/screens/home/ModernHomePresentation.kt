@@ -7,6 +7,7 @@ import com.nuvio.tv.LocaleCache
 import com.nuvio.tv.R
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.Collection
+import com.nuvio.tv.domain.model.stableItemKey
 import com.nuvio.tv.ui.util.asStable
 import java.util.Locale
 import kotlinx.coroutines.withContext
@@ -135,9 +136,9 @@ internal fun buildModernHomePresentation(
                                     cachedItem.showFullReleaseDate == input.showFullReleaseDate
                                 ) {
                                     cachedItem.carouselItem.let { cached ->
-                                        val positionalKey = "${rowKey}_$itemIndex"
-                                        if (cached.key == positionalKey) cached
-                                        else cached.copy(key = positionalKey)
+                                        val stableItemKey = row.stableItemKey(itemIndex)
+                                        if (cached.key == stableItemKey) cached
+                                        else cached.copy(key = stableItemKey)
                                     }
                                 } else {
                                     val built = buildCatalogItem(
@@ -149,7 +150,7 @@ internal fun buildModernHomePresentation(
                                         strTypeSeries = strTypeSeries,
                                         showFullReleaseDate = input.showFullReleaseDate,
                                         previousCachedItem = cachedItem?.carouselItem
-                                    ).copy(key = "${rowKey}_$itemIndex")
+                                    ).copy(key = row.stableItemKey(itemIndex))
                                     rowItemCache[cacheKey] = CachedCarouselItem(
                                         source = item,
                                         useLandscapePosters = input.useLandscapePosters,
@@ -221,11 +222,12 @@ internal fun buildModernHomePresentation(
                         return@forEachIndexed
                     }
                     renderedCatalogRows++
+                    val stableRowKey = homeRow.stableCatalogKey
                     val fakeItemCount = 8
                     val fakeItems = (0 until fakeItemCount).map { i ->
                         val fakeId = "__placeholder_${homeRow.catalogKey}_$i"
                         ModernCarouselItem(
-                            key = "${homeRow.catalogKey}_$i",
+                            key = "${stableRowKey}_$i",
                             title = "",
                             subtitle = null,
                             // Dummy URL triggers shimmer instead of MonochromePosterPlaceholder
@@ -253,7 +255,7 @@ internal fun buildModernHomePresentation(
                         homeRow.catalogName.replaceFirstChar { it.uppercase() }
                     }
                     val placeholderRow = HeroCarouselRow(
-                        key = homeRow.catalogKey,
+                        key = stableRowKey,
                         title = placeholderTitle,
                         globalRowIndex = index,
                         catalogId = homeRow.catalogId,

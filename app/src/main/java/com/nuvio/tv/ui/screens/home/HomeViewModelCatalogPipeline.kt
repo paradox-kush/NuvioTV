@@ -9,7 +9,9 @@ import com.nuvio.tv.domain.model.CatalogDescriptor
 import com.nuvio.tv.domain.model.CatalogRow
 import com.nuvio.tv.domain.model.Collection
 import com.nuvio.tv.domain.model.HomeLayout
+import com.nuvio.tv.domain.model.catalogRowStableKey
 import com.nuvio.tv.domain.model.enabledAddons
+import com.nuvio.tv.domain.model.legacyKey
 import com.nuvio.tv.domain.model.mergeCatalogPage
 import com.nuvio.tv.domain.model.nextCatalogSkip
 import com.nuvio.tv.domain.model.skipStep
@@ -103,15 +105,18 @@ internal fun HomeViewModel.observeTmdbSettingsPipeline() {
             .distinctUntilChanged()
             .collectLatest { settings ->
                 val languageChanged = currentTmdbSettings.language != settings.language
+                val releaseDatesChanged = currentTmdbSettings.useReleaseDates != settings.useReleaseDates
                 currentTmdbSettings = settings
                 val tmdbEnabledForLayout = settings.enabled &&
                     (_uiState.value.homeLayout != HomeLayout.MODERN || settings.modernHomeEnabled)
                 val enrichEnabled = tmdbEnabledForLayout || externalMetaPrefetchEnabled
                 _uiState.update { it.copy(heroEnrichmentEnabled = enrichEnabled) }
-                if (languageChanged) {
-                    // Allow re-enrichment with the new language on next focus.
+                if (languageChanged || releaseDatesChanged) {
+                    // Allow re-enrichment with the updated TMDB metadata selection on next focus.
                     prefetchedTmdbIds.clear()
                     prefetchedExternalMetaIds.clear()
+                    _enrichedPreviews.value = emptyMap()
+                    _lastEnrichedPreview.value = null
                 }
                 scheduleUpdateCatalogRows()
             }
@@ -576,7 +581,7 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
         val selectedHeroRows = if (selectedHeroCatalogSet.isNotEmpty()) {
             // Include hero catalogs from ordered rows
             val fromOrdered = orderedRows.filter { row ->
-                val key = "${row.addonId}_${row.apiType}_${row.catalogId}"
+                val key = row.legacyKey()
                 key in selectedHeroCatalogSet
             }
             // Also include hero catalogs loaded but not in catalog order
@@ -659,7 +664,7 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
         val computedDisplayRows = orderedRows.map { row ->
             val shouldKeepFullRowInModern = currentLayout == HomeLayout.MODERN
             if (row.items.size > 25 && !shouldKeepFullRowInModern) {
-                val key = "${row.addonId}_${row.apiType}_${row.catalogId}"
+                val key = row.legacyKey()
                 val cachedEntry = getTruncatedRowCacheEntry(key)
                 if (cachedEntry != null && cachedEntry.sourceRow === row) {
                     cachedEntry.truncatedRow
@@ -675,7 +680,7 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
                     truncatedRow
                 }
             } else {
-                val key = "${row.addonId}_${row.apiType}_${row.catalogId}"
+                val key = row.legacyKey()
                 removeTruncatedRowCacheEntry(key)
                 row
             }
@@ -692,7 +697,7 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
 
     val (computedHomeRows, nextGridItems) = withContext(Dispatchers.Default) {
         val computedHomeRows = buildList {
-            val displayRowsByKey = displayRows.associateBy { "${it.addonId}_${it.apiType}_${it.catalogId}" }
+            val displayRowsByKey = displayRows.associateBy { it.legacyKey() }
             // Build a lookup of placeholder descriptors by key for lazy catalogs
             val placeholdersByKey = synchronized(catalogStateLock) {
                 placeholderDescriptors.associateBy { it.catalogKey }
@@ -720,6 +725,12 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
                         if (currentLayout == HomeLayout.MODERN) {
                             add(HomeRow.PlaceholderCatalog(
                                 catalogKey = placeholder.catalogKey,
+                                stableCatalogKey = catalogRowStableKey(
+                                    placeholder.addonId,
+                                    placeholder.addonBaseUrl,
+                                    placeholder.apiType,
+                                    placeholder.catalogId
+                                ),
                                 addonId = placeholder.addonId,
                                 addonName = placeholder.addonName,
                                 addonBaseUrl = placeholder.addonBaseUrl,
@@ -805,6 +816,7 @@ internal suspend fun HomeViewModel.updateCatalogRowsPipeline() {
                                 add(GridItem.SeeAll(
                                     catalogId = row.catalogId,
                                     addonId = row.addonId,
+                                    addonBaseUrl = row.addonBaseUrl,
                                     type = row.apiType
                                 ))
                             }
