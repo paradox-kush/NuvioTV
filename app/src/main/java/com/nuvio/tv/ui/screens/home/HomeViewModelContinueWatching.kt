@@ -1152,7 +1152,8 @@ internal fun HomeViewModel.loadContinueWatchingPipeline() {
                 val enrichStartMs = SystemClock.elapsedRealtime()
                 val changed = enrichVisibleContinueWatchingItems(
                     finalItems = normalItems,
-                    debug = debug
+                    debug = debug,
+                    pipelineProfileId = pipelineProfileId
                 )
                 debug.recordEnrichmentComplete(
                     elapsedMs = SystemClock.elapsedRealtime() - enrichStartMs,
@@ -1508,7 +1509,8 @@ private suspend fun HomeViewModel.buildLightweightNextUpItems(
 
 private suspend fun HomeViewModel.enrichVisibleContinueWatchingItems(
     finalItems: List<ContinueWatchingItem>,
-    debug: CwDebugSession? = null
+    debug: CwDebugSession? = null,
+    pipelineProfileId: Int
 ): Boolean = coroutineScope {
     if (finalItems.isEmpty()) return@coroutineScope false
 
@@ -1573,7 +1575,8 @@ private suspend fun HomeViewModel.enrichVisibleContinueWatchingItems(
     }
     persistLocalContinueWatchingMetadata(
         originalItems = finalItems,
-        enrichedItems = sortedEnrichedItems
+        enrichedItems = sortedEnrichedItems,
+        pipelineProfileId = pipelineProfileId
     )
     true
 }
@@ -2389,7 +2392,8 @@ private fun buildNextUpSeedCacheKey(
 
 private fun HomeViewModel.persistLocalContinueWatchingMetadata(
     originalItems: List<ContinueWatchingItem>,
-    enrichedItems: List<ContinueWatchingItem>
+    enrichedItems: List<ContinueWatchingItem>,
+    pipelineProfileId: Int
 ) {
     val localItems = enrichedItems.indices.mapNotNull { index ->
         val original = originalItems.getOrNull(index) as? ContinueWatchingItem.InProgress ?: return@mapNotNull null
@@ -2464,6 +2468,7 @@ private fun HomeViewModel.persistLocalContinueWatchingMetadata(
     }
 
     viewModelScope.launch(Dispatchers.IO) {
+        if (profileManager.activeProfileId.value != pipelineProfileId) return@launch
         if (nextUpSnapshot.isNotEmpty()) {
             runCatching { cwEnrichmentCache.saveNextUpSnapshot(nextUpSnapshot, force = true) }
         }
