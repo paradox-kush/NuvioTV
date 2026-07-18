@@ -82,6 +82,12 @@ class WatchedSeriesStateHolder @Inject constructor(
         }
     }
 
+    /** Clear in-memory state only — does NOT touch DataStore on disk. */
+    fun clearInMemory() {
+        _fullyWatchedSeriesIds.value = emptySet()
+        revalidateAfterMap = emptyMap()
+    }
+
     /**
      * Update badge IDs and mark the given series as freshly validated.
      * [revalidateAt] allows setting per-series deadlines (e.g. upcoming season premiere).

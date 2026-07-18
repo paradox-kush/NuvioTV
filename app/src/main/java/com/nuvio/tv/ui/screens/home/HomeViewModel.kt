@@ -343,7 +343,7 @@ class HomeViewModel @Inject constructor(
                     _initialCwResolved.value = false
                     loadContinueWatching()
                     // Clear watched badges so they don't leak between profiles.
-                    watchedSeriesStateHolder.update(emptySet())
+                    watchedSeriesStateHolder.clearInMemory()
                     watchedSeriesStateHolder.loadFromDisk(profileId = newId)
                     _movieWatchedStatus.value = emptyMap()
                     _pendingWatchedBatch.value = emptyMap()
