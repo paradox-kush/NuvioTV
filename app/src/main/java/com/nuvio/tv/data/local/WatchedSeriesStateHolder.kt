@@ -49,12 +49,13 @@ class WatchedSeriesStateHolder @Inject constructor(
     /** Per-series revalidation deadline (contentId → epochMs when re-check is needed). */
     @Volatile
     private var revalidateAfterMap: Map<String, Long> = emptyMap()
-    private var loaded = false
+    @Volatile
+    private var loadedForProfileId: Int? = null
 
     private fun store(profileId: Int = profileManager.activeProfileId.value) = factory.get(profileId, FEATURE)
 
     suspend fun loadFromDisk(profileId: Int = profileManager.activeProfileId.value) {
-        if (loaded) return
+        if (loadedForProfileId == profileId) return
         val prefs = store(profileId).data.first()
         val persisted = prefs[KEY] ?: emptySet()
         val resetVersion = prefs[VALIDATION_RESET_KEY] ?: 0
@@ -70,7 +71,7 @@ class WatchedSeriesStateHolder @Inject constructor(
         if (_fullyWatchedSeriesIds.value.isEmpty() && persisted.isNotEmpty()) {
             _fullyWatchedSeriesIds.value = persisted
         }
-        loaded = true
+        loadedForProfileId = profileId
     }
 
     fun update(ids: Set<String>) {
