@@ -32,6 +32,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import java.io.IOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
@@ -42,6 +44,10 @@ import javax.inject.Singleton
 import javax.net.ssl.SSLException
 
 private const val TAG = "AuthManager"
+
+// If the current access token is still valid for at least this long, treat the session as fresh
+// and skip a manual refresh — supabase-kt's alwaysAutoRefresh already owns background refresh.
+private val REFRESH_SKEW = 60.seconds
 
 private enum class SessionRefreshResult {
     REFRESHED,
@@ -327,6 +333,15 @@ class AuthManager @Inject constructor(
         }
         if (observedRefreshToken != null && currentRefreshToken != observedRefreshToken) {
             Log.d(TAG, "$reason; session was already refreshed by another request")
+            return@withLock SessionRefreshResult.REFRESHED
+        }
+        // ponytail: don't fire a second refresh that races supabase-kt's alwaysAutoRefresh loop.
+        // Two POSTs presenting the same refresh token can trip GoTrue reuse detection
+        // (refresh_token_not_found -> the library clears the session -> spurious "signed out" +
+        // playback teardown). If the library already keeps the access token valid, we're done.
+        val expiresAt = auth.currentSessionOrNull()?.expiresAt
+        if (expiresAt != null && expiresAt > Clock.System.now() + REFRESH_SKEW) {
+            Log.d(TAG, "$reason; access token still valid, deferring to auto-refresh")
             return@withLock SessionRefreshResult.REFRESHED
         }
         return@withLock try {
