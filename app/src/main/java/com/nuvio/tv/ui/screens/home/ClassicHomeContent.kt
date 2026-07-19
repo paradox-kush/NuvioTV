@@ -24,11 +24,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -133,6 +135,7 @@ fun ClassicHomeContent(
     // This spreads the composition work and prevents frame spikes when a new row scrolls in.
     val nestedPrefetchStrategy = remember { LazyListPrefetchStrategy(nestedPrefetchItemCount = 2) }
 
+    val scope = rememberCoroutineScope()
     val columnListState = rememberLazyListState(
         initialFirstVisibleItemIndex = focusState.verticalScrollIndex,
         initialFirstVisibleItemScrollOffset = focusState.verticalScrollOffset,
@@ -403,14 +406,26 @@ fun ClassicHomeContent(
                         k == null -> null
                         k == "hero_carousel" -> heroFocusRequester
                         rowEntryFocusRequesters.containsKey(k) -> rowEntryFocusRequesters[k]
-                        else -> null
+                        else -> {
+                            val baseKey = k.substringBeforeLast('_')
+                            rowEntryFocusRequesters[baseKey]
+                        }
                     }
                     val requester = if (target == null) null
                     else requesterForKey(target.key as? String)
                         ?: visibleItems.firstNotNullOfOrNull { requesterForKey(it.key as? String) }
 
-                    runCatching { requester?.requestFocus() }
-                    null // Classic uses imperative requestFocus for now
+                    requester?.let { req ->
+                        scope.launch {
+                            repeat(6) {
+                                val ok = runCatching { req.requestFocus(); true }
+                                    .getOrDefault(false)
+                                if (ok) return@launch
+                                withFrameNanos { }
+                            }
+                        }
+                    }
+                    null // Classic uses imperative requestFocus
                 },
             ),
         contentPadding = PaddingValues(top = if (heroVisible) NuvioTheme.spacing.none else NuvioTheme.spacing.xl, bottom = NuvioTheme.spacing.xl),
