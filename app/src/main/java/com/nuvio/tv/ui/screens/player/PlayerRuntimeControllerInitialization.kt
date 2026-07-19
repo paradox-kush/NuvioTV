@@ -2031,7 +2031,8 @@ private fun FfmpegAudioRenderer.applyDownmixSettings(
 
 private class CueNormalizingTextOutput(
     private val delegate: TextOutput,
-    private val shouldNormalizeCuePositionProvider: () -> Boolean
+    private val shouldNormalizeCuePositionProvider: () -> Boolean,
+    private val isBuiltInSubtitleProvider: () -> Boolean
 ) : TextOutput {
 
     override fun onCues(cueGroup: CueGroup) {
