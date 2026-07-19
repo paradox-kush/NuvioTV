@@ -2180,6 +2180,7 @@ private class CueNormalizingTextOutput(
     }
     
     // Take CharSequence instead of String -> preserve spans.
+    // There is a specific issue affecting Hebrew text, for example: "- 4 בדצמבר 1981 -" (Series "Dark", S1E2, 18:11).
     private fun fixRtlPunctuationForLtr(line: CharSequence): CharSequence {
         if (line.isEmpty()) return line
         val hasCr = line[line.length - 1] == '\r'
